@@ -105,13 +105,31 @@ randomList n = do
 genMultipleRandom :: Int->Int->IO([[Int]])
 genMultipleRandom 0 _ = return []
 genMultipleRandom nbLists lengthlist = do 
-            newrand1<-evaluate (replicate lengthlist 1)
+            newrand1<-evaluate (replicate 5 2)
             newrand2<-evaluate (replicate lengthlist 2)
             newrest <- genMultipleRandom (nbLists-2) lengthlist
             return (newrand1 :(newrand2: newrest ))
+
+
+genTmAbs :: Term -> Int -> Term
+genTmAbs t 0 = t 
+genTmAbs t n = TmAbs (genTmAbs t (n-1) )
+
+
+
+generateTerms1 :: [Int]->Term 
+generateTerms1 [1] =  TmTrue
+generateTerms1 [2] = TmVar (generateHnatTermVar 1 Z)
+generateTerms1 [3] = TmTrue
+--generateTerms (1:rest) = TmAbs (generateTerms rest)
+generateTerms1 (_:rest) = TmIf (generateTerms rest) (generateTerms rest) (generateTerms rest)
+--generateTerms (3:rest) = TmApp (TmAbs (generateTerms rest )) (generateTerms rest)
+
+
+
 generateTerms :: [Int]->Term 
 generateTerms [1] =  TmTrue
-generateTerms [2] = TmVar Z
+generateTerms [2] = TmVar (generateHnatTermVar 100 Z)
 generateTerms [3] = TmTrue
 --generateTerms (1:rest) = TmAbs (generateTerms rest)
 generateTerms (_:rest) = TmIf (generateTerms rest) (generateTerms rest) (generateTerms rest)
@@ -119,7 +137,7 @@ generateTerms (_:rest) = TmIf (generateTerms rest) (generateTerms rest) (generat
 
 --genBenchesTerms :: [[Int]] ->[Term]
 genBenchesTerms [] = []
-genBenchesTerms (ints:rest) = (generateTerms ints : genBenchesTerms rest)
+genBenchesTerms (ints:ints2:rest) = ( (generateTerms1 ints) :( genTmAbs (generateTerms ints2) 100 )  : genBenchesTerms rest)
 
 genBenchesTermsIO [] = return []
 genBenchesTermsIO (ints:rest) = do 
@@ -129,12 +147,12 @@ genBenchesTermsIO (ints:rest) = do
 genBenches [] _= return []
 genBenches (term1: (term2 :rest)) nb= do 
                restbench<- genBenches rest (nb+1)
-               return ( (bench (show nb)  $ nf (termtermSubstitute term1 Z) (TmAbs term2))  : restbench)
+               return ( (bench (show nb)  $ nf (termtermSubstitute (term1 ) Z) (term2))  : restbench)
 
 main = do 
-    result1<-genMultipleRandom 10 3
-    result2<-genMultipleRandom 10 5
-    result3<-genMultipleRandom 10 7
-    benches <- (genBenches (genBenchesTerms (result1++result2++result3)) 0)
+    result2<- ( genMultipleRandom 10 7) 
+    result3<- ( genMultipleRandom 10 9)  
+    result4<- ( genMultipleRandom 10 11)  
+    benches <- (genBenches (genBenchesTerms ( result2++result3++result4)) 0)
     finalres<- defaultMain [  bgroup "testTerms"  benches ]
     return finalres
