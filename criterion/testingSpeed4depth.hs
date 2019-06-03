@@ -137,7 +137,7 @@ generateTerms (_:rest) = TmIf (generateTerms rest) (generateTerms rest) (generat
 
 --genBenchesTerms :: [[Int]] ->[Term]
 genBenchesTerms [] = []
-genBenchesTerms (ints:ints2:rest) = ( (generateTerms1 ints) :(generateTerms1 ints2) )  : genBenchesTerms rest)
+genBenchesTerms (ints:ints2:rest) = ( (generateTerms1 ints) :(generateTerms1 ints2)   : genBenchesTerms rest)
 
 genBenchesTermsIO [] = return []
 genBenchesTermsIO (ints:rest) = do 
