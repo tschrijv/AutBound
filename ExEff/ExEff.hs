@@ -893,35 +893,35 @@ valueshiftminus d t =
     Z
     t
 
-coercionSubstituteHelp sub orig c (CoercionVar hnat)
-  | hnat == plus orig c = coercionshiftplus orig sub
+coercionSubstituteHelp sub c (CoercionVar hnat)
+  | hnat == c = coercionshiftplus c sub
   | otherwise = CoercionVar hnat
 
-dirtSubstituteHelp sub orig c (DirtVariable hnat)
-  | hnat == plus orig c = dirtshiftplus orig sub
+dirtSubstituteHelp sub c (DirtVariable hnat)
+  | hnat == c = dirtshiftplus c sub
   | otherwise = DirtVariable hnat
 
-skeletonTypeSubstituteHelp sub orig c (SkelVar hnat)
-  | hnat == plus orig c = skeletonTypeshiftplus orig sub
+skeletonTypeSubstituteHelp sub c (SkelVar hnat)
+  | hnat == c = skeletonTypeshiftplus c sub
   | otherwise = SkelVar hnat
 
-valueTypeSubstituteHelp sub orig c (ValTyVar hnat)
-  | hnat == plus orig c = valueTypeshiftplus orig sub
+valueTypeSubstituteHelp sub c (ValTyVar hnat)
+  | hnat == c = valueTypeshiftplus c sub
   | otherwise = ValTyVar hnat
 
-valueSubstituteHelp sub orig c (TmVar hnat)
-  | hnat == plus orig c = valueshiftplus orig sub
+valueSubstituteHelp sub c (TmVar hnat)
+  | hnat == c = valueshiftplus c sub
   | otherwise = TmVar hnat
 
 coercioncoercionSubstitute :: Coercion -> HNat -> Coercion -> Coercion
 coercioncoercionSubstitute sub orig t =
   rewriteCoercion $
   coercionmap
-    (coercionSubstituteHelp sub orig)
+    (coercionSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 coercionvalueTypeSubstitute :: ValueType -> HNat -> Coercion -> Coercion
@@ -929,10 +929,10 @@ coercionvalueTypeSubstitute sub orig t =
   rewriteCoercion $
   coercionmap
     (\c x -> x)
-    (valueTypeSubstituteHelp sub orig)
+    (valueTypeSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 coercionskeletonTypeSubstitute :: SkeletonType -> HNat -> Coercion -> Coercion
@@ -941,9 +941,9 @@ coercionskeletonTypeSubstitute sub orig t =
   coercionmap
     (\c x -> x)
     (\c x -> x)
-    (skeletonTypeSubstituteHelp sub orig)
+    (skeletonTypeSubstituteHelp sub)
     (\c x -> x)
-    Z
+    orig
     t
 
 coerciondirtSubstitute :: Dirt -> HNat -> Coercion -> Coercion
@@ -953,18 +953,18 @@ coerciondirtSubstitute sub orig t =
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    (dirtSubstituteHelp sub orig)
-    Z
+    (dirtSubstituteHelp sub)
+    orig
     t
 
 computationTypevalueTypeSubstitute ::
      ValueType -> HNat -> ComputationType -> ComputationType
 computationTypevalueTypeSubstitute sub orig t =
   computationTypemap
-    (valueTypeSubstituteHelp sub orig)
+    (valueTypeSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 computationTypeskeletonTypeSubstitute ::
@@ -972,32 +972,32 @@ computationTypeskeletonTypeSubstitute ::
 computationTypeskeletonTypeSubstitute sub orig t =
   computationTypemap
     (\c x -> x)
-    (skeletonTypeSubstituteHelp sub orig)
+    (skeletonTypeSubstituteHelp sub)
     (\c x -> x)
-    Z
+    orig
     t
 
 computationTypedirtSubstitute ::
      Dirt -> HNat -> ComputationType -> ComputationType
 computationTypedirtSubstitute sub orig t =
-  computationTypemap (\c x -> x) (\c x -> x) (dirtSubstituteHelp sub orig) Z t
+  computationTypemap (\c x -> x) (\c x -> x) (dirtSubstituteHelp sub) orig t
 
 dirtdirtSubstitute :: Dirt -> HNat -> Dirt -> Dirt
-dirtdirtSubstitute sub orig t = dirtmap (dirtSubstituteHelp sub orig) Z t
+dirtdirtSubstitute sub orig t = dirtmap (dirtSubstituteHelp sub) orig t
 
 skeletonTypeskeletonTypeSubstitute ::
      SkeletonType -> HNat -> SkeletonType -> SkeletonType
 skeletonTypeskeletonTypeSubstitute sub orig t =
-  skeletonTypemap (skeletonTypeSubstituteHelp sub orig) Z t
+  skeletonTypemap (skeletonTypeSubstituteHelp sub) orig t
 
 simpleCoercionTypevalueTypeSubstitute ::
      ValueType -> HNat -> SimpleCoercionType -> SimpleCoercionType
 simpleCoercionTypevalueTypeSubstitute sub orig t =
   simpleCoercionTypemap
-    (valueTypeSubstituteHelp sub orig)
+    (valueTypeSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 simpleCoercionTypeskeletonTypeSubstitute ::
@@ -1005,62 +1005,57 @@ simpleCoercionTypeskeletonTypeSubstitute ::
 simpleCoercionTypeskeletonTypeSubstitute sub orig t =
   simpleCoercionTypemap
     (\c x -> x)
-    (skeletonTypeSubstituteHelp sub orig)
+    (skeletonTypeSubstituteHelp sub)
     (\c x -> x)
-    Z
+    orig
     t
 
 simpleCoercionTypedirtSubstitute ::
      Dirt -> HNat -> SimpleCoercionType -> SimpleCoercionType
 simpleCoercionTypedirtSubstitute sub orig t =
-  simpleCoercionTypemap
-    (\c x -> x)
-    (\c x -> x)
-    (dirtSubstituteHelp sub orig)
-    Z
-    t
+  simpleCoercionTypemap (\c x -> x) (\c x -> x) (dirtSubstituteHelp sub) orig t
 
 coercionTypevalueTypeSubstitute ::
      ValueType -> HNat -> CoercionType -> CoercionType
 coercionTypevalueTypeSubstitute sub orig t =
-  coercionTypemap (valueTypeSubstituteHelp sub orig) (\c x -> x) (\c x -> x) Z t
+  coercionTypemap (valueTypeSubstituteHelp sub) (\c x -> x) (\c x -> x) orig t
 
 coercionTypeskeletonTypeSubstitute ::
      SkeletonType -> HNat -> CoercionType -> CoercionType
 coercionTypeskeletonTypeSubstitute sub orig t =
   coercionTypemap
     (\c x -> x)
-    (skeletonTypeSubstituteHelp sub orig)
+    (skeletonTypeSubstituteHelp sub)
     (\c x -> x)
-    Z
+    orig
     t
 
 coercionTypedirtSubstitute :: Dirt -> HNat -> CoercionType -> CoercionType
 coercionTypedirtSubstitute sub orig t =
-  coercionTypemap (\c x -> x) (\c x -> x) (dirtSubstituteHelp sub orig) Z t
+  coercionTypemap (\c x -> x) (\c x -> x) (dirtSubstituteHelp sub) orig t
 
 valueTypevalueTypeSubstitute :: ValueType -> HNat -> ValueType -> ValueType
 valueTypevalueTypeSubstitute sub orig t =
-  valueTypemap (valueTypeSubstituteHelp sub orig) (\c x -> x) (\c x -> x) Z t
+  valueTypemap (valueTypeSubstituteHelp sub) (\c x -> x) (\c x -> x) orig t
 
 valueTypeskeletonTypeSubstitute ::
      SkeletonType -> HNat -> ValueType -> ValueType
 valueTypeskeletonTypeSubstitute sub orig t =
-  valueTypemap (\c x -> x) (skeletonTypeSubstituteHelp sub orig) (\c x -> x) Z t
+  valueTypemap (\c x -> x) (skeletonTypeSubstituteHelp sub) (\c x -> x) orig t
 
 valueTypedirtSubstitute :: Dirt -> HNat -> ValueType -> ValueType
 valueTypedirtSubstitute sub orig t =
-  valueTypemap (\c x -> x) (\c x -> x) (dirtSubstituteHelp sub orig) Z t
+  valueTypemap (\c x -> x) (\c x -> x) (dirtSubstituteHelp sub) orig t
 
 computationvalueSubstitute :: Value -> HNat -> Computation -> Computation
 computationvalueSubstitute sub orig t =
   computationmap
-    (valueSubstituteHelp sub orig)
+    (valueSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 computationvalueTypeSubstitute ::
@@ -1068,11 +1063,11 @@ computationvalueTypeSubstitute ::
 computationvalueTypeSubstitute sub orig t =
   computationmap
     (\c x -> x)
-    (valueTypeSubstituteHelp sub orig)
+    (valueTypeSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 computationskeletonTypeSubstitute ::
@@ -1081,10 +1076,10 @@ computationskeletonTypeSubstitute sub orig t =
   computationmap
     (\c x -> x)
     (\c x -> x)
-    (skeletonTypeSubstituteHelp sub orig)
+    (skeletonTypeSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 computationdirtSubstitute :: Dirt -> HNat -> Computation -> Computation
@@ -1093,9 +1088,9 @@ computationdirtSubstitute sub orig t =
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    (dirtSubstituteHelp sub orig)
+    (dirtSubstituteHelp sub)
     (\c x -> x)
-    Z
+    orig
     t
 
 computationcoercionSubstitute :: Coercion -> HNat -> Computation -> Computation
@@ -1105,30 +1100,30 @@ computationcoercionSubstitute sub orig t =
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    (coercionSubstituteHelp sub orig)
-    Z
+    (coercionSubstituteHelp sub)
+    orig
     t
 
 handlervalueSubstitute :: Value -> HNat -> Handler -> Handler
 handlervalueSubstitute sub orig t =
   handlermap
-    (valueSubstituteHelp sub orig)
+    (valueSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 handlervalueTypeSubstitute :: ValueType -> HNat -> Handler -> Handler
 handlervalueTypeSubstitute sub orig t =
   handlermap
     (\c x -> x)
-    (valueTypeSubstituteHelp sub orig)
+    (valueTypeSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 handlerskeletonTypeSubstitute :: SkeletonType -> HNat -> Handler -> Handler
@@ -1136,10 +1131,10 @@ handlerskeletonTypeSubstitute sub orig t =
   handlermap
     (\c x -> x)
     (\c x -> x)
-    (skeletonTypeSubstituteHelp sub orig)
+    (skeletonTypeSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 handlerdirtSubstitute :: Dirt -> HNat -> Handler -> Handler
@@ -1148,9 +1143,9 @@ handlerdirtSubstitute sub orig t =
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    (dirtSubstituteHelp sub orig)
+    (dirtSubstituteHelp sub)
     (\c x -> x)
-    Z
+    orig
     t
 
 handlercoercionSubstitute :: Coercion -> HNat -> Handler -> Handler
@@ -1160,20 +1155,20 @@ handlercoercionSubstitute sub orig t =
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    (coercionSubstituteHelp sub orig)
-    Z
+    (coercionSubstituteHelp sub)
+    orig
     t
 
 operationCompTuplevalueSubstitute ::
      Value -> HNat -> OperationCompTuple -> OperationCompTuple
 operationCompTuplevalueSubstitute sub orig t =
   operationCompTuplemap
-    (valueSubstituteHelp sub orig)
+    (valueSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 operationCompTuplevalueTypeSubstitute ::
@@ -1181,11 +1176,11 @@ operationCompTuplevalueTypeSubstitute ::
 operationCompTuplevalueTypeSubstitute sub orig t =
   operationCompTuplemap
     (\c x -> x)
-    (valueTypeSubstituteHelp sub orig)
+    (valueTypeSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 operationCompTupleskeletonTypeSubstitute ::
@@ -1194,10 +1189,10 @@ operationCompTupleskeletonTypeSubstitute sub orig t =
   operationCompTuplemap
     (\c x -> x)
     (\c x -> x)
-    (skeletonTypeSubstituteHelp sub orig)
+    (skeletonTypeSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 operationCompTupledirtSubstitute ::
@@ -1207,9 +1202,9 @@ operationCompTupledirtSubstitute sub orig t =
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    (dirtSubstituteHelp sub orig)
+    (dirtSubstituteHelp sub)
     (\c x -> x)
-    Z
+    orig
     t
 
 operationCompTuplecoercionSubstitute ::
@@ -1220,30 +1215,30 @@ operationCompTuplecoercionSubstitute sub orig t =
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    (coercionSubstituteHelp sub orig)
-    Z
+    (coercionSubstituteHelp sub)
+    orig
     t
 
 valuevalueSubstitute :: Value -> HNat -> Value -> Value
 valuevalueSubstitute sub orig t =
   valuemap
-    (valueSubstituteHelp sub orig)
+    (valueSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 valuevalueTypeSubstitute :: ValueType -> HNat -> Value -> Value
 valuevalueTypeSubstitute sub orig t =
   valuemap
     (\c x -> x)
-    (valueTypeSubstituteHelp sub orig)
+    (valueTypeSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 valueskeletonTypeSubstitute :: SkeletonType -> HNat -> Value -> Value
@@ -1251,10 +1246,10 @@ valueskeletonTypeSubstitute sub orig t =
   valuemap
     (\c x -> x)
     (\c x -> x)
-    (skeletonTypeSubstituteHelp sub orig)
+    (skeletonTypeSubstituteHelp sub)
     (\c x -> x)
     (\c x -> x)
-    Z
+    orig
     t
 
 valuedirtSubstitute :: Dirt -> HNat -> Value -> Value
@@ -1263,9 +1258,9 @@ valuedirtSubstitute sub orig t =
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    (dirtSubstituteHelp sub orig)
+    (dirtSubstituteHelp sub)
     (\c x -> x)
-    Z
+    orig
     t
 
 valuecoercionSubstitute :: Coercion -> HNat -> Value -> Value
@@ -1275,8 +1270,8 @@ valuecoercionSubstitute sub orig t =
     (\c x -> x)
     (\c x -> x)
     (\c x -> x)
-    (coercionSubstituteHelp sub orig)
-    Z
+    (coercionSubstituteHelp sub)
+    orig
     t
 
 freeVariablesCoercion :: HNat -> Coercion -> [HNat]

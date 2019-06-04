@@ -193,28 +193,27 @@ typeshiftminus d t = typemap (typeshiftHelpminus d) Z t
 termshiftminus :: HNat -> Term -> Term
 termshiftminus d t = termmap (termshiftHelpminus d) (typeshiftHelpminus d) Z t
 
-typeSubstituteHelp sub orig c (TyVar hnat)
-  | hnat == plus orig c = typeshiftplus orig sub
+typeSubstituteHelp sub c (TyVar hnat)
+  | hnat == c = typeshiftplus c sub
   | otherwise = TyVar hnat
 
-termSubstituteHelp sub orig c (TmVar hnat)
-  | hnat == plus orig c = termshiftplus orig sub
+termSubstituteHelp sub c (TmVar hnat)
+  | hnat == c = termshiftplus c sub
   | otherwise = TmVar hnat
 
 coerciontypeSubstitute :: Type -> HNat -> Coercion -> Coercion
-coerciontypeSubstitute sub orig t =
-  coercionmap (typeSubstituteHelp sub orig) Z t
+coerciontypeSubstitute sub orig t = coercionmap (typeSubstituteHelp sub) orig t
 
 typetypeSubstitute :: Type -> HNat -> Type -> Type
-typetypeSubstitute sub orig t = typemap (typeSubstituteHelp sub orig) Z t
+typetypeSubstitute sub orig t = typemap (typeSubstituteHelp sub) orig t
 
 termtermSubstitute :: Term -> HNat -> Term -> Term
 termtermSubstitute sub orig t =
-  termmap (termSubstituteHelp sub orig) (\c x -> x) Z t
+  termmap (termSubstituteHelp sub) (\c x -> x) orig t
 
 termtypeSubstitute :: Type -> HNat -> Term -> Term
 termtypeSubstitute sub orig t =
-  termmap (\c x -> x) (typeSubstituteHelp sub orig) Z t
+  termmap (\c x -> x) (typeSubstituteHelp sub) orig t
 
 freeVariablesCoercion :: HNat -> Coercion -> [HNat]
 freeVariablesCoercion c (CoId) = nub ([])

@@ -867,11 +867,10 @@ constructorsToCheckSubst (c:cdefsrest) sname =
 
 constructorDefineCheckSubst :: ConstructorDef -> SortName -> Doc String
 constructorDefineCheckSubst (MkVarConstructor consName _) sname =
-  pretty (toLowerCaseFirst sname) <> pretty "SubstituteHelp sub orig c (" <+>
+  pretty (toLowerCaseFirst sname) <> pretty "SubstituteHelp sub  c (" <+>
   pretty (capitalize consName) <+>
-  pretty "hnat) \n  |hnat == plus orig c =" <+>
-  pretty (toLowerCaseFirst sname) <>
-  pretty "shiftplus orig  sub \n  | otherwise =" <+>
+  pretty "hnat) \n  |hnat ==   c =" <+>
+  pretty (toLowerCaseFirst sname) <> pretty "shiftplus c  sub \n  | otherwise =" <+>
   pretty (capitalize consName) <+> pretty "hnat \n"
 constructorDefineCheckSubst _ _ = pretty ""
 
@@ -927,14 +926,14 @@ namespaceInstanceSubstFunction sname (INH instname namespaceName) instances defs
     pretty "$" <+>
     pretty (toLowerCaseFirst sname) <> pretty "map" <+>
     declarationsToFunctionsSubst (INH instname namespaceName) instances defs <+>
-    pretty " Z t  \n"
+    pretty " orig t  \n"
   | otherwise =
     generateTypingsubst sname secondSort defs <>
     pretty (toLowerCaseFirst sname ++ secondSort) <>
     pretty "Substitute sub orig t =" <+>
     pretty (toLowerCaseFirst sname) <> pretty "map" <+>
     declarationsToFunctionsSubst (INH instname namespaceName) instances defs <+>
-    pretty " Z t  \n"
+    pretty " orig t  \n"
   where
     secondSort = lookForSortName namespaceName defs
 namespaceInstanceSubstFunction sname _ instances defs _ = pretty ""
@@ -945,8 +944,7 @@ declarationsToFunctionsSubst _ [] _ = pretty ""
 declarationsToFunctionsSubst (INH instname1 namespaceName) ((INH instname2 _):rest) defs
   | instname1 == instname2 =
     pretty "(" <+>
-    pretty (lookForSortName namespaceName defs) <>
-    pretty "SubstituteHelp sub orig)" <+>
+    pretty (lookForSortName namespaceName defs) <> pretty "SubstituteHelp sub )" <+>
     declarationsToFunctionsSubst (INH instname1 namespaceName) rest defs
   | otherwise =
     pretty "(\\c x->x)" <+>

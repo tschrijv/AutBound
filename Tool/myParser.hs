@@ -3,7 +3,7 @@ module MyParser
   , pLanguage
   ) where
 
--- parser mostly inspired by the Inbound haskell parser
+-- parser mostly inspired by the inbound haskell parser
 import           Control.Applicative
 import           Control.Monad
 import           Data.Char

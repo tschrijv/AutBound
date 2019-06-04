@@ -15,6 +15,3 @@ test3 =
 test4 =
   fullEvalComputation
     (ComputationApp (TmFun (ReturnComp (TmVar (STypeVar Z))) ValTUnit) TmUnit)
-
-test5 = fullEvalComputation
-    (HandleComp (OpComp TmUnit) (TmHandler  (ReturnHandler [OpAndComp (ReturnComp TmUnit) IdOp  ] ValTUnit (ReturnComp (TmVar Z)))   ) )
