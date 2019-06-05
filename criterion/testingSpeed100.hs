@@ -3,8 +3,8 @@ import System.Random
 import Criterion.Main
 import GHC.Generics (Generic,Generic1)
 import Control.DeepSeq
-import           Data.List
 import Control.Exception (evaluate)
+import           Data.List
 
 data Term
   = TmVar HNat
@@ -40,7 +40,7 @@ minus result Z = result
 
 data Env
   = Nil
-  | ETermVar  Env
+  | ETermVar Env
   deriving (Show, Eq)
 
 generateHnatTermVar 0 c = c
@@ -71,7 +71,7 @@ termshiftminus :: HNat -> Term -> Term
 termshiftminus d t = termmap (termshiftHelpminus d) Z t
 
 termSubstituteHelp sub orig c (TmVar hnat)
-  | hnat == plus orig c = termshiftplus orig sub
+  | hnat == plus orig c = termshiftplus c sub
   | otherwise = TmVar hnat
 
 termtermSubstitute :: Term -> HNat -> Term -> Term
@@ -90,6 +90,7 @@ freeVariablesTerm c (TmIf t t2 t3) =
   nub
     ((freeVariablesTerm c t) ++
      (freeVariablesTerm c t2) ++ (freeVariablesTerm c t3))
+
 
 
 --end generated code 
@@ -122,7 +123,7 @@ generateTerms1 [1] =  TmTrue
 generateTerms1 [2] = TmVar (generateHnatTermVar 1 Z)
 generateTerms1 [3] = TmTrue
 --generateTerms (1:rest) = TmAbs (generateTerms rest)
-generateTerms1 (_:rest) = TmIf (generateTerms rest) (generateTerms rest) (generateTerms rest)
+generateTerms1 (_:rest) = TmIf (generateTerms1 rest) (generateTerms1 rest) (generateTerms1 rest)
 --generateTerms (3:rest) = TmApp (TmAbs (generateTerms rest )) (generateTerms rest)
 
 
@@ -150,9 +151,9 @@ genBenches (term1: (term2 :rest)) nb= do
                return ( (bench (show nb)  $ nf (termtermSubstitute (term1 ) Z) (term2))  : restbench)
 
 main = do 
+    result1<- ( genMultipleRandom 10 5)  
     result2<- ( genMultipleRandom 10 7) 
     result3<- ( genMultipleRandom 10 9)  
-    result4<- ( genMultipleRandom 10 11)  
-    benches <- (genBenches (genBenchesTerms ( result2++result3++result4)) 0)
+    benches <- (genBenches (genBenchesTerms ( result1++result2++result3)) 0)
     finalres<- defaultMain [  bgroup "testTerms"  benches ]
     return finalres

@@ -39,7 +39,7 @@ minus result Z = result
 
 data Env
   = Nil
-  | ETermVar  Env
+  | ETermVar Env
   deriving (Show, Eq)
 
 generateHnatTermVar 0 c = c
@@ -70,7 +70,7 @@ termshiftminus :: HNat -> Term -> Term
 termshiftminus d t = termmap (termshiftHelpminus d) Z t
 
 termSubstituteHelp sub orig c (TmVar hnat)
-  | hnat == plus orig c = termshiftplus orig sub
+  | hnat == plus orig c = termshiftplus c sub
   | otherwise = TmVar hnat
 
 termtermSubstitute :: Term -> HNat -> Term -> Term
@@ -89,6 +89,7 @@ freeVariablesTerm c (TmIf t t2 t3) =
   nub
     ((freeVariablesTerm c t) ++
      (freeVariablesTerm c t2) ++ (freeVariablesTerm c t3))
+
 
 
 --end generated code 
@@ -115,7 +116,7 @@ genMultipleRandom nbLists lengthlist = do
             newrest <- genMultipleRandom (nbLists-1) lengthlist
             return (newrand: newrest )
 generateTerms :: [Int]->Term 
-generateTerms [1] = TmVar Z 
+generateTerms [1] = TmVar (STermVar Z) 
 generateTerms [2] = TmVar Z 
 generateTerms [3] = TmVar Z 
 --generateTerms (1:rest) = TmAbs (generateTerms rest)
@@ -137,7 +138,7 @@ genBenches (term1:rest) nb= do
                return ( (bench (show nb)  $ nf (termshiftplus (generateHnatTermVar 10 Z) ) (term1))  : restbench)
 
 main = do 
-    result<-return [replicate i 1 |i <- [1..9]]
+    result<-return [replicate i 1 |i <- [3..7]]
     benches <- (genBenches (genBenchesTerms (result)) 0)
     finalres<- defaultMain [  bgroup "testTerms"  benches ]
     return finalres

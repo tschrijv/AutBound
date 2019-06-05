@@ -37,7 +37,7 @@ test11 =
   fullEval
     (TmApp
        (TmAbs (TmAbs (TmVar (STermVar Z)) TyTop) (TyArr TyTop TyTop))
-       (TmAbs (TmVar Z) TyTop))
+       (TmAbs (TmVar (STermVar Z)) TyTop))
 
 test12 =
   typeOf

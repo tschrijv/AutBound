@@ -3,8 +3,8 @@ import System.Random
 import Criterion.Main
 import GHC.Generics (Generic,Generic1)
 import Control.DeepSeq
-import           Data.List
 import Control.Exception (evaluate)
+import           Data.List
 
 data Term
   = TmVar HNat
@@ -40,7 +40,7 @@ minus result Z = result
 
 data Env
   = Nil
-  | ETermVar  Env
+  | ETermVar Env
   deriving (Show, Eq)
 
 generateHnatTermVar 0 c = c
@@ -71,7 +71,7 @@ termshiftminus :: HNat -> Term -> Term
 termshiftminus d t = termmap (termshiftHelpminus d) Z t
 
 termSubstituteHelp sub orig c (TmVar hnat)
-  | hnat == plus orig c = termshiftplus orig sub
+  | hnat == plus orig c = termshiftplus c sub
   | otherwise = TmVar hnat
 
 termtermSubstitute :: Term -> HNat -> Term -> Term
@@ -92,6 +92,7 @@ freeVariablesTerm c (TmIf t t2 t3) =
      (freeVariablesTerm c t2) ++ (freeVariablesTerm c t3))
 
 
+
 --end generated code 
 
 
@@ -105,7 +106,7 @@ randomList n = do
 genMultipleRandom :: Int->Int->IO([[Int]])
 genMultipleRandom 0 _ = return []
 genMultipleRandom nbLists lengthlist = do 
-            newrand1<-evaluate (replicate 5 2)
+            newrand1<-evaluate (replicate 5 1)
             newrand2<-evaluate (replicate lengthlist 2)
             newrest <- genMultipleRandom (nbLists-2) lengthlist
             return (newrand1 :(newrand2: newrest ))
@@ -119,17 +120,17 @@ genTmAbs t n = TmAbs (genTmAbs t (n-1) )
 
 generateTerms1 :: [Int]->Term 
 generateTerms1 [1] =  TmTrue
-generateTerms1 [2] = TmVar (generateHnatTermVar 1 Z)
+generateTerms1 [2] = TmVar Z
 generateTerms1 [3] = TmTrue
 --generateTerms (1:rest) = TmAbs (generateTerms rest)
-generateTerms1 (_:rest) = TmIf (generateTerms rest) (generateTerms rest) (generateTerms rest)
+generateTerms1 (_:rest) = TmIf (generateTerms1 rest) (generateTerms1 rest) (generateTerms1 rest)
 --generateTerms (3:rest) = TmApp (TmAbs (generateTerms rest )) (generateTerms rest)
 
 
 
 generateTerms :: [Int]->Term 
 generateTerms [1] =  TmTrue
-generateTerms [2] = TmVar (generateHnatTermVar 50 Z)
+generateTerms [2] = TmVar Z
 generateTerms [3] = TmTrue
 --generateTerms (1:rest) = TmAbs (generateTerms rest)
 generateTerms (_:rest) = TmIf (generateTerms rest) (generateTerms rest) (generateTerms rest)
@@ -137,7 +138,7 @@ generateTerms (_:rest) = TmIf (generateTerms rest) (generateTerms rest) (generat
 
 --genBenchesTerms :: [[Int]] ->[Term]
 genBenchesTerms [] = []
-genBenchesTerms (ints:ints2:rest) = ( (generateTerms1 ints) :( generateTerms1 ints2 )  : genBenchesTerms rest)
+genBenchesTerms (ints:ints2:rest) = ( (generateTerms1 ints) :( generateTerms ints2 )  : genBenchesTerms rest)
 
 genBenchesTermsIO [] = return []
 genBenchesTermsIO (ints:rest) = do 
@@ -150,9 +151,9 @@ genBenches (term1: (term2 :rest)) nb= do
                return ( (bench (show nb)  $ nf (termtermSubstitute (term1 ) Z) (term2))  : restbench)
 
 main = do 
-    result2<- ( genMultipleRandom 10 5) 
-    result3<- ( genMultipleRandom 10 7)  
-    result4<- ( genMultipleRandom 10 9)  
+    result2<- ( genMultipleRandom 10 7) 
+    result3<- ( genMultipleRandom 10 9)  
+    result4<- ( genMultipleRandom 10 11)  
     benches <- (genBenches (genBenchesTerms ( result2++result3++result4)) 0)
     finalres<- defaultMain [  bgroup "testTerms"  benches ]
     return finalres

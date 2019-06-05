@@ -177,24 +177,25 @@ fiTermshiftminus :: HNat -> FiTerm -> FiTerm
 fiTermshiftminus d t =
   fiTermmap (fiTermshiftHelpminus d) (fiTypeshiftHelpminus d) Z t
 
-fiTypeSubstituteHelp sub c (TyVar hnat)
-  | hnat == c = fiTypeshiftplus c sub
+fiTypeSubstituteHelp sub orig c (TyVar hnat)
+  | hnat == plus orig c = fiTypeshiftplus c sub
   | otherwise = TyVar hnat
 
-fiTermSubstituteHelp sub c (TmVar hnat)
-  | hnat == c = fiTermshiftplus c sub
+fiTermSubstituteHelp sub orig c (TmVar hnat)
+  | hnat == plus orig c = fiTermshiftplus c sub
   | otherwise = TmVar hnat
 
 fiTypefiTypeSubstitute :: FiType -> HNat -> FiType -> FiType
-fiTypefiTypeSubstitute sub orig t = fiTypemap (fiTypeSubstituteHelp sub) orig t
+fiTypefiTypeSubstitute sub orig t =
+  fiTypemap (fiTypeSubstituteHelp sub orig) Z t
 
 fiTermfiTermSubstitute :: FiTerm -> HNat -> FiTerm -> FiTerm
 fiTermfiTermSubstitute sub orig t =
-  fiTermmap (fiTermSubstituteHelp sub) (\c x -> x) orig t
+  fiTermmap (fiTermSubstituteHelp sub orig) (\c x -> x) Z t
 
 fiTermfiTypeSubstitute :: FiType -> HNat -> FiTerm -> FiTerm
 fiTermfiTypeSubstitute sub orig t =
-  fiTermmap (\c x -> x) (fiTypeSubstituteHelp sub) orig t
+  fiTermmap (\c x -> x) (fiTypeSubstituteHelp sub orig) Z t
 
 freeVariablesFiType :: HNat -> FiType -> [HNat]
 freeVariablesFiType c (TyTop) = nub ([])

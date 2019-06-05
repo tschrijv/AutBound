@@ -39,7 +39,7 @@ minus result Z = result
 
 data Env
   = Nil
-  | ETermVar  Env
+  | ETermVar Env
   deriving (Show, Eq)
 
 generateHnatTermVar 0 c = c
@@ -70,7 +70,7 @@ termshiftminus :: HNat -> Term -> Term
 termshiftminus d t = termmap (termshiftHelpminus d) Z t
 
 termSubstituteHelp sub orig c (TmVar hnat)
-  | hnat == plus orig c = termshiftplus orig sub
+  | hnat == plus orig c = termshiftplus c sub
   | otherwise = TmVar hnat
 
 termtermSubstitute :: Term -> HNat -> Term -> Term
@@ -89,6 +89,7 @@ freeVariablesTerm c (TmIf t t2 t3) =
   nub
     ((freeVariablesTerm c t) ++
      (freeVariablesTerm c t2) ++ (freeVariablesTerm c t3))
+
 
 
 --end generated code 
