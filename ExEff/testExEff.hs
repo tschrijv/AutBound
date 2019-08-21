@@ -14,4 +14,4 @@ test3 =
 
 test4 =
   fullEvalComputation
-    (ComputationApp (TmFun (ReturnComp (TmVar (STypeVar Z))) ValTUnit) TmUnit)
+    (ComputationApp (TmFun (ReturnComp (TmVar (STermVar Z))) ValTUnit) TmUnit)
