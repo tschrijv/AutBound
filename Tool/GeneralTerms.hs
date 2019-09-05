@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wall #-}
+
 module GeneralTerms
   ( collectRulesAllField
   , IdName
@@ -18,12 +20,10 @@ module GeneralTerms
   , NameSpaceDef(..)
   , getConstructorDefsSort
   , collectRulesSyn
-  , getLeftExprId
   , isInh
   , isSyn
   , filterTableBySameNamespace
   , getInstanceNamesOfRuleLeft
-  , getInstanceNamesOfRuleRight
   , getLeftIdSub
   , getInstanceSorts
   , capitalize
@@ -32,9 +32,8 @@ module GeneralTerms
   , FoldName
   ) where
 
-import           Data.Char
-import           Data.List
-import           Data.Maybe
+import Data.Char
+import Data.Maybe
 
 type FoldName = String
 
@@ -254,11 +253,11 @@ helpWellFormedVariables ((MkVarConstructor _ contextName):rest) instances = do
 helpWellFormedVariables (_:rest) instances =
   helpWellFormedVariables rest instances
 
---function to detect if all namespaceinstances used in rules exist
-helpWellFormedInstanceNamesExist ::
-     [InstanceName] -> [InstanceName] -> Either String Bool
-helpWellFormedInstanceNamesExist l l2 =
-  shouldBeInSecondList l l2 "rule does not reference an existing instance"
+-- --function to detect if all namespaceinstances used in rules exist
+-- helpWellFormedInstanceNamesExist ::
+--      [InstanceName] -> [InstanceName] -> Either String Bool
+-- helpWellFormedInstanceNamesExist l l2 =
+--   shouldBeInSecondList l l2 "rule does not reference an existing instance"
 
 --function to detect if all namespaces used in instances in sorts exist
 helpWellFormedInstances ::
@@ -485,20 +484,20 @@ getRightExprIdsConstructorBinding (MkBindConstructor _ _ sorts _ namespace rules
   concatMap getRightExprIdBinding (map snd rules)
 getRightExprIdsConstructorBinding _ = []
 
---getListIds
-getListIds :: ConstructorDef -> [SortName]
-getListIds (MkDefConstructor _ lists sorts _ rules _) = (map fst lists)
-getListIds (MkBindConstructor _ lists sorts _ namespace rules _) =
-  (map fst lists)
-getListIds _ = []
+-- --getListIds
+-- getListIds :: ConstructorDef -> [SortName]
+-- getListIds (MkDefConstructor _ lists sorts _ rules _) = (map fst lists)
+-- getListIds (MkBindConstructor _ lists sorts _ namespace rules _) =
+--   (map fst lists)
+-- getListIds _ = []
 
---get ids of the folds
-getFoldIds :: ConstructorDef -> [SortName]
-getFoldIds (MkDefConstructor _ lists sorts folds rules _) =
-  map (\(x, y, z) -> x) folds
-getFoldIds (MkBindConstructor _ lists sorts folds namespace rules _) =
-  map (\(x, y, z) -> x) folds
-getFoldIds _ = []
+-- --get ids of the folds
+-- getFoldIds :: ConstructorDef -> [SortName]
+-- getFoldIds (MkDefConstructor _ lists sorts folds rules _) =
+--   map (\(x, y, z) -> x) folds
+-- getFoldIds (MkBindConstructor _ lists sorts folds namespace rules _) =
+--   map (\(x, y, z) -> x) folds
+-- getFoldIds _ = []
 
 -- get the ids of the RightExpr without any binders included
 getRightExprIdsConstructor :: ConstructorDef -> [IdName]
@@ -561,18 +560,18 @@ getInstanceNamesOfRuleRight (ExprAdd expr _) = getInstanceNamesOfRuleRight expr
 getInstanceNamesOfRuleRight (ExprLHS name) = name
 getInstanceNamesOfRuleRight (ExprSub _ name) = name
 
---get the name of the contexts an expr
-getInstanceNamesOfRule :: NameSpaceRule -> [InstanceName]
-getInstanceNamesOfRule (l, r) =
-  [getInstanceNamesOfRuleLeft l] ++ [getInstanceNamesOfRuleRight r]
+-- --get the name of the contexts an expr
+-- getInstanceNamesOfRule :: NameSpaceRule -> [InstanceName]
+-- getInstanceNamesOfRule (l, r) =
+--   [getInstanceNamesOfRuleLeft l] ++ [getInstanceNamesOfRuleRight r]
 
--- get the instance names used by the rules in the constructor
-getInstanceNamesOfConstructor :: ConstructorDef -> [InstanceName]
-getInstanceNamesOfConstructor (MkDefConstructor _ _ _ _ rules _) =
-  concatMap getInstanceNamesOfRule rules
-getInstanceNamesOfConstructor (MkBindConstructor _ _ _ _ _ rules _) =
-  concatMap getInstanceNamesOfRule rules
-getInstanceNamesOfConstructor _ = []
+-- -- get the instance names used by the rules in the constructor
+-- getInstanceNamesOfConstructor :: ConstructorDef -> [InstanceName]
+-- getInstanceNamesOfConstructor (MkDefConstructor _ _ _ _ rules _) =
+--   concatMap getInstanceNamesOfRule rules
+-- getInstanceNamesOfConstructor (MkBindConstructor _ _ _ _ _ rules _) =
+--   concatMap getInstanceNamesOfRule rules
+-- getInstanceNamesOfConstructor _ = []
 
 -- get the instances by the sorts in the
 getInstanceSorts :: SortDef -> [NamespaceInstance]
@@ -592,13 +591,13 @@ getTableOfInstancesToNamespacesSortWithSortName ::
 getTableOfInstancesToNamespacesSortWithSortName s =
   (getname s, getInstanceSorts s)
 
---get a list of tuples with sortnames and their respective namespaceinstances
-getTableOfInstancesToNamespacesSortsWithSortName ::
-     [SortDef] -> [(SortName, [NamespaceInstance])]
-getTableOfInstancesToNamespacesSortsWithSortName sorts =
-  map getTableOfInstancesToNamespacesSortWithSortName sorts
-  -- checking if the binding to a constructorrule is ok by looking if the right expression is of the right type
+-- --get a list of tuples with sortnames and their respective namespaceinstances
+-- getTableOfInstancesToNamespacesSortsWithSortName ::
+--      [SortDef] -> [(SortName, [NamespaceInstance])]
+-- getTableOfInstancesToNamespacesSortsWithSortName sorts =
+--   map getTableOfInstancesToNamespacesSortWithSortName sorts
 
+  -- checking if the binding to a constructorrule is ok by looking if the right expression is of the right type
 isWellFormedBindToContextConstructorRule ::
      SortName
   -> NameSpaceName
