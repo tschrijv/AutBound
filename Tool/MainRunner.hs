@@ -17,7 +17,9 @@ toFileHaskell lang name =
 
 main :: IO ()
 main = do
-  result <- parseFromFile pLanguage "EBNFform.txt"
+  putStrLn "Name of input file:"
+  name <- getLine
+  result <- parseFromFile pLanguage name
   case result of
     Left err -> print err
     Right lang -> do
