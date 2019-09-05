@@ -26,46 +26,46 @@ main = do
       toWrite <- toFileHaskell lang "haskellOutput"
       case toWrite of
         Right (Left err)    -> print err
-        Right (Right value) -> writeFile "haskellOutput.hs" (show value)
+        Right (Right value) -> writeFile "HaskellOutput.hs" (show value)
 
-genLangNoFormat :: String -> IO ()
-genLangNoFormat name = do
-  result <- parseFromFile pLanguage name
-  case result of
-    Left err -> print err
-    Right lang -> do
-      toWrite <- toFileHaskell lang "haskellOutput"
-      case toWrite of
-        Right (Left err) -> print err
-        Right (Right value) -> do
-          a <- writeFile "haskellOutput.hs" (show value)
-         -- b <- callCommand "hfmt -w"
-          return ()
+-- genLangNoFormat :: String -> IO ()
+-- genLangNoFormat name = do
+--   result <- parseFromFile pLanguage name
+--   case result of
+--     Left err -> print err
+--     Right lang -> do
+--       toWrite <- toFileHaskell lang "haskellOutput"
+--       case toWrite of
+--         Right (Left err) -> print err
+--         Right (Right value) -> do
+--           a <- writeFile "haskellOutput.hs" (show value)
+--          -- b <- callCommand "hfmt -w"
+--           return ()
 
-genLang :: String -> IO ()
-genLang name = do
-  result <- parseFromFile pLanguage name
-  case result of
-    Left err -> print err
-    Right lang -> do
-      toWrite <- toFileHaskell lang "haskellOutput"
-      case toWrite of
-        Right (Left err) -> print err
-        Right (Right value) -> do
-          a <- writeFile "haskellOutput.hs" (show value)
-          b <- callCommand "hfmt -w"
-          return ()
+-- genLang :: String -> IO ()
+-- genLang name = do
+--   result <- parseFromFile pLanguage name
+--   case result of
+--     Left err -> print err
+--     Right lang -> do
+--       toWrite <- toFileHaskell lang "haskellOutput"
+--       case toWrite of
+--         Right (Left err) -> print err
+--         Right (Right value) -> do
+--           a <- writeFile "haskellOutput.hs" (show value)
+--           b <- callCommand "hfmt -w"
+--           return ()
 
-genLangName :: String -> String -> IO ()
-genLangName nameinput nameoutput = do
-  result <- parseFromFile pLanguage nameinput
-  case result of
-    Left err -> print err
-    Right lang -> do
-      toWrite <- toFileHaskell lang nameoutput
-      case toWrite of
-        Right (Left err) -> print err
-        Right (Right value) -> do
-          a <- writeFile (nameoutput ++ ".hs") (show value)
-          b <- callCommand "hfmt -w"
-          return ()
+-- genLangName :: String -> String -> IO ()
+-- genLangName nameinput nameoutput = do
+--   result <- parseFromFile pLanguage nameinput
+--   case result of
+--     Left err -> print err
+--     Right lang -> do
+--       toWrite <- toFileHaskell lang nameoutput
+--       case toWrite of
+--         Right (Left err) -> print err
+--         Right (Right value) -> do
+--           a <- writeFile (nameoutput ++ ".hs") (show value)
+--           b <- callCommand "hfmt -w"
+--           return ()
