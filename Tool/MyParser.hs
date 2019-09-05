@@ -1,33 +1,20 @@
-module MyParser
-  (
-    -- parseSpecification ,
-  pLanguage
-  ) where
+{-# OPTIONS_GHC -Wall #-}
 
 -- parser mostly inspired by the inbound haskell parser
-import           Control.Applicative
-import           Control.Monad
-import           Data.Char
-import           Data.Either
--- import           Data.Set             (Set)
--- import qualified Data.Set             as S
-import           System.IO
+module MyParser (pLanguage) where
 
-import qualified Text.Parsec          as P
-import qualified Text.Parsec.Language as P
-import qualified Text.Parsec.Token    as P
+import Text.ParserCombinators.Parsec
+import Text.ParserCombinators.Parsec.Language
+import Text.ParserCombinators.Parsec.Token
 
-import           GeneralTerms
+import GeneralTerms
 
--- toLowerCaseFirst :: String -> String
--- toLowerCaseFirst (first:rest) = ((toLower first) : rest)
-
-myDef :: P.LanguageDef st
+myDef :: LanguageDef st
 myDef =
-  P.haskellStyle
-    { P.opStart = P.oneOf ":!#$%&*+./<=>?@\\^|-~,;"
-    , P.opLetter = P.oneOf ":!#$%&*+./<=>?@\\^|-~,;"
-    , P.reservedNames =
+  haskellStyle
+    { opStart = oneOf ":!#$%&*+./<=>?@\\^|-~,;"
+    , opLetter = oneOf ":!#$%&*+./<=>?@\\^|-~,;"
+    , reservedNames =
         [ "namespace"
         , "sort"
         , "lhs"
@@ -38,32 +25,29 @@ myDef =
         , "import"
         , "HaskellCode"
         ]
-    , P.reservedOpNames = ["@", "=", ",", ".", ";"]
+    , reservedOpNames = ["@", "=", ",", ".", ";"]
     }
 
-inboundTokenParser = P.makeTokenParser myDef
-pIdentifier        = P.identifier inboundTokenParser
-pBrackets          = P.brackets inboundTokenParser
-pSymbol            = P.symbol inboundTokenParser
-pColon             = P.colon inboundTokenParser
-pDot               = P.dot inboundTokenParser
-pComma             = P.comma inboundTokenParser
-pReserved          = P.reserved inboundTokenParser
-pParens            = P.parens inboundTokenParser
-pBraces            = P.braces inboundTokenParser
-pWhiteSpace        = P.whiteSpace inboundTokenParser
-pCommaSep1         = P.commaSep1 inboundTokenParser
-
-type Parser a = P.Parsec String () a
+inboundTokenParser = makeTokenParser myDef
+pIdentifier        = identifier inboundTokenParser
+pBrackets          = brackets inboundTokenParser
+pSymbol            = symbol inboundTokenParser
+pColon             = colon inboundTokenParser
+pDot               = dot inboundTokenParser
+pComma             = comma inboundTokenParser
+pReserved          = reserved inboundTokenParser
+pParens            = parens inboundTokenParser
+pBraces            = braces inboundTokenParser
+pWhiteSpace        = whiteSpace inboundTokenParser
 
 pLanguage :: Parser Language
 pLanguage = do
   pWhiteSpace
   idecls <- many pImports
   ndecls <- many pNameSpaceDecl
-  sdecls <- P.manyTill pSortDecl pHaskellLiteral
+  sdecls <- manyTill pSortDecl pHaskellLiteral
   hsCode <- pEnd
-  return $ (ndecls, sdecls, idecls, hsCode)
+  return (ndecls, sdecls, idecls, hsCode)
 
 -- * Imports
 -- ----------------------------------------------------------------------------
@@ -80,13 +64,13 @@ pImportsName =
   pParens $ do
     list <- many pNameDot
     a <- pIdentifier
-    return ((listToString list) ++ a)
+    return (listToString list ++ a)
 
 pNameDot :: Parser String
 pNameDot =
-  P.try
+  try
     (do a <- pIdentifier
-        pDot
+        _ <- pDot
         return a)
 
 listToString :: [String] -> String
@@ -94,13 +78,11 @@ listToString []       = ""
 listToString (x:rest) = x ++ "." ++ listToString rest
 
 pImportChoose :: Parser [String]
-pImportChoose = P.try (pSpecifically) <|> return []
+pImportChoose = try pSpecifically <|> return []
 
 pSpecifically :: Parser [String]
 pSpecifically =
-  pParens $ do
-    a <- many pIdentifier
-    return a
+  pParens $ many pIdentifier
 
 -- * Namespaces
 -- ----------------------------------------------------------------------------
@@ -117,27 +99,27 @@ pNameSpaceName = pIdentifier
 pEnvAdd :: Parser [String]
 pEnvAdd =
   many $ do
-    pComma
+    _ <- pComma
     pIdentifier
 
 -- * Sort declarations
 -- ----------------------------------------------------------------------------
 
 pSortDecl :: Parser SortDef
-pSortDecl = (P.try pSortDeclRewrite) <|> pSortDeclNoRewrite
+pSortDecl = try pSortDeclRewrite <|> pSortDeclNoRewrite
 
 pSortDeclRewrite :: Parser SortDef
 pSortDeclRewrite = do
-  a <- pReserved "sort"
+  _ <- pReserved "sort"
   b <- pSortName
-  e <- pReserved "rewrite"
+  _ <- pReserved "rewrite"
   c <- many pInstance
   d <- many pCtorDecl
   return (MkDefSort b c d True)
 
 pSortDeclNoRewrite :: Parser SortDef
 pSortDeclNoRewrite = do
-  a <- pReserved "sort"
+  _ <- pReserved "sort"
   b <- pSortName
   c <- many pInstance
   d <- many pCtorDecl
@@ -151,11 +133,11 @@ pInstance = pInh <|> pSyn
 
 pCtorDecl :: Parser ConstructorDef
 pCtorDecl = do
-  pSymbol "|"
+  _ <- pSymbol "|"
   a <- pCtorName
-  (P.try (pCtorVar a) <|>
-   P.try (pCtorBindState (MkBindConstructor a [] [] [] ("", "") [] [])) <|>
-   (pCtorNotVarState (MkDefConstructor a [] [] [] [] [])))
+  try (pCtorVar a) <|>
+   try (pCtorBindState (MkBindConstructor a [] [] [] ("", "") [] [])) <|>
+   pCtorNotVarState (MkDefConstructor a [] [] [] [] [])
 
 pInh :: Parser NamespaceInstance
 pInh = do
@@ -181,28 +163,27 @@ pCtorVar name = do
 
 pCtorBindState :: ConstructorDef -> Parser ConstructorDef
 pCtorBindState (MkBindConstructor name lists sorts folds namespace rules haskelltypes) =
-  (P.try (pConstructorListsNameState cons)) <|> (P.try (pFoldState cons)) <|>
-  (pConstructorSortNameState cons) <|>
-  (pHaskellTypesState cons) <|>
+  try (pConstructorListsNameState cons) <|> try (pFoldState cons) <|>
+  pConstructorSortNameState cons <|>
+  pHaskellTypesState cons <|>
   pRuleStateBind cons
   where
-    cons =
-      (MkBindConstructor name lists sorts folds namespace rules haskelltypes)
+    cons = MkBindConstructor name lists sorts folds namespace rules haskelltypes
 
 pCtorNotVarState :: ConstructorDef -> Parser ConstructorDef
 pCtorNotVarState (MkDefConstructor name lists sorts folds rules haskelltypes) =
-  (P.try (pConstructorListsNameState cons)) <|> (P.try (pFoldState cons)) <|>
-  (pConstructorSortNameState cons) <|>
-  (pHaskellTypesState cons) <|>
+  try (pConstructorListsNameState cons) <|> try (pFoldState cons) <|>
+  pConstructorSortNameState cons <|>
+  pHaskellTypesState cons <|>
   pRuleState cons
   where
-    cons = (MkDefConstructor name lists sorts folds rules haskelltypes)
+    cons = MkDefConstructor name lists sorts folds rules haskelltypes
 
 pVarNameSpace :: Parser NameSpaceName
 pVarNameSpace =
   pParens $ do
-    pIdentifier
-    pSymbol "@"
+    _ <- pIdentifier
+    _ <- pSymbol "@"
     pIdentifier
 
 pConstructorListsNameState :: ConstructorDef -> Parser ConstructorDef
@@ -274,13 +255,13 @@ pHaskellTypesState (MkBindConstructor name lists sorts folds namespace rules has
         (haskelltypes ++ [a]))
 
 pRuleStateBind :: ConstructorDef -> Parser ConstructorDef
-pRuleStateBind (MkBindConstructor name lists sorts folds namespace rules haskelltypes) = do
+pRuleStateBind (MkBindConstructor name lists sorts folds _namespace _rules haskelltypes) = do
   a <- pConstructorNameSpaceName
   b <- many pRule
   return (MkBindConstructor name lists sorts folds a b haskelltypes)
 
 pRuleState :: ConstructorDef -> Parser ConstructorDef
-pRuleState (MkDefConstructor name lists sorts folds rules haskelltypes) = do
+pRuleState (MkDefConstructor name lists sorts folds _rules haskelltypes) = do
   a <- many pRule
   return (MkDefConstructor name lists sorts folds a haskelltypes)
 
@@ -288,92 +269,86 @@ pConstructorListsName :: Parser (String, SortName)
 pConstructorListsName =
   pParens $ do
     a <- pIdentifier
-    pColon
+    _ <- pColon
     b <- pBracketSort
     return (a, b)
 
 pFolds :: Parser (String, SortName, FoldName)
 pFolds =
   pParens $ do
-    id <- pIdentifier
-    pColon
+    iden <- pIdentifier
+    _ <- pColon
     foldname <- pIdentifier
     sort <- pIdentifier
-    return (id, sort, foldname)
+    return (iden, sort, foldname)
 
 pConstructorSortName :: Parser (String, SortName)
 pConstructorSortName =
   pParens $ do
     a <- pIdentifier
-    pColon
+    _ <- pColon
     b <- pIdentifier
     return (a, b)
 
 pHaskellTypes :: Parser HaskellTypeName
-pHaskellTypes =
-  pBraces $ do
-    a <- pIdentifier
-    return a
+pHaskellTypes = pBraces pIdentifier
 
 pConstructorNameSpaceName :: Parser (String, NameSpaceName)
 pConstructorNameSpaceName =
   pBrackets $ do
     a <- pIdentifier
-    pSymbol ":"
+    _ <- pSymbol ":"
     b <- pIdentifier
     return (a, b)
 
 pRule :: Parser NameSpaceRule
 pRule = do
   a <- pLeftExpr
-  pSymbol "="
+  _ <- pSymbol "="
   b <- pRightExpr
   return (a, b)
 
 pBracketSort :: Parser SortName
-pBracketSort =
-  pBrackets $ do
-    b <- pIdentifier
-    return b
+pBracketSort = pBrackets pIdentifier
 
 pLeftExpr :: Parser LeftExpr
 pLeftExpr = pLHSLeftExpr <|> pSubLeftExpr
 
 pRightExpr :: Parser RightExpr
-pRightExpr = P.try (pRightExprAdd) <|> pRightExprLHS <|> pRightExprSub
+pRightExpr = try pRightExprAdd <|> pRightExprLHS <|> pRightExprSub
 
 pLHSLeftExpr :: Parser LeftExpr
 pLHSLeftExpr = do
   pReserved "lhs"
-  pDot
+  _ <- pDot
   a <- pIdentifier
   return (LHS a)
 
 pSubLeftExpr :: Parser LeftExpr
 pSubLeftExpr = do
   a <- pIdentifier
-  pDot
+  _ <- pDot
   b <- pIdentifier
   return (Sub a b)
 
 pRightExprAdd :: Parser RightExpr
 pRightExprAdd = do
-  a <- (pRightExprLHS <|> pRightExprSub)
-  pSymbol ","
+  a <- pRightExprLHS <|> pRightExprSub
+  _ <- pSymbol ","
   b <- pIdentifier
   return (ExprAdd a b)
 
 pRightExprLHS :: Parser RightExpr
 pRightExprLHS = do
   pReserved "lhs"
-  pSymbol "."
+  _ <- pSymbol "."
   a <- pIdentifier
   return (ExprLHS a)
 
 pRightExprSub :: Parser RightExpr
 pRightExprSub = do
   a <- pIdentifier
-  pSymbol "."
+  _ <- pSymbol "."
   b <- pIdentifier
   return (ExprSub a b)
 
@@ -382,30 +357,25 @@ pRightExprSub = do
 
 pHaskellLiteral :: Parser ()
 pHaskellLiteral =
-  (do a <- pReserved "HaskellCode"
-      return a) <|>
-  P.eof
+  pReserved "HaskellCode" <|> eof
 
 pEnd :: Parser [String]
-pEnd = P.try (pHsCode) <|> parseEOF
+pEnd = try pHsCode <|> parseEOF
 
 pHsCode :: Parser [String]
 pHsCode = do
   x <- line
   xs <-
     many $ do
-      P.newline
+      _ <- newline
       line
-  P.eof
+  eof
   return (x : xs)
 
 parseEOF :: Parser [String]
 parseEOF = do
-  P.eof
+  eof
   return []
 
 line :: Parser String
-line = many $ P.noneOf "\n"
-
--- parseSpecification :: String -> Either P.ParseError Language
--- parseSpecification = P.parse (pLanguage) ""
+line = many $ noneOf "\n"
