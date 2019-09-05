@@ -1,165 +1,15 @@
-module ToHaskellPrint
-  ( toHaskellLanguageStart
-  , toHaskellmapStart
-  ) where
+{-# OPTIONS_GHC -Wall #-}
 
-import           Data.Char
-import           Data.Either
-import           Data.List
-import           Data.Maybe
-import           Data.Text.Prettyprint.Doc
-import           GeneralTerms
+module ToHaskellPrint (toHaskellLanguageStart) where
 
-toLowerCaseFirst :: String -> String
-toLowerCaseFirst (first:rest) = ((toLower first) : rest)
-
-getnameInstancenamespace :: NamespaceInstance -> NameSpaceName
-getnameInstancenamespace (INH _ name) = name
-getnameInstancenamespace (SYN _ name) = name
-
-foldToNormalList :: [(String, String, String)] -> [(String, String)]
-foldToNormalList foldsWithFoldName =
-  map (\(a, b, c) -> (a, b)) foldsWithFoldName
-
-foldableToSpaces :: [(String, String, String)] -> Doc String
-foldableToSpaces folds = seperate folds
-  where
-    seperate [] = pretty ""
-    seperate ((id, sort, foldname):xrest) =
-      pretty "(" <+>
-      pretty (capitalize foldname) <+>
-      pretty (capitalize sort) <+> pretty ")" <+> (seperate xrest)
-
-listToSpaces :: [(String, String)] -> Doc String
-listToSpaces list = seperate (map snd list)
-  where
-    seperate [] = pretty ""
-    seperate ((x:srest):xrest) =
-      pretty (((toUpper) x : srest)) <+> (seperate xrest)
-
-listToSpacesList :: [(String, String)] -> Doc String
-listToSpacesList list = seperate (map snd list)
-  where
-    seperate [] = pretty ""
-    seperate ((x:srest):xrest) =
-      pretty "[" <+>
-      pretty (((toUpper) x : srest)) <+> pretty "]" <+> (seperate xrest)
-
-listToSpaceslower :: [(String, String)] -> Doc String
-listToSpaceslower list = seperate (map fst list)
-  where
-    seperate [] = pretty ""
-    seperate (name:xrest) = pretty (toLowerCaseFirst name) <+> (seperate xrest)
-
-prettyListToSpaces :: [Doc String] -> Doc String
-prettyListToSpaces (l:lrest) = pretty "|" <+> l <+> prettyListToSpaces lrest
-prettyListToSpaces []        = pretty ""
-
-listToEndings :: [Doc String] -> Doc String
-listToEndings list = seperate list
-  where
-    seperate []           = pretty ""
-    seperate (name:xrest) = name <> pretty "\n" <> (seperate xrest)
+import Data.Char
+import Data.List
+import Data.Maybe
+import Data.Text.Prettyprint.Doc
+import GeneralTerms
 
 toHaskellLanguageStart :: Language -> String -> Doc String
 toHaskellLanguageStart lan name = toHaskellLanguage lan [] [] [] name []
-
-generateModule ::
-     [NameSpaceDef]
-  -> [(SortName, [NamespaceInstance])]
-  -> [SortDef]
-  -> String
-  -> Doc String
-generateModule namespaces table accsorts name =
-  pretty "module" <+>
-  pretty (capitalize name) <+>
-  pretty "(  Env(..), HNat(..) " <+>
-  generateFunctionsModule namespaces table varTable accsorts <+>
-  generateHnatFunctions namespaces <+> pretty ") \n where "
-  where
-    varTable = getTableOfHasAccessVariable accsorts
-
-generateFunctionsModule ::
-     [NameSpaceDef]
-  -> [(SortName, [NamespaceInstance])]
-  -> [(SortName, Bool)]
-  -> [SortDef]
-  -> Doc String
-generateFunctionsModule namespaces table canAccessVarTable [] = pretty ""
-generateFunctionsModule namespaces table canAccessVarTable (sort:srest)
-  | fromJust (lookup sname canAccessVarTable) =
-    generateSortNames sname <+>
-    generateInstanceFunctions namespaces table sname <+>
-    genFunctionModule sname <+>
-    generateFunctionsModule namespaces table canAccessVarTable srest
-  | otherwise =
-    generateSortNames sname <+>
-    generateInstanceSynFunctions namespaces synInstances sname <+>
-    generateFunctionsModule namespaces table canAccessVarTable srest
-  where
-    sname = getname sort
-    synInstances = filter isSyn (fromJust (lookup sname table))
-
-generateHnatFunctions :: [NameSpaceDef] -> Doc String
-generateHnatFunctions [] = pretty ""
-generateHnatFunctions (def:rest) =
-  pretty ", generateHnat" <> pretty (getname def) <+>
-  pretty "\n" <> generateHnatFunctions rest
-
-generateInstanceFunctions ::
-     [NameSpaceDef] -> [(SortName, [NamespaceInstance])] -> String -> Doc String
-generateInstanceFunctions namespaces table sname =
-  generateInstanceInhFunctions namespaces inhInstances sname <+>
-  generateInstanceSynFunctions namespaces synInstances sname
-  where
-    inhInstances = filter isInh (fromJust (lookup sname table))
-    synInstances = filter isSyn (fromJust (lookup sname table))
-
-generateInstanceSynFunctions ::
-     [NameSpaceDef] -> [NamespaceInstance] -> String -> Doc String
-generateInstanceSynFunctions namespaces [] sname = pretty ""
-generateInstanceSynFunctions namespaces ((SYN ctxname namespacename):rest) sname =
-  pretty ", addToEnvironment" <> pretty sname <> pretty ctxname <>
-  generateInstanceSynFunctions namespaces rest sname
-
-generateInstanceInhFunctions ::
-     [NameSpaceDef] -> [NamespaceInstance] -> String -> Doc String
-generateInstanceInhFunctions namespaces [] sname = pretty ""
-generateInstanceInhFunctions namespaces ((INH ctxname namespacename):rest) sname =
-  pretty "," <+>
-  pretty (toLowerCaseFirst sname) <> pretty (toLowerCaseFirst secondSort) <>
-  pretty "Substitute" <+>
-  generateInstanceInhFunctions namespaces rest sname
-  where
-    secondSort = lookForSortName namespacename namespaces
-
-generateSortNames :: String -> Doc String
-generateSortNames sname =
-  pretty "," <+> pretty (capitalize sname) <+> pretty "(..)"
-
-genFunctionModule :: String -> Doc String
-genFunctionModule sname =
-  pretty ", freeVariables" <> pretty sname <+>
-  pretty ", " <+>
-  pretty (toLowerCaseFirst sname) <> pretty "shiftplus" <+>
-  pretty "," <+> pretty (toLowerCaseFirst sname) <> pretty "shiftminus"
-
-genImportsAll :: [[String]] -> Doc String
-genImportsAll [] = pretty ""
-genImportsAll (str:rest) = genImports str <+> pretty "\n" <> genImportsAll rest
-
-genImports :: [String] -> Doc String
-genImports (str:[]) = pretty "import" <+> pretty str
-genImports (str:rest) =
-  pretty "import" <+> pretty str <+> pretty "(" <+> genImportsRest rest
-
-genImportsRest :: [String] -> Doc String
-genImportsRest []         = pretty ")"
-genImportsRest (str:rest) = pretty str <+> pretty "," <+> genImportsRest rest
-
-genCode :: [String] -> Doc String
-genCode []          = pretty ""
-genCode (line:rest) = pretty line <> pretty "\n" <> genCode rest
 
 toHaskellLanguage ::
      Language
@@ -199,6 +49,11 @@ toHaskellLanguage ([], [], [], code) namespaces table accsorts name imports =
   genCode code
   where
     varTable = getTableOfHasAccessVariable accsorts
+
+    genCode :: [String] -> Doc String
+    genCode []          = pretty ""
+    genCode (line:rest) = pretty line <> pretty "\n" <> genCode rest
+
 toHaskellLanguage (s:srest, sorts, imp, code) namespaces table accsorts name imports =
   toHaskellLanguage
     (srest, sorts, imp, code)
@@ -224,15 +79,180 @@ toHaskellLanguage ([], [], (imp:imprest), code) namespaces table accsorts name i
     name
     (imp : imprest)
 
-toHaskellEnv :: [NameSpaceDef] -> Doc String
-toHaskellEnv [] = pretty " deriving(Show,Eq)"
-toHaskellEnv ((MkNameSpace sname _ inEnv):nsrest) =
-  pretty "| E" <> pretty (capitalize sname) <+>
-  addToEnvPrint inEnv <+> pretty "Env" <+> toHaskellEnv nsrest
+-- * Module declaration
+-- ----------------------------------------------------------------------------
 
-addToEnvPrint :: [String] -> Doc String
-addToEnvPrint []          = pretty ""
-addToEnvPrint (name:rest) = pretty (capitalize name) <+> addToEnvPrint rest
+generateModule ::
+     [NameSpaceDef]
+  -> [(SortName, [NamespaceInstance])]
+  -> [SortDef]
+  -> String
+  -> Doc String
+generateModule namespaces table accsorts name =
+  pretty "module" <+>
+  pretty (capitalize name) <+>
+  pretty "(  Env(..), HNat(..) " <+>
+  generateFunctionsModule namespaces table varTable accsorts <+>
+  generateHnatFunctions namespaces <+> pretty ") \n where "
+  where
+    varTable = getTableOfHasAccessVariable accsorts
+
+generateFunctionsModule ::
+     [NameSpaceDef]
+  -> [(SortName, [NamespaceInstance])]
+  -> [(SortName, Bool)]
+  -> [SortDef]
+  -> Doc String
+generateFunctionsModule namespaces table canAccessVarTable [] = pretty ""
+generateFunctionsModule namespaces table canAccessVarTable (sort:srest)
+  | fromJust (lookup sname canAccessVarTable) =
+    generateSortNames sname <+>
+    generateInstanceFunctions namespaces table sname <+>
+    genFunctionModule sname <+>
+    generateFunctionsModule namespaces table canAccessVarTable srest
+  | otherwise =
+    generateSortNames sname <+>
+    generateInstanceSynFunctions namespaces synInstances sname <+>
+    generateFunctionsModule namespaces table canAccessVarTable srest
+  where
+    sname = getname sort
+    synInstances = filter isSyn (fromJust (lookup sname table))
+
+generateSortNames :: String -> Doc String
+generateSortNames sname =
+  pretty "," <+> pretty (capitalize sname) <+> pretty "(..)"
+
+generateInstanceFunctions ::
+     [NameSpaceDef] -> [(SortName, [NamespaceInstance])] -> String -> Doc String
+generateInstanceFunctions namespaces table sname =
+  generateInstanceInhFunctions namespaces inhInstances sname <+>
+  generateInstanceSynFunctions namespaces synInstances sname
+  where
+    inhInstances = filter isInh (fromJust (lookup sname table))
+    synInstances = filter isSyn (fromJust (lookup sname table))
+
+generateInstanceInhFunctions ::
+     [NameSpaceDef] -> [NamespaceInstance] -> String -> Doc String
+generateInstanceInhFunctions namespaces [] sname = pretty ""
+generateInstanceInhFunctions namespaces ((INH ctxname namespacename):rest) sname =
+  pretty "," <+>
+  pretty (toLowerCaseFirst sname) <> pretty (toLowerCaseFirst secondSort) <>
+  pretty "Substitute" <+>
+  generateInstanceInhFunctions namespaces rest sname
+  where
+    secondSort = lookForSortName namespacename namespaces
+
+generateInstanceSynFunctions ::
+     [NameSpaceDef] -> [NamespaceInstance] -> String -> Doc String
+generateInstanceSynFunctions namespaces [] sname = pretty ""
+generateInstanceSynFunctions namespaces ((SYN ctxname namespacename):rest) sname =
+  pretty ", addToEnvironment" <> pretty sname <> pretty ctxname <>
+  generateInstanceSynFunctions namespaces rest sname
+
+genFunctionModule :: String -> Doc String
+genFunctionModule sname =
+  pretty ", freeVariables" <> pretty sname <+>
+  pretty ", " <+>
+  pretty (toLowerCaseFirst sname) <> pretty "shiftplus" <+>
+  pretty "," <+> pretty (toLowerCaseFirst sname) <> pretty "shiftminus"
+
+generateHnatFunctions :: [NameSpaceDef] -> Doc String
+generateHnatFunctions [] = pretty ""
+generateHnatFunctions (def:rest) =
+  pretty ", generateHnat" <> pretty (getname def) <+>
+  pretty "\n" <> generateHnatFunctions rest
+
+lookForSortName :: NameSpaceName -> [NameSpaceDef] -> SortName
+lookForSortName name ((MkNameSpace name2 sortname _):rest)
+  | name2 == name = toLowerCaseFirst sortname
+  | otherwise = lookForSortName name rest
+
+-- * Imports
+-- ----------------------------------------------------------------------------
+
+genImportsAll :: [[String]] -> Doc String
+genImportsAll [] = pretty ""
+genImportsAll (str:rest) = genImports str <+> pretty "\n" <> genImportsAll rest
+
+genImports :: [String] -> Doc String
+genImports (str:[]) = pretty "import" <+> pretty str
+genImports (str:rest) =
+  pretty "import" <+> pretty str <+> pretty "(" <+> genImportsRest rest
+
+genImportsRest :: [String] -> Doc String
+genImportsRest []         = pretty ")"
+genImportsRest (str:rest) = pretty str <+> pretty "," <+> genImportsRest rest
+
+-- * Sorts
+-- ----------------------------------------------------------------------------
+
+toHaskellSort :: [SortDef] -> Doc String
+toHaskellSort [] = pretty ""
+toHaskellSort ((MkDefSort sname _ (c:crest) _):rest) =
+  pretty "data" <+>
+  pretty (capitalize sname) <+>
+  pretty "=" <+>
+  toHaskellConstructor c <+>
+  prettyListToSpaces (map (toHaskellConstructor) crest) <+>
+  pretty " deriving(Show,Eq) \n" <> toHaskellSort rest
+
+toHaskellConstructor :: ConstructorDef -> Doc String
+toHaskellConstructor (MkDefConstructor consName lists listSorts folds _ hTypes) =
+  pretty (capitalize consName) <+>
+  foldableToSpaces folds <+>
+  listToSpacesList lists <+>
+  (listToSpaces listSorts) <+> haskellTypesToPretty (map capitalize hTypes)
+toHaskellConstructor (MkBindConstructor consName lists listSorts folds _ _ hTypes) =
+  pretty (capitalize consName) <+>
+  foldableToSpaces folds <+>
+  listToSpacesList lists <+>
+  (listToSpaces listSorts) <+> haskellTypesToPretty (map capitalize hTypes)
+toHaskellConstructor (MkVarConstructor consName _) =
+  pretty (capitalize consName) <+> pretty "HNat"
+
+prettyListToSpaces :: [Doc String] -> Doc String
+prettyListToSpaces (l:lrest) = pretty "|" <+> l <+> prettyListToSpaces lrest
+prettyListToSpaces []        = pretty ""
+
+foldableToSpaces :: [(String, String, String)] -> Doc String
+foldableToSpaces folds = seperate folds
+  where
+    seperate [] = pretty ""
+    seperate ((id, sort, foldname):xrest) =
+      pretty "(" <+>
+      pretty (capitalize foldname) <+>
+      pretty (capitalize sort) <+> pretty ")" <+> (seperate xrest)
+
+listToSpacesList :: [(String, String)] -> Doc String
+listToSpacesList list = seperate (map snd list)
+  where
+    seperate [] = pretty ""
+    seperate ((x:srest):xrest) =
+      pretty "[" <+>
+      pretty (((toUpper) x : srest)) <+> pretty "]" <+> (seperate xrest)
+
+listToSpaces :: [(String, String)] -> Doc String
+listToSpaces list = seperate (map snd list)
+  where
+    seperate [] = pretty ""
+    seperate ((x:srest):xrest) =
+      pretty (((toUpper) x : srest)) <+> (seperate xrest)
+
+haskellTypesToPretty :: [String] -> Doc String
+haskellTypesToPretty []        = pretty ""
+haskellTypesToPretty (x:xrest) = pretty x <+> haskellTypesToPretty xrest
+
+-- * HNat type
+-- ----------------------------------------------------------------------------
+
+toHaskellHnat :: [NameSpaceDef] -> Doc String
+toHaskellHnat [] = pretty " deriving(Show,Eq)"
+toHaskellHnat ((MkNameSpace sortname _ _):nsrest) =
+  pretty "| S" <> pretty (capitalize sortname) <+>
+  pretty "HNat" <+> toHaskellHnat nsrest
+
+-- * HNat plus function
+-- ----------------------------------------------------------------------------
 
 toHaskellHnatOperations :: [NameSpaceDef] -> Doc String
 toHaskellHnatOperations [] = pretty "plus Z h = h \nplus h Z = h \n"
@@ -242,6 +262,48 @@ toHaskellHnatOperations ((MkNameSpace sname _ _):nsrest) =
   pretty "=" <+>
   pretty "S" <> pretty (capitalize sname) <+>
   pretty "(plus x1 x2)" <+> pretty "\n" <> toHaskellHnatOperations nsrest
+
+-- * HNat Ord type class
+-- ----------------------------------------------------------------------------
+
+generateOrdHnat :: [NameSpaceDef] -> [NameSpaceDef] -> Doc String
+generateOrdHnat [] _ =
+  pretty "  compare Z Z = EQ\n  compare Z _ = LT\n  compare _ Z  = GT"
+generateOrdHnat (namespace:namespacerest) namespaces =
+  listToEndings (map (generateNamespaceOrd namespace) namespaces) <+>
+  pretty " \n" <> generateOrdHnat namespacerest namespaces
+
+listToEndings :: [Doc String] -> Doc String
+listToEndings list = seperate list
+  where
+    seperate []           = pretty ""
+    seperate (name:xrest) = name <> pretty "\n" <> (seperate xrest)
+
+generateNamespaceOrd :: NameSpaceDef -> NameSpaceDef -> Doc String
+generateNamespaceOrd namespace1 namespace2
+  | namespace1 == namespace2 =
+    pretty "  compare" <+>
+    pretty "(" <+>
+    pretty (generateHnatName namespace1) <+>
+    pretty "h1)" <+>
+    pretty "(" <+>
+    pretty (generateHnatName namespace2) <+>
+    pretty "h2)" <+> pretty "= compare  h1 h2 "
+  | otherwise =
+    pretty "  compare" <+>
+    pretty "(" <+>
+    pretty (generateHnatName namespace1) <+>
+    pretty "h1)" <+>
+    pretty "(" <+>
+    pretty (generateHnatName namespace2) <+>
+    pretty "h2)" <+>
+    pretty "=  error \"differing namespace found in compare \" "
+
+generateHnatName :: NameSpaceDef -> String
+generateHnatName (MkNameSpace sname _ _) = "S" ++ (capitalize sname)
+
+-- * HNat minus function
+-- ----------------------------------------------------------------------------
 
 generateMinusHnat :: [NameSpaceDef] -> [NameSpaceDef] -> Doc String
 generateMinusHnat [] _ =
@@ -270,70 +332,21 @@ generateMinus namespace1 namespace2
     pretty (generateHnatName namespace2) <+>
     pretty "h2)" <+> pretty "=  error \"differing namespace found in minus \" "
 
--- Ord type class generation
-generateOrdHnat :: [NameSpaceDef] -> [NameSpaceDef] -> Doc String
-generateOrdHnat [] _ =
-  pretty "  compare Z Z = EQ\n  compare Z _ = LT\n  compare _ Z  = GT"
-generateOrdHnat (namespace:namespacerest) namespaces =
-  listToEndings (map (generateNamespaceOrd namespace) namespaces) <+>
-  pretty " \n" <> generateOrdHnat namespacerest namespaces
+-- * Env data type
+-- ----------------------------------------------------------------------------
 
-generateNamespaceOrd :: NameSpaceDef -> NameSpaceDef -> Doc String
-generateNamespaceOrd namespace1 namespace2
-  | namespace1 == namespace2 =
-    pretty "  compare" <+>
-    pretty "(" <+>
-    pretty (generateHnatName namespace1) <+>
-    pretty "h1)" <+>
-    pretty "(" <+>
-    pretty (generateHnatName namespace2) <+>
-    pretty "h2)" <+> pretty "= compare  h1 h2 "
-  | otherwise =
-    pretty "  compare" <+>
-    pretty "(" <+>
-    pretty (generateHnatName namespace1) <+>
-    pretty "h1)" <+>
-    pretty "(" <+>
-    pretty (generateHnatName namespace2) <+>
-    pretty "h2)" <+>
-    pretty "=  error \"differing namespace found in compare \" "
+toHaskellEnv :: [NameSpaceDef] -> Doc String
+toHaskellEnv [] = pretty " deriving(Show,Eq)"
+toHaskellEnv ((MkNameSpace sname _ inEnv):nsrest) =
+  pretty "| E" <> pretty (capitalize sname) <+>
+  addToEnvPrint inEnv <+> pretty "Env" <+> toHaskellEnv nsrest
 
-generateHnatName :: NameSpaceDef -> String
-generateHnatName (MkNameSpace sname _ _) = "S" ++ (capitalize sname)
+addToEnvPrint :: [String] -> Doc String
+addToEnvPrint []          = pretty ""
+addToEnvPrint (name:rest) = pretty (capitalize name) <+> addToEnvPrint rest
 
-toHaskellHnat :: [NameSpaceDef] -> Doc String
-toHaskellHnat [] = pretty " deriving(Show,Eq)"
-toHaskellHnat ((MkNameSpace sortname _ _):nsrest) =
-  pretty "| S" <> pretty (capitalize sortname) <+>
-  pretty "HNat" <+> toHaskellHnat nsrest
-
-toHaskellSort :: [SortDef] -> Doc String
-toHaskellSort [] = pretty ""
-toHaskellSort ((MkDefSort sname _ (c:crest) _):rest) =
-  pretty "data" <+>
-  pretty (capitalize sname) <+>
-  pretty "=" <+>
-  toHaskellConstructor c <+>
-  prettyListToSpaces (map (toHaskellConstructor) crest) <+>
-  pretty " deriving(Show,Eq) \n" <> toHaskellSort rest
-
-toHaskellConstructor :: ConstructorDef -> Doc String
-toHaskellConstructor (MkDefConstructor consName lists listSorts folds _ hTypes) =
-  pretty (capitalize consName) <+>
-  foldableToSpaces folds <+>
-  listToSpacesList lists <+>
-  (listToSpaces listSorts) <+> haskellTypesToPretty (map capitalize hTypes)
-toHaskellConstructor (MkBindConstructor consName lists listSorts folds _ _ hTypes) =
-  pretty (capitalize consName) <+>
-  foldableToSpaces folds <+>
-  listToSpacesList lists <+>
-  (listToSpaces listSorts) <+> haskellTypesToPretty (map capitalize hTypes)
-toHaskellConstructor (MkVarConstructor consName _) =
-  pretty (capitalize consName) <+> pretty "HNat"
-
-haskellTypesToPretty :: [String] -> Doc String
-haskellTypesToPretty []        = pretty ""
-haskellTypesToPretty (x:xrest) = pretty x <+> haskellTypesToPretty xrest
+-- * HNat generator functions
+-- ----------------------------------------------------------------------------
 
 generateListSNamespaces :: [NameSpaceDef] -> Doc String
 generateListSNamespaces [] = pretty ""
@@ -352,6 +365,9 @@ generatenNamespace name =
   pretty " n c=" <+>
   pretty "S" <> pretty name <+>
   pretty "(generateHnat" <> pretty name <+> pretty "(n-1) c)"
+
+-- * Mapping functions
+-- ----------------------------------------------------------------------------
 
 toHaskellmapStart ::
      [(SortName, [NamespaceInstance])]
@@ -383,15 +399,6 @@ generateTypingmap sname instances namespaces =
   where
     sorttype = pretty (capitalize sname)
 
-generateTypingInstancemap :: [NamespaceInstance] -> [NameSpaceDef] -> Doc String
-generateTypingInstancemap [] _ = pretty ""
-generateTypingInstancemap (INH _ namespaceName:rest) namespaces =
-  pretty "(HNat->" <> sortType <+>
-  pretty "->" <+>
-  sortType <> pretty ")->" <+> generateTypingInstancemap rest namespaces
-  where
-    sortType = pretty (capitalize (lookForSortName namespaceName namespaces))
-
 toHaskellmap ::
      SortName
   -> [NamespaceInstance]
@@ -418,6 +425,26 @@ toHaskellmap sname inst (c:cdefs) table namespaces accessVarTable =
     accessVarTable <+>
   pretty "\n" <> toHaskellmap sname inst cdefs table namespaces accessVarTable
 
+generateTypingInstancemap :: [NamespaceInstance] -> [NameSpaceDef] -> Doc String
+generateTypingInstancemap [] _ = pretty ""
+generateTypingInstancemap (INH _ namespaceName:rest) namespaces =
+  pretty "(HNat->" <> sortType <+>
+  pretty "->" <+>
+  sortType <> pretty ")->" <+> generateTypingInstancemap rest namespaces
+  where
+    sortType = pretty (capitalize (lookForSortName namespaceName namespaces))
+
+sortNamemapname :: SortName -> Doc String
+sortNamemapname sname = pretty (toLowerCaseFirst sname) <> pretty "map"
+
+namespaceInstanceFunctions :: [NameSpaceName] -> Doc String
+namespaceInstanceFunctions [] = pretty ""
+namespaceInstanceFunctions (name:rest) =
+  instancePretty name <+> namespaceInstanceFunctions rest
+
+instancePretty :: NameSpaceName -> Doc String
+instancePretty namespace = pretty "on" <> pretty namespace
+
 --before = part
 toHaskellmapConstructor ::
      SortName
@@ -437,24 +464,6 @@ toHaskellmapConstructor sname inst (MkBindConstructor consName lists listSorts f
   listToSpaceslower listSorts <+> haskellTypesToPrettyLower hTypes 0
 toHaskellmapConstructor sname inst (MkVarConstructor consName _) table =
   pretty (capitalize consName) <+> pretty "hnat"
-
-haskellTypesToPrettyLower :: [String] -> Int -> Doc String
-haskellTypesToPrettyLower [] _ = pretty ""
-haskellTypesToPrettyLower (x:xrest) n =
-  pretty (toLowerCaseFirst x) <> pretty n <+>
-  haskellTypesToPrettyLower xrest (n + 1)
-
-sortNamemapname :: SortName -> Doc String
-sortNamemapname sname = pretty (toLowerCaseFirst sname) <> pretty "map"
-
---
-namespaceInstanceFunctions :: [NameSpaceName] -> Doc String
-namespaceInstanceFunctions [] = pretty ""
-namespaceInstanceFunctions (name:rest) =
-  instancePretty name <+> namespaceInstanceFunctions rest
-
-instancePretty :: NameSpaceName -> Doc String
-instancePretty namespace = pretty "on" <> pretty namespace
 
 --after = part
 toHaskellmapConstructorMappingFunction ::
@@ -504,6 +513,26 @@ toHaskellmapConstructorMappingFunction sname inst (MkVarConstructor consName con
        (head (fromJust (lookup (capitalize sname) table)))) <+>
   pretty "c" <+>
   pretty "(" <+> pretty (capitalize consName) <+> pretty " hnat )"
+
+haskellTypesToPrettyLower :: [String] -> Int -> Doc String
+haskellTypesToPrettyLower [] _ = pretty ""
+haskellTypesToPrettyLower (x:xrest) n =
+  pretty (toLowerCaseFirst x) <> pretty n <+>
+  haskellTypesToPrettyLower xrest (n + 1)
+
+listToSpaceslower :: [(String, String)] -> Doc String
+listToSpaceslower list = seperate (map fst list)
+  where
+    seperate [] = pretty ""
+    seperate (name:xrest) = pretty (toLowerCaseFirst name) <+> (seperate xrest)
+
+foldToNormalList :: [(String, String, String)] -> [(String, String)]
+foldToNormalList foldsWithFoldName =
+  map (\(a, b, c) -> (a, b)) foldsWithFoldName
+
+getnameInstancenamespace :: NamespaceInstance -> NameSpaceName
+getnameInstancenamespace (INH _ name) = name
+getnameInstancenamespace (SYN _ name) = name
 
 --calculate the inherited namespace of an identifier and for every inherited namespace, check what happens
 applyRulesIdentifiers ::
@@ -789,6 +818,10 @@ calculateInheritedNameSpace sname table = filter isInh instances
 lookupIdToSort :: IdName -> [(IdName, SortName)] -> SortName
 lookupIdToSort id table = fromJust (lookup id table)
 
+
+-- * Shift functions
+-- ----------------------------------------------------------------------------
+
 -- checker for shift operation generation
 sortDefineCheckShiftMultiple ::
      [SortDef] -> String -> [(SortName, Bool)] -> [NameSpaceDef] -> Doc String
@@ -846,6 +879,48 @@ lookforInstance ((INH ctxname namespacename):rest) instname
 lookforInstance ((SYN ctxname namespacename):rest) instname =
   lookforInstance rest instname
 
+-- * Multiple shift functions??
+-- ----------------------------------------------------------------------------
+
+-- generation of all shift functions
+sortDefineShiftMultiple ::
+     [SortDef] -> [NameSpaceDef] -> String -> [(SortName, Bool)] -> Doc String
+sortDefineShiftMultiple [] _ opName varAccessTable = pretty ""
+sortDefineShiftMultiple (s:srest) defs opName varAccessTable
+  | fromJust (lookup (getname s) varAccessTable) =
+    generateTypingshift s defs opName <> sortDefineShift s defs opName <+>
+    pretty "\n" <> sortDefineShiftMultiple srest defs opName varAccessTable
+  | otherwise = sortDefineShiftMultiple srest defs opName varAccessTable
+
+generateTypingshift :: SortDef -> [NameSpaceDef] -> String -> Doc String
+generateTypingshift (MkDefSort sname _ _ _) namespaces str =
+  pretty (toLowerCaseFirst sname) <> pretty "shift" <> pretty str <+>
+  pretty "::" <+>
+  pretty "HNat ->" <+> sorttype <+> pretty "->" <+> sorttype <+> pretty "\n"
+  where
+    sorttype = pretty (capitalize sname)
+
+sortDefineShift :: SortDef -> [NameSpaceDef] -> String -> Doc String
+sortDefineShift (MkDefSort sname namespaceDecl _ _) defs opName =
+  pretty (toLowerCaseFirst sname) <> pretty "shift" <> pretty opName <+>
+  pretty "d t =" <+>
+  pretty (toLowerCaseFirst sname) <> pretty "map" <+>
+  declarationsToFunctions namespaceDecl defs opName <+> pretty "Z  t "
+
+declarationsToFunctions ::
+     [NamespaceInstance] -> [NameSpaceDef] -> String -> Doc String
+declarationsToFunctions [] _ _ = pretty ""
+declarationsToFunctions ((INH _ namespaceName):rest) defs opName =
+  pretty "(" <+>
+  pretty (lookForSortName namespaceName defs) <> pretty "shiftHelp" <>
+  pretty opName <+>
+  pretty "d )" <+> declarationsToFunctions rest defs opName
+declarationsToFunctions (_:rest) defs opName =
+  declarationsToFunctions rest defs opName
+
+-- * //
+-- ----------------------------------------------------------------------------
+
 -- checker for substition generation
 sortDefineCheckSubstMultiple :: [SortDef] -> [(SortName, Bool)] -> Doc String
 sortDefineCheckSubstMultiple [] _ = pretty ""
@@ -874,6 +949,9 @@ constructorDefineCheckSubst (MkVarConstructor consName _) sname =
   pretty (capitalize consName) <+> pretty "hnat \n"
 constructorDefineCheckSubst _ _ = pretty ""
 
+-- * //
+-- ----------------------------------------------------------------------------
+
 -- generation of all substition functions
 sortDefineSubstMultiple ::
      [SortDef] -> [NameSpaceDef] -> [(SortName, Bool)] -> Doc String
@@ -899,15 +977,6 @@ namespaceInstanceSubst _ [] _ _ _ = pretty ""
 namespaceInstanceSubst sname (inst:rest) instances namespaces bool =
   namespaceInstanceSubstFunction sname inst instances namespaces bool <>
   namespaceInstanceSubst sname rest instances namespaces bool
-
-generateTypingsubst :: SortName -> SortName -> [NameSpaceDef] -> Doc String
-generateTypingsubst snamefirst snamesecond namespaces =
-  pretty ((toLowerCaseFirst snamefirst) ++ snamesecond) <> pretty "Substitute" <+>
-  pretty "::" <+>
-  pretty (capitalize snamesecond) <+>
-  pretty "->HNat ->" <+> sorttype <+> pretty "->" <+> sorttype <+> pretty "\n"
-  where
-    sorttype = pretty (capitalize snamefirst)
 
 namespaceInstanceSubstFunction ::
      SortName
@@ -938,6 +1007,15 @@ namespaceInstanceSubstFunction sname (INH instname namespaceName) instances defs
     secondSort = lookForSortName namespaceName defs
 namespaceInstanceSubstFunction sname _ instances defs _ = pretty ""
 
+generateTypingsubst :: SortName -> SortName -> [NameSpaceDef] -> Doc String
+generateTypingsubst snamefirst snamesecond namespaces =
+  pretty ((toLowerCaseFirst snamefirst) ++ snamesecond) <> pretty "Substitute" <+>
+  pretty "::" <+>
+  pretty (capitalize snamesecond) <+>
+  pretty "->HNat ->" <+> sorttype <+> pretty "->" <+> sorttype <+> pretty "\n"
+  where
+    sorttype = pretty (capitalize snamefirst)
+
 declarationsToFunctionsSubst ::
      NamespaceInstance -> [NamespaceInstance] -> [NameSpaceDef] -> Doc String
 declarationsToFunctionsSubst _ [] _ = pretty ""
@@ -953,46 +1031,8 @@ declarationsToFunctionsSubst (INH instname1 namespaceName) (_:rest) defs =
   declarationsToFunctionsSubst (INH instname1 namespaceName) rest defs
 declarationsToFunctionsSubst _ _ _ = pretty ""
 
-generateTypingshift :: SortDef -> [NameSpaceDef] -> String -> Doc String
-generateTypingshift (MkDefSort sname _ _ _) namespaces str =
-  pretty (toLowerCaseFirst sname) <> pretty "shift" <> pretty str <+>
-  pretty "::" <+>
-  pretty "HNat ->" <+> sorttype <+> pretty "->" <+> sorttype <+> pretty "\n"
-  where
-    sorttype = pretty (capitalize sname)
-
--- generation of all shift functions
-sortDefineShiftMultiple ::
-     [SortDef] -> [NameSpaceDef] -> String -> [(SortName, Bool)] -> Doc String
-sortDefineShiftMultiple [] _ opName varAccessTable = pretty ""
-sortDefineShiftMultiple (s:srest) defs opName varAccessTable
-  | fromJust (lookup (getname s) varAccessTable) =
-    generateTypingshift s defs opName <> sortDefineShift s defs opName <+>
-    pretty "\n" <> sortDefineShiftMultiple srest defs opName varAccessTable
-  | otherwise = sortDefineShiftMultiple srest defs opName varAccessTable
-
-sortDefineShift :: SortDef -> [NameSpaceDef] -> String -> Doc String
-sortDefineShift (MkDefSort sname namespaceDecl _ _) defs opName =
-  pretty (toLowerCaseFirst sname) <> pretty "shift" <> pretty opName <+>
-  pretty "d t =" <+>
-  pretty (toLowerCaseFirst sname) <> pretty "map" <+>
-  declarationsToFunctions namespaceDecl defs opName <+> pretty "Z  t "
-
-declarationsToFunctions ::
-     [NamespaceInstance] -> [NameSpaceDef] -> String -> Doc String
-declarationsToFunctions [] _ _ = pretty ""
-declarationsToFunctions ((INH _ namespaceName):rest) defs opName =
-  pretty "(" <+>
-  pretty (lookForSortName namespaceName defs) <> pretty "shiftHelp" <>
-  pretty opName <+>
-  pretty "d )" <+> declarationsToFunctions rest defs opName
-declarationsToFunctions (_:rest) defs opName =
-  declarationsToFunctions rest defs opName
-
-lookForSortName :: NameSpaceName -> [NameSpaceDef] -> SortName
-lookForSortName name ((MkNameSpace name2 sortname _):rest)
-  | name2 == name = toLowerCaseFirst sortname
-  | otherwise = lookForSortName name rest
+-- * //
+-- ----------------------------------------------------------------------------
 
 -- generation for all syn contexts
 generateSortSynSystem ::
@@ -1089,14 +1129,18 @@ generateSortSynSystemOneConstructor sname namespaces table (MkBindConstructor co
     newtable = filterTableBySameNamespace inst table
                 -- newrules = rules --getNewRules rules [] sname newtable listSorts
 
-isExprAdd :: RightExpr -> Bool
-isExprAdd (ExprAdd _ _) = True
-isExprAdd _             = False
+haskellTypesToUnderscore :: [String] -> Doc String
+haskellTypesToUnderscore []     = pretty ""
+haskellTypesToUnderscore (x:xs) = pretty "_" <+> haskellTypesToUnderscore xs
 
-isEndPoint :: NameSpaceRule -> Bool
-isEndPoint (l, ExprLHS _)      = True
-isEndPoint (l, ExprAdd expr _) = isEndPoint (l, expr)
-isEndPoint _                   = False
+-- isExprAdd :: RightExpr -> Bool
+-- isExprAdd (ExprAdd _ _) = True
+-- isExprAdd _             = False
+
+-- isEndPoint :: NameSpaceRule -> Bool
+-- isEndPoint (l, ExprLHS _)      = True
+-- isEndPoint (l, ExprAdd expr _) = isEndPoint (l, expr)
+-- isEndPoint _                   = False
 
 --after = part logic of the syn functions
 getEnvFunctionGenerate ::
@@ -1160,6 +1204,9 @@ navigateRules sname inst namespaces table listSorts rules (Sub _ _, ExprSub id _
       pretty "addToEnvironment" <> pretty (lookup id listSorts) <>
       pretty (getname inst) <+>
       pretty id
+
+-- * //
+-- ----------------------------------------------------------------------------
 
 --generate free variable functions
 generateFreeVariableFunctionStart ::
@@ -1247,10 +1294,6 @@ generateFreeVariableConstructor sname inst (MkBindConstructor consName lists lis
   haskellTypesToUnderscore hTypes
 generateFreeVariableConstructor sname inst (MkVarConstructor consName _) table =
   pretty (capitalize consName) <+> pretty "hnat"
-
-haskellTypesToUnderscore :: [String] -> Doc String
-haskellTypesToUnderscore []     = pretty ""
-haskellTypesToUnderscore (x:xs) = pretty "_" <+> haskellTypesToUnderscore xs
 
 --after = part
 generateFreeVariableFunctionConstructor ::

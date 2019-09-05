@@ -26,6 +26,7 @@ module GeneralTerms
   , getInstanceNamesOfRuleLeft
   , getLeftIdSub
   , getInstanceSorts
+  , toLowerCaseFirst
   , capitalize
   , HaskellTypeName
   , getTableOfHasAccessVariable
