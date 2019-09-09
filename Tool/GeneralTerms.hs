@@ -133,17 +133,12 @@ collectRulesAllField rules = map (\(i, _) -> collectRulesOfId rules i)
   where
     -- group the rules of one  identifier together
     collectRulesOfId :: [NameSpaceRule] -> IdName -> (IdName, [NameSpaceRule])
-    collectRulesOfId nsr i = (i, filter (\(LeftSub fieldname ctxname, r) -> fieldname == i) nsr)
+    collectRulesOfId nsr i = (i, filter (\(LeftSub fieldname _, _) -> fieldname == i) nsr)
 
 collectRulesSyn :: [NameSpaceRule] -> [(IdName, SortName)] -> [(IdName, [NameSpaceRule])] -> [(IdName, [NameSpaceRule])]
-collectRulesSyn rules [] acc = ("lhs", collectRuleLHS rules []) : acc where
-  collectRuleLHS :: [NameSpaceRule] -> [NameSpaceRule] -> [NameSpaceRule]
-  collectRuleLHS ((LeftLHS ctxname, r):rest) acc =
-    collectRuleLHS rest ((LeftLHS ctxname, r) : acc)
-  collectRuleLHS (_:rest) acc = collectRuleLHS rest acc
-  collectRuleLHS [] acc = acc
+collectRulesSyn rules [] acc = ("lhs", [(LeftLHS c, r) | (LeftLHS c, r) <- rules]) : acc
 collectRulesSyn rules ((iden, _):rest) acc =
   collectRulesSyn rules rest (acc ++ [collectRulesOfIdSyn rules iden])
   where
     collectRulesOfIdSyn :: [NameSpaceRule] -> IdName -> (IdName, [NameSpaceRule])
-    collectRulesOfIdSyn nsr iden = (iden, filter (\(LeftSub fieldname ctxname, RightSub fieldname2 ctxName2) -> fieldname == iden) nsr)
+    collectRulesOfIdSyn nsr i = (iden, filter (\(LeftSub fieldname _, RightSub _ _) -> fieldname == i) nsr)
