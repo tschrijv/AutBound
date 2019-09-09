@@ -2,8 +2,6 @@
 
 module GeneralTerms where
 
-import Data.Maybe
-
 type FoldName         = String
 type ConstructorName  = String
 type SortName         = String
@@ -21,47 +19,50 @@ data NamespaceInstance
 
 --the left part of an expression like t1.ctx=lhs.ctx
 data LeftExpr
-  = LHS InstanceName
-  | Sub IdName InstanceName
+  = LeftLHS InstanceName
+  | LeftSub IdName InstanceName
   deriving (Show, Eq)
 
 --the right part of an expression like t1.ctx=lhs.ctx
 data RightExpr
-  = ExprLHS InstanceName
-  | ExprSub IdName InstanceName
-  | ExprAdd RightExpr IdName
+  = RightLHS InstanceName
+  | RightSub IdName InstanceName
+  | RightAdd RightExpr IdName
   deriving (Show, Eq)
 
 --the complete expression of like t1.ctx=lhs.ctx
 type NameSpaceRule = (LeftExpr, RightExpr)
 
 --the definition of a namespace declaration
-data NameSpaceDef =
-  MkNameSpace NameSpaceName SortName [String]
+data NameSpaceDef
+  = MkNameSpace NameSpaceName SortName [String]
   deriving (Show, Eq)
 
 --definition of a sort
-data SortDef =
-  MkDefSort SortName [NamespaceInstance] [ConstructorDef] Bool
+data SortDef
+  = MkDefSort SortName [NamespaceInstance] [ConstructorDef] Bool
   deriving (Show, Eq)
 
 --definition of a constructor
 data ConstructorDef
-  = MkDefConstructor ConstructorName
-                     [(IdName, SortName)] --list where all is inherited
-                     [(IdName, SortName)] -- just this
-                     [(IdName, SortName, FoldName)] -- for Foldables
-                     [NameSpaceRule]
-                     [HaskellTypeName]
-  | MkBindConstructor ConstructorName
-                      [(IdName, SortName)] --list where all is inherited
-                      [(IdName, SortName)]
-                      [(IdName, SortName, FoldName)] -- for Foldables
-                      (String, NameSpaceName)
-                      [NameSpaceRule]
-                      [HaskellTypeName]
-  | MkVarConstructor ConstructorName
-                     InstanceName
+  = MkDefConstructor
+      ConstructorName
+      [(IdName, SortName)] --list where all is inherited
+      [(IdName, SortName)] -- just this
+      [(IdName, SortName, FoldName)] -- for Foldables
+      [NameSpaceRule]
+      [HaskellTypeName]
+  | MkBindConstructor
+      ConstructorName
+      [(IdName, SortName)] --list where all is inherited
+      [(IdName, SortName)]
+      [(IdName, SortName, FoldName)] -- for Foldables
+      (String, NameSpaceName)
+      [NameSpaceRule]
+      [HaskellTypeName]
+  | MkVarConstructor
+      ConstructorName
+      InstanceName
   deriving (Show, Eq)
 
 class Named a where
@@ -73,9 +74,8 @@ instance Named SortDef where
 instance Named NameSpaceDef where
   getName (MkNameSpace name _ _) = name
 
-instance Named ConstructorDef
-    -- get the name of definition of a constructor
-                                                   where
+-- get the name of definition of a constructor
+instance Named ConstructorDef where
   getName (MkDefConstructor cname _ _ _ _ _)    = cname
   getName (MkVarConstructor cname _)            = cname
   getName (MkBindConstructor cname _ _ _ _ _ _) = cname
@@ -85,23 +85,31 @@ instance Named NamespaceInstance where
   getName (SYN name _) = name
 
 --get the defs of constructors in the sort
-getConstructorDefsSort :: SortDef -> [ConstructorDef]
-getConstructorDefsSort (MkDefSort _ _ cdefs _) = cdefs
+getConstrDefs :: SortDef -> [ConstructorDef]
+getConstrDefs (MkDefSort _ _ cdefs _) = cdefs
+
+-- get the instances by the sorts in the
+getNSI :: SortDef -> [NamespaceInstance]
+getNSI (MkDefSort _ instances _ _) = instances
+
+--get the names   contexts and the namespaces it refers to for a sorts in a tuple
+getNameAndNSI :: SortDef -> (SortName, [NamespaceInstance])
+getNameAndNSI s = (getName s, getNSI s)
 
 -- get the name on the left expression
 getLeftExprId :: LeftExpr -> [IdName]
-getLeftExprId (LHS _)    = []
-getLeftExprId (Sub id _) = [id]
+getLeftExprId (LeftLHS _)    = []
+getLeftExprId (LeftSub iden _) = [iden]
 
 getLeftIdSub :: LeftExpr -> IdName
-getLeftIdSub (LHS _)    = ""
-getLeftIdSub (Sub id _) = id
+getLeftIdSub (LeftLHS _)    = ""
+getLeftIdSub (LeftSub iden _) = iden
 
 --gets the idName of the rightexpr
 getRightExprId :: RightExpr -> [IdName]
-getRightExprId (ExprLHS _)      = []
-getRightExprId (ExprSub name _) = [name]
-getRightExprId (ExprAdd expr _) = getRightExprId expr
+getRightExprId (RightLHS _)      = []
+getRightExprId (RightSub name _) = [name]
+getRightExprId (RightAdd expr _) = getRightExprId expr
 
 -- get the namespaceName where the instance is referring to
 getNamespaceNameInstance :: NamespaceInstance -> NameSpaceName
@@ -110,66 +118,32 @@ getNamespaceNameInstance (SYN _ name) = name
 
 --get the name of the context of a left expr
 getInstanceNamesOfRuleLeft :: LeftExpr -> InstanceName
-getInstanceNamesOfRuleLeft (LHS name)   = name
-getInstanceNamesOfRuleLeft (Sub _ name) = name
+getInstanceNamesOfRuleLeft (LeftLHS name)   = name
+getInstanceNamesOfRuleLeft (LeftSub _ name) = name
 
 --get the name of the context of a right expr
 getInstanceNamesOfRuleRight :: RightExpr -> InstanceName
-getInstanceNamesOfRuleRight (ExprAdd expr _) = getInstanceNamesOfRuleRight expr
-getInstanceNamesOfRuleRight (ExprLHS name) = name
-getInstanceNamesOfRuleRight (ExprSub _ name) = name
-
--- get the instances by the sorts in the
-getInstanceSorts :: SortDef -> [NamespaceInstance]
-getInstanceSorts (MkDefSort _ instances _ _) = instances
-
---get the names   contexts and the namespaces it refers to for a sorts in a tuple
-sortNameAndNSI :: SortDef -> (SortName, [NamespaceInstance])
-sortNameAndNSI s = (getName s, getInstanceSorts s)
+getInstanceNamesOfRuleRight (RightAdd expr _) = getInstanceNamesOfRuleRight expr
+getInstanceNamesOfRuleRight (RightLHS name) = name
+getInstanceNamesOfRuleRight (RightSub _ name) = name
 
 --collects all the rules of the identifiers used in the constructor and groups them in a list with each identifier getting a list of rules
-collectRulesAllField ::
-     [NameSpaceRule]
-  -> [(IdName, SortName)]
-  -> [(IdName, [NameSpaceRule])]
-  -> [(IdName, [NameSpaceRule])]
-collectRulesAllField rules [] acc = acc
-collectRulesAllField rules ((id, _):rest) acc =
-  collectRulesAllField rules rest (acc ++ [collectRulesOfId rules id []])
+collectRulesAllField :: [NameSpaceRule] -> [(IdName, SortName)] -> [(IdName, [NameSpaceRule])]
+collectRulesAllField rules = map (\(i, _) -> collectRulesOfId rules i)
   where
     -- group the rules of one  identifier together
-    collectRulesOfId ::
-        [NameSpaceRule] -> IdName -> [NameSpaceRule] -> (IdName, [NameSpaceRule])
-    collectRulesOfId [] id acc = (id, acc)
-    collectRulesOfId ((Sub fieldname ctxname, r):rest) id acc
-      | fieldname == id =
-        collectRulesOfId rest id ((Sub fieldname ctxname, r) : acc)
-      | otherwise = collectRulesOfId rest id acc
-    collectRulesOfId (_:rest) id acc = collectRulesOfId rest id acc
+    collectRulesOfId :: [NameSpaceRule] -> IdName -> (IdName, [NameSpaceRule])
+    collectRulesOfId nsr i = (i, filter (\(LeftSub fieldname ctxname, r) -> fieldname == i) nsr)
 
-collectRulesOfIdSyn ::
-     [NameSpaceRule] -> IdName -> [NameSpaceRule] -> (IdName, [NameSpaceRule])
-collectRulesOfIdSyn [] id acc = (id, acc)
-collectRulesOfIdSyn ((Sub fieldname ctxname, ExprSub fieldname2 ctxName2):rest) id acc
-  | fieldname == id =
-    collectRulesOfIdSyn
-      rest
-      id
-      ((Sub fieldname ctxname, ExprSub fieldname2 ctxName2) : acc)
-  | otherwise = collectRulesOfIdSyn rest id acc
-collectRulesOfIdSyn (_:rest) id acc = collectRulesOfIdSyn rest id acc
-
-collectRuleLHS :: [NameSpaceRule] -> [NameSpaceRule] -> [NameSpaceRule]
-collectRuleLHS ((LHS ctxname, r):rest) acc =
-  collectRuleLHS rest ((LHS ctxname, r) : acc)
-collectRuleLHS (_:rest) acc = collectRuleLHS rest acc
-collectRuleLHS [] acc = acc
-
-collectRulesSyn ::
-     [NameSpaceRule]
-  -> [(IdName, SortName)]
-  -> [(IdName, [NameSpaceRule])]
-  -> [(IdName, [NameSpaceRule])]
-collectRulesSyn rules [] acc = (("lhs", collectRuleLHS rules []) : acc)
-collectRulesSyn rules ((id, _):rest) acc =
-  collectRulesSyn rules rest (acc ++ [collectRulesOfIdSyn rules id []])
+collectRulesSyn :: [NameSpaceRule] -> [(IdName, SortName)] -> [(IdName, [NameSpaceRule])] -> [(IdName, [NameSpaceRule])]
+collectRulesSyn rules [] acc = ("lhs", collectRuleLHS rules []) : acc where
+  collectRuleLHS :: [NameSpaceRule] -> [NameSpaceRule] -> [NameSpaceRule]
+  collectRuleLHS ((LeftLHS ctxname, r):rest) acc =
+    collectRuleLHS rest ((LeftLHS ctxname, r) : acc)
+  collectRuleLHS (_:rest) acc = collectRuleLHS rest acc
+  collectRuleLHS [] acc = acc
+collectRulesSyn rules ((iden, _):rest) acc =
+  collectRulesSyn rules rest (acc ++ [collectRulesOfIdSyn rules iden])
+  where
+    collectRulesOfIdSyn :: [NameSpaceRule] -> IdName -> (IdName, [NameSpaceRule])
+    collectRulesOfIdSyn nsr iden = (iden, filter (\(LeftSub fieldname ctxname, RightSub fieldname2 ctxName2) -> fieldname == iden) nsr)

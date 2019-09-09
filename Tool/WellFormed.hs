@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wall #-}
+
 module WellFormed (wellFormed) where
 
 import GeneralTerms
@@ -46,11 +48,11 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
       namespacenames
   c <-
     wellFormedConstructors
-      (getConstructorDefsSort s)
-      (map getName (getInstanceSorts s))
+      (getConstrDefs s)
+      (map getName (getNSI s))
   d <- helpWellFormedInstances (getInstanceSortsNameSpaceNames s) namespacenames
-  e <- helpWellFormedVariables (getConstructorDefsSort s) (getInstanceSorts s)
-  f <- helpWellFormedInstanceNames (map getName (getInstanceSorts s))
+  e <- helpWellFormedVariables (getConstrDefs s) (getNSI s)
+  f <- helpWellFormedInstanceNames (map getName (getNSI s))
   helpWellFormed
     ([], lanrest, imp)
     ((getName s) : sortnames)
@@ -58,7 +60,7 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
     ((getSortsUsedByConstructors s) ++ sortconsnames)
     namespacenames
     sortnamespaces
-    (sortNameAndNSI s : instTable)
+    (getNameAndNSI s : instTable)
     (s : sortdefs)
     where
       --get the namespaces used by the constructors
@@ -68,7 +70,7 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
           fromJust
           (filter
             isJust
-            (map (getNamespaceNameConstructor) (getConstructorDefsSort s)))
+            (map (getNamespaceNameConstructor) (getConstrDefs s)))
         where
           --getNamespaceName of a ConstructorDef
           getNamespaceNameConstructor :: ConstructorDef -> Maybe NameSpaceName
@@ -88,7 +90,7 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
       --get the sorts used in all constructors of the sort
       getSortsUsedByConstructors :: SortDef -> [SortName]
       getSortsUsedByConstructors s =
-        (getSortsOfConstructors (getConstructorDefsSort s))
+        (getSortsOfConstructors (getConstrDefs s))
         where
           -- get the sorts used by constructors in a list of constructors
           getSortsOfConstructors :: [ConstructorDef] -> [SortName]
@@ -164,9 +166,9 @@ wellFormedConstructor cons inst = do
 
     -- get the name on the right expression
     getRightExprIdBinding :: RightExpr -> [IdName]
-    getRightExprIdBinding (ExprLHS _)       = []
-    getRightExprIdBinding (ExprSub _ _)     = []
-    getRightExprIdBinding (ExprAdd expr id) = (id : (getRightExprIdBinding expr))
+    getRightExprIdBinding (RightLHS _)       = []
+    getRightExprIdBinding (RightSub _ _)     = []
+    getRightExprIdBinding (RightAdd expr id) = (id : (getRightExprIdBinding expr))
 
     -- get all the identifiers without the binder included
     getIdentifiersWithoutBinding :: ConstructorDef -> [String]
@@ -227,7 +229,7 @@ helpWellFormedVariables ((MkVarConstructor _ contextName):rest) instances = do
 helpWellFormedVariables (_:rest) instances =
   helpWellFormedVariables rest instances
 
--- --function to detect if all namespaceinstances used in rules exist
+-- --function to detect if all getNSI used in rules exist
 -- helpWellFormedInstanceNamesExist ::
 --      [InstanceName] -> [InstanceName] -> Either String Bool
 -- helpWellFormedInstanceNamesExist l l2 =
@@ -374,7 +376,7 @@ helpWellFormedIdentifierInRightExpr l l2 =
     l2
     "Identifier in right expression does not appear as constructorfield"
 
---LeftExpressions that are LHS should be SYN contexts
+--LeftExpressions that are LeftLHS should be SYN contexts
 helpWellFormedRulesLHSExpressions ::
      [SortDef] -> [(SortName, [NamespaceInstance])] -> Either String Bool
 helpWellFormedRulesLHSExpressions sdefs table
@@ -392,7 +394,7 @@ helpWellFormedRulesLHSExpressionsSort ::
 helpWellFormedRulesLHSExpressionsSort table s =
   concatMap
     (helpWellFormedRulesLHSExpressionsConstructor (getName s) table)
-    (getConstructorDefsSort s)
+    (getConstrDefs s)
 
 helpWellFormedRulesLHSExpressionsConstructor ::
      SortName
@@ -412,7 +414,7 @@ helpWellFormedRulesInstancesRuleLHSLeft ::
   -> [(SortName, [NamespaceInstance])]
   -> NameSpaceRule
   -> Either String Bool
-helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LHS contextName, ExprLHS contextName2)
+helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LeftLHS contextName, RightLHS contextName2)
   | length (findContextToNamespaceInstanceSyn contextName sname tableInstances) >
       0 &&
       length
@@ -423,7 +425,7 @@ helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (L
       (contextName ++
        contextName2 ++
        "not a good combination of synthesised and inherited namespaces")
-helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LHS contextName, ExprSub fieldname2 contextName2)
+helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LeftLHS contextName, RightSub fieldname2 contextName2)
   | (lookup fieldname2 tableIdentifiers) == Nothing = return True
   | length (findContextToNamespaceInstanceSyn contextName sname tableInstances) >
       0 &&
@@ -434,13 +436,13 @@ helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (L
            tableInstances) >
       0 = return True
   | otherwise = Left (contextName ++ "is not a synthesised namespace")
-helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (leftexpr, ExprAdd expr _) =
+helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (leftexpr, RightAdd expr _) =
   helpWellFormedRulesInstancesRuleLHSLeft
     sname
     tableIdentifiers
     tableInstances
     (leftexpr, expr)
-helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (Sub fieldname contextName, ExprSub fieldname2 contextName2)
+helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LeftSub fieldname contextName, RightSub fieldname2 contextName2)
   | sname2 == Nothing || sname1 == Nothing = return True
   | fieldname == fieldname2 =
     Left
@@ -462,7 +464,7 @@ helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (S
   where
     sname2 = (lookup fieldname2 tableIdentifiers)
     sname1 = (lookup fieldname tableIdentifiers)
-helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (Sub fieldname contextName, ExprLHS contextName2)
+helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LeftSub fieldname contextName, RightLHS contextName2)
   | (lookup fieldname tableIdentifiers) == Nothing = return True
   | length
      (findContextToNamespaceInstanceInh
@@ -509,7 +511,7 @@ isWellFormedBindToContextConstructorRule ::
  -> [(SortName, [NamespaceInstance])]
  -> NameSpaceRule
  -> Either String Bool
-isWellFormedBindToContextConstructorRule sname namespacebind tableIdentifiers tableInstances (_, ExprAdd expr id)
+isWellFormedBindToContextConstructorRule sname namespacebind tableIdentifiers tableInstances (_, RightAdd expr id)
  | getRightExprId expr == [] &&
      any
        (\x ->
@@ -546,7 +548,7 @@ isWellFormedBindToContextSort ::
 isWellFormedBindToContextSort table s =
  concatMap
    (isWellFormedBindToContextConstructor (getName s) table)
-   (getConstructorDefsSort s)
+   (getConstrDefs s)
 
 --binders should only be added to contexts that correspond to the same namespace (not necessarily the same context)
 isWellFormedBindToContext ::
@@ -645,7 +647,7 @@ helpWellFormedRulesInstancesSort ::
 helpWellFormedRulesInstancesSort table s =
  concatMap
    (helpWellFormedRulesInstancesConstructor (getName s) table)
-   (getConstructorDefsSort s)
+   (getConstrDefs s)
 
 -- identifiers in Rules can only use contexts they are allowed to use
 helpWellFormedRulesInstances ::

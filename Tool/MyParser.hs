@@ -322,35 +322,35 @@ pLHSLeftExpr = do
   pReserved "lhs"
   _ <- pDot
   a <- pIdentifier
-  return (LHS a)
+  return (LeftLHS a)
 
 pSubLeftExpr :: Parser LeftExpr
 pSubLeftExpr = do
   a <- pIdentifier
   _ <- pDot
   b <- pIdentifier
-  return (Sub a b)
+  return (LeftSub a b)
 
 pRightExprAdd :: Parser RightExpr
 pRightExprAdd = do
   a <- pRightExprLHS <|> pRightExprSub
   _ <- pSymbol ","
   b <- pIdentifier
-  return (ExprAdd a b)
+  return (RightAdd a b)
 
 pRightExprLHS :: Parser RightExpr
 pRightExprLHS = do
   pReserved "lhs"
   _ <- pSymbol "."
   a <- pIdentifier
-  return (ExprLHS a)
+  return (RightLHS a)
 
 pRightExprSub :: Parser RightExpr
 pRightExprSub = do
   a <- pIdentifier
   _ <- pSymbol "."
   b <- pIdentifier
-  return (ExprSub a b)
+  return (RightSub a b)
 
 -- * Haskell code
 -- ----------------------------------------------------------------------------

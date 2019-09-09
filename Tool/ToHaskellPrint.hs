@@ -12,7 +12,7 @@ import Utility
 toHaskellLanguageStart :: Language -> String -> Doc String
 toHaskellLanguageStart (ndecls, sdecls, idecls, hsCode) name =
   toHaskellLanguage (reverse ndecls) table (reverse sdecls) name idecls hsCode -- TODO: do we need to reverse?
-  where table = map sortNameAndNSI (reverse sdecls)
+  where table = map getNameAndNSI (reverse sdecls)
 
 toHaskellLanguage ::
      [NameSpaceDef]
@@ -179,7 +179,7 @@ sortCanAccessVariables allSorts listVisited s
       or
         (map
            (constructorCanAccessVariables sortDefTable listVisited)
-           (getConstructorDefsSort s))
+           (getConstrDefs s))
 
 getTableOfHasAccessVariable :: [SortDef] -> [(SortName, Bool)]
 getTableOfHasAccessVariable [] = []
@@ -206,7 +206,7 @@ isVariable (MkVarConstructor _ _) = True
 isVariable _                      = False
 
 hasVariables :: SortDef -> Bool
-hasVariables s = or (map isVariable (getConstructorDefsSort s))
+hasVariables s = or (map isVariable (getConstrDefs s))
 
 -- * Imports
 -- ----------------------------------------------------------------------------
@@ -523,8 +523,7 @@ toHaskellmapConstructorMappingFunction sname inst (MkDefConstructor consName lis
     rules
     (collectRulesAllField
        rules
-       (foldToNormalList folds ++ lists ++ listSorts)
-       [])
+       (foldToNormalList folds ++ lists ++ listSorts))
     (foldToNormalList folds)
     lists
     listSorts
@@ -539,8 +538,7 @@ toHaskellmapConstructorMappingFunction sname inst (MkBindConstructor consName li
     rules
     (collectRulesAllField
        rules
-       (foldToNormalList folds ++ lists ++ listSorts)
-       [])
+       (foldToNormalList folds ++ lists ++ listSorts))
     (foldToNormalList folds)
     lists
     listSorts
@@ -763,13 +761,13 @@ applyOneRuleLogic ::
   -> [(IdName, SortName)]
   -> [(SortName, [NamespaceInstance])]
   -> Maybe (Doc String)
-applyOneRuleLogic sname inst rules (l, ExprLHS _) folds lists listSorts table =
+applyOneRuleLogic sname inst rules (l, RightLHS _) folds lists listSorts table =
   Nothing
-applyOneRuleLogic sname inst rules (l, ExprAdd expr _) folds lists listSorts table =
+applyOneRuleLogic sname inst rules (l, RightAdd expr _) folds lists listSorts table =
   return
     (pretty " S" <> pretty (getNameInstancenamespace inst) <+>
      stepLogic sname inst rules (l, expr) folds lists listSorts table)
-applyOneRuleLogic sname inst rules (l, ExprSub id context) folds lists listSorts table
+applyOneRuleLogic sname inst rules (l, RightSub id context) folds lists listSorts table
   | (elem id (map fst lists) || elem id (map fst folds)) && (isJust newrule) =
     return
       (pretty "generateHnat" <> pretty (getNameInstancenamespace inst) <+>
@@ -804,13 +802,13 @@ stepLogic ::
   -> [(IdName, SortName)]
   -> [(SortName, [NamespaceInstance])]
   -> Doc String
-stepLogic sname inst rules (l, ExprLHS _) folds lists listSorts table =
+stepLogic sname inst rules (l, RightLHS _) folds lists listSorts table =
   pretty ""
-stepLogic sname inst rules (l, ExprAdd expr _) folds lists listSorts table =
+stepLogic sname inst rules (l, RightAdd expr _) folds lists listSorts table =
   (pretty " S" <> pretty (getNameInstancenamespace inst) <+>
    stepLogic sname inst rules (l, expr) folds lists listSorts table) <+>
   pretty ""
-stepLogic sname inst rules (l, ExprSub id context) folds lists listSorts table
+stepLogic sname inst rules (l, RightSub id context) folds lists listSorts table
   | (elem id (map fst lists) || elem id (map fst folds)) && (isJust newrule) =
     (pretty "generateHnat" <> pretty (getNameInstancenamespace inst) <+>
      pretty "( length" <+> pretty id <+> pretty ")" <+> nextStep)
@@ -1112,7 +1110,7 @@ generateSortSynSystemSort sname namespaces table sort =
     namespaces
     table
     sort
-    (filter isSyn (getInstanceSorts sort))
+    (filter isSyn (getNSI sort))
 
 generateSortSynSystemSortPerSyn ::
      SortName
@@ -1128,7 +1126,7 @@ generateSortSynSystemSortPerSyn sname namespaces table sort (x:xrest) =
     sname
     namespaces
     table
-    (getConstructorDefsSort sort)
+    (getConstrDefs sort)
     x
 
 generateTypingsyn :: SortName -> InstanceName -> Doc String
@@ -1189,12 +1187,12 @@ haskellTypesToUnderscore []     = pretty ""
 haskellTypesToUnderscore (x:xs) = pretty "_" <+> haskellTypesToUnderscore xs
 
 -- isExprAdd :: RightExpr -> Bool
--- isExprAdd (ExprAdd _ _) = True
+-- isExprAdd (RightAdd _ _) = True
 -- isExprAdd _             = False
 
 -- isEndPoint :: NameSpaceRule -> Bool
--- isEndPoint (l, ExprLHS _)      = True
--- isEndPoint (l, ExprAdd expr _) = isEndPoint (l, expr)
+-- isEndPoint (l, RightLHS _)      = True
+-- isEndPoint (l, RightAdd expr _) = isEndPoint (l, expr)
 -- isEndPoint _                   = False
 
 --after = part logic of the syn functions
@@ -1226,12 +1224,12 @@ navigateRules ::
   -> [NameSpaceRule]
   -> NameSpaceRule
   -> Doc String
-navigateRules sname inst namespaces table listSorts rules (l, ExprAdd expr _) =
+navigateRules sname inst namespaces table listSorts rules (l, RightAdd expr _) =
   pretty "S" <> pretty (getNameInstancenamespace inst) <+>
   navigateRules sname inst namespaces table listSorts rules (l, expr)
-navigateRules sname inst namespaces table listSorts rules (LHS _, ExprLHS _) =
+navigateRules sname inst namespaces table listSorts rules (LeftLHS _, RightLHS _) =
   pretty "c"
-navigateRules sname inst namespaces table listSorts rules (LHS _, ExprSub id _)
+navigateRules sname inst namespaces table listSorts rules (LeftLHS _, RightSub id _)
   | isJust newrule =
     functionName <+>
     pretty "(" <+>
@@ -1244,9 +1242,9 @@ navigateRules sname inst namespaces table listSorts rules (LHS _, ExprSub id _)
       pretty "addToEnvironment" <> pretty (lookup id listSorts) <>
       pretty (getName inst) <+>
       pretty id
-navigateRules sname inst namespaces table listSorts rules (Sub _ _, ExprLHS _) =
+navigateRules sname inst namespaces table listSorts rules (LeftSub _ _, RightLHS _) =
   pretty "c"
-navigateRules sname inst namespaces table listSorts rules (Sub _ _, ExprSub id _)
+navigateRules sname inst namespaces table listSorts rules (LeftSub _ _, RightSub id _)
   | isJust newrule =
     pretty "(" <+>
     functionName <+>
@@ -1366,8 +1364,7 @@ generateFreeVariableFunctionConstructor sname inst (MkDefConstructor consName li
     rules
     (collectRulesAllField
        rules
-       (foldToNormalList folds ++ lists ++ listSorts)
-       [])
+       (foldToNormalList folds ++ lists ++ listSorts))
     (foldToNormalList folds)
     lists
     listSorts
@@ -1380,8 +1377,7 @@ generateFreeVariableFunctionConstructor sname inst (MkBindConstructor consName l
     rules
     (collectRulesAllField
        rules
-       (foldToNormalList folds ++ lists ++ listSorts)
-       [])
+       (foldToNormalList folds ++ lists ++ listSorts))
     (foldToNormalList folds)
     lists
     listSorts
