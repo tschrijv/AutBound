@@ -475,6 +475,32 @@ helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (S
       0 = return True
   | otherwise = Left (contextName ++ "is not a synthesised namespace")
 
+-- filters all the synthesised namespaces
+findContextToNamespaceInstanceSyn ::
+     InstanceName
+  -> SortName
+  -> [(SortName, [NamespaceInstance])]
+  -> [NamespaceInstance]
+findContextToNamespaceInstanceSyn ctxName sname table =
+  filter
+    (\x -> getname x == ctxName)
+    [ SYN ctxNamesyn namespacename
+    | SYN ctxNamesyn namespacename <- fromJust (lookup sname table)
+    ]
+
+-- filters all the inherited namespaces
+findContextToNamespaceInstanceInh ::
+     InstanceName
+  -> SortName
+  -> [(SortName, [NamespaceInstance])]
+  -> [NamespaceInstance]
+findContextToNamespaceInstanceInh ctxName sname table =
+  filter
+    (\x -> getname x == ctxName)
+    [ INH ctxNameinh namespacename
+    | INH ctxNameinh namespacename <- fromJust (lookup sname table)
+    ]
+
   -- checking if the binding to a constructorrule is ok by looking if the right expression is of the right type
 isWellFormedBindToContextConstructorRule ::
     SortName

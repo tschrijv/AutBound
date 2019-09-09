@@ -2,7 +2,6 @@
 
 module GeneralTerms where
 
-import Data.Char
 import Data.Maybe
 
 type FoldName         = String
@@ -85,12 +84,6 @@ instance Named NamespaceInstance where
   getname (INH name _) = name
   getname (SYN name _) = name
 
-toLowerCaseFirst :: String -> String
-toLowerCaseFirst (first:rest) = ((toLower first) : rest)
-
-capitalize :: String -> String
-capitalize (first:rest) = ((toUpper first) : rest)
-
 --get the defs of constructors in the sort
 getConstructorDefsSort :: SortDef -> [ConstructorDef]
 getConstructorDefsSort (MkDefSort _ _ cdefs _) = cdefs
@@ -129,14 +122,6 @@ getInstanceNamesOfRuleRight (ExprSub _ name) = name
 -- get the instances by the sorts in the
 getInstanceSorts :: SortDef -> [NamespaceInstance]
 getInstanceSorts (MkDefSort _ instances _ _) = instances
-
-isInh :: NamespaceInstance -> Bool
-isInh (INH _ _) = True
-isInh _         = False
-
-isSyn :: NamespaceInstance -> Bool
-isSyn (SYN _ _) = True
-isSyn _         = False
 
 --get the names   contexts and the namespaces it refers to for a sorts in a tuple
 getTableOfInstancesToNamespacesSortWithSortName ::
@@ -190,99 +175,3 @@ collectRulesSyn ::
 collectRulesSyn rules [] acc = (("lhs", collectRuleLHS rules []) : acc)
 collectRulesSyn rules ((id, _):rest) acc =
   collectRulesSyn rules rest (acc ++ [collectRulesOfIdSyn rules id []])
-
--- filters all the synthesised namespaces
-findContextToNamespaceInstanceSyn ::
-     InstanceName
-  -> SortName
-  -> [(SortName, [NamespaceInstance])]
-  -> [NamespaceInstance]
-findContextToNamespaceInstanceSyn ctxName sname table =
-  filter
-    (\x -> getname x == ctxName)
-    [ SYN ctxNamesyn namespacename
-    | SYN ctxNamesyn namespacename <- fromJust (lookup sname table)
-    ]
-
--- filters all the inherited namespaces
-findContextToNamespaceInstanceInh ::
-     InstanceName
-  -> SortName
-  -> [(SortName, [NamespaceInstance])]
-  -> [NamespaceInstance]
-findContextToNamespaceInstanceInh ctxName sname table =
-  filter
-    (\x -> getname x == ctxName)
-    [ INH ctxNameinh namespacename
-    | INH ctxNameinh namespacename <- fromJust (lookup sname table)
-    ]
-
-filterTableBySameNamespace ::
-     NamespaceInstance
-  -> [(SortName, [NamespaceInstance])]
-  -> [(SortName, [NamespaceInstance])]
-filterTableBySameNamespace inst table =
-  map (filterTableBySameNamespaceSort (getNamespaceNameInstance inst)) table
-
-filterTableBySameNamespaceSort ::
-     NameSpaceName
-  -> (SortName, [NamespaceInstance])
-  -> (SortName, [NamespaceInstance])
-filterTableBySameNamespaceSort namespacename (sname, list) = (sname, newlist)
-  where
-    newlist = filter (\x -> getNamespaceNameInstance x == namespacename) list
-
--- function generating for each Sort, if it has access to some variable
-isVariable :: ConstructorDef -> Bool
-isVariable (MkVarConstructor _ _) = True
-isVariable _                      = False
-
-hasVariables :: SortDef -> Bool
-hasVariables s = or (map isVariable (getConstructorDefsSort s))
-
-getTableOfHasVariable :: [SortDef] -> [(SortName, Bool)]
-getTableOfHasVariable [] = []
-getTableOfHasVariable (s:srest) =
-  ((getname s, hasVariables s) : getTableOfHasVariable srest)
-
-hasAccessSortName :: [(SortName, SortDef)] -> [SortName] -> SortName -> Bool
-hasAccessSortName table visited nextSort
-  | any (\x -> x == nextSort) visited = False
-  | otherwise =
-    snd
-      (sortCanAccessVariables
-         (map snd table)
-         (nextSort : visited)
-         (fromJust (lookup nextSort table)))
-
-constructorCanAccessVariables ::
-     [(SortName, SortDef)] -> [SortName] -> ConstructorDef -> Bool
-constructorCanAccessVariables table visited (MkVarConstructor _ _) = True
-constructorCanAccessVariables table visited (MkBindConstructor _ listSorts sorts folds _ _ _) =
-  or
-    (map
-       (hasAccessSortName table visited)
-       ((map snd sorts) ++ (map snd listSorts) ++ map (\(a, b, c) -> b) folds))
-constructorCanAccessVariables table visited (MkDefConstructor _ listSorts sorts folds _ _) =
-  or
-    (map
-       (hasAccessSortName table visited)
-       ((map snd sorts) ++ (map snd listSorts) ++ map (\(a, b, c) -> b) folds))
-
-sortCanAccessVariables :: [SortDef] -> [SortName] -> SortDef -> (SortName, Bool)
-sortCanAccessVariables allSorts listVisited s
-  | hasAccess = (sname, hasAccess)
-  | otherwise = (sname, findPathToVariable)
-  where
-    sname = getname s
-    hasAccess = fromJust (lookup sname (getTableOfHasVariable allSorts))
-    sortDefTable = map (\x -> (getname x, x)) allSorts
-    findPathToVariable =
-      or
-        (map
-           (constructorCanAccessVariables sortDefTable listVisited)
-           (getConstructorDefsSort s))
-
-getTableOfHasAccessVariable :: [SortDef] -> [(SortName, Bool)]
-getTableOfHasAccessVariable [] = []
-getTableOfHasAccessVariable sList = map (sortCanAccessVariables sList []) sList

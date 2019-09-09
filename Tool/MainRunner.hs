@@ -24,4 +24,4 @@ toFileHaskell :: Language -> String -> IO (Either String (Doc String))
 toFileHaskell lang name =
   case wellFormed lang of
     Left failtxt2 -> return (Left failtxt2)
-    Right _ -> return (Right (toHaskellLanguageStart lang name))
+    Right _ -> return (Right (toHaskellLanguageStart lang name)) -- TODO: what about non well-formedness?

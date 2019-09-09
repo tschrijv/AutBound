@@ -1,5 +1,7 @@
 module Utility where
 
+import Data.Char
+
 --function to detect if all names are unique
 isUniqueInList :: [String] -> String -> Either String Bool
 isUniqueInList [] _ = return True
@@ -23,3 +25,9 @@ shouldBeInSecondList (str:strs) sorts err =
   if any (\x -> x == str) sorts
     then (shouldBeInSecondList strs sorts err)
     else Left (show (str) ++ err)
+
+toLowerCaseFirst :: String -> String
+toLowerCaseFirst (first:rest) = ((toLower first) : rest)
+
+capitalize :: String -> String
+capitalize (first:rest) = ((toUpper first) : rest)
