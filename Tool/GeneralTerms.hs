@@ -135,10 +135,12 @@ collectRulesAllField rules = map (\(i, _) -> collectRulesOfId rules i)
     collectRulesOfId :: [NameSpaceRule] -> IdName -> (IdName, [NameSpaceRule])
     collectRulesOfId nsr i = (i, filter (\(LeftSub fieldname _, _) -> fieldname == i) nsr)
 
-collectRulesSyn :: [NameSpaceRule] -> [(IdName, SortName)] -> [(IdName, [NameSpaceRule])] -> [(IdName, [NameSpaceRule])]
-collectRulesSyn rules [] acc = ("lhs", [(LeftLHS c, r) | (LeftLHS c, r) <- rules]) : acc
-collectRulesSyn rules ((iden, _):rest) acc =
-  collectRulesSyn rules rest (acc ++ [collectRulesOfIdSyn rules iden])
+collectRulesSyn :: [NameSpaceRule] -> [(IdName, SortName)] -> [(IdName, [NameSpaceRule])]
+collectRulesSyn rules ids =
+  foldl
+    (++)
+    [("lhs", [(LeftLHS c, r) | (LeftLHS c, r) <- rules])]
+    (map (\(iden, _) -> [collectRulesOfIdSyn rules iden]) ids)
   where
     collectRulesOfIdSyn :: [NameSpaceRule] -> IdName -> (IdName, [NameSpaceRule])
-    collectRulesOfIdSyn nsr i = (iden, filter (\(LeftSub fieldname _, RightSub _ _) -> fieldname == i) nsr)
+    collectRulesOfIdSyn nsr i = (i, filter (\(LeftSub fieldname _, RightSub _ _) -> fieldname == i) nsr)

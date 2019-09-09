@@ -1208,7 +1208,7 @@ getEnvFunctionGenerate sname inst namespaces table listSorts rules
   | fromJust (lookup "lhs" allrules) == [] = pretty "c"
   | otherwise = navigateRules sname inst namespaces table listSorts rules start
   where
-    allrules = (collectRulesSyn rules listSorts [])
+    allrules = (collectRulesSyn rules listSorts)
     start =
       fromJust
         (find
