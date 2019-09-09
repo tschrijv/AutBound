@@ -17,7 +17,7 @@ wellFormed (namespaces, sorts, imps, _) = do
 --then looks up if all sortnames,namespacenames and contructornames are unique, if all sorts in the constructors exist,
 --and whether sorts and constructors and namespaces have distinct names. Also namespacenames used in sorts should exist and constructors can only use variablebindings of namespaces they can access in the sort
 helpWellFormed ::
-     ([NameSpaceDef], [SortDef], [[String]])
+     ([NameSpaceDef], [SortDef], [(String, [String])])
   -> [SortName]
   -> [ConstructorName]
   -> [SortName]

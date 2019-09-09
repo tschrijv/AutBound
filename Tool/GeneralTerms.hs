@@ -8,7 +8,7 @@ type SortName         = String
 type NameSpaceName    = String
 type IdName           = String
 type HaskellTypeName  = String
-type Language         = ([NameSpaceDef], [SortDef], [[String]], [String])
+type Language         = ([NameSpaceDef], [SortDef], [(String, [String])], [String])
 type InstanceName     = String
 
 --the inherited or synthesised contexts

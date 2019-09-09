@@ -19,7 +19,7 @@ toHaskellLanguage ::
   -> [(SortName, [NamespaceInstance])]
   -> [SortDef]
   -> String
-  -> [[String]]
+  -> [(String, [String])]
   -> [String]
   -> Doc String
 toHaskellLanguage namespaces table accsorts name imports code =
@@ -211,13 +211,16 @@ hasVariables s = or (map isVariable (getConstrDefs s))
 -- * Imports
 -- ----------------------------------------------------------------------------
 
-genImportsAll :: [[String]] -> Doc String
-genImportsAll [] = pretty ""
-genImportsAll (str:rest) = genImports str <+> pretty "\n" <> genImportsAll rest
+genImportsAll :: [(String, [String])] -> Doc String
+genImportsAll imp =
+  foldl
+    (<>)
+    (pretty "")
+    (map (\x -> genImports x <+> pretty "\n") imp)
 
-genImports :: [String] -> Doc String
-genImports (str:[]) = pretty "import" <+> pretty str
-genImports (str:rest) =
+genImports :: (String, [String]) -> Doc String
+genImports (str, []) = pretty "import" <+> pretty str
+genImports (str, rest) =
   pretty "import" <+> pretty str <+> pretty "(" <+> genImportsRest rest
 
 genImportsRest :: [String] -> Doc String

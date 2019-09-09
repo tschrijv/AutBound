@@ -52,12 +52,12 @@ pLanguage = do
 -- * Imports
 -- ----------------------------------------------------------------------------
 
-pImports :: Parser [String]
+pImports :: Parser (String, [String])
 pImports = do
   pReserved "import"
   name <- pImportsName
   chooselist <- pImportChoose
-  return (name : chooselist)
+  return (name, chooselist)
 
 pImportsName :: Parser String
 pImportsName =
