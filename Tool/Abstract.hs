@@ -1,3 +1,9 @@
+{-# OPTIONS_GHC -Wall #-}
+
+module Abstract where
+
+import GeneralTerms
+
 -- | Variable, function and constructor names
 type Name = String
 -- | Data types (including built-in and classes)
@@ -23,3 +29,13 @@ data Program = P {
   functions :: [Function],
   code :: [String]
 }
+
+convert :: Language -> Program
+convert (nsd, sd, imp, cd) =
+  P {
+    imports = imp,
+    types = [],
+    instances = [],
+    functions = [],
+    code = cd
+  }
