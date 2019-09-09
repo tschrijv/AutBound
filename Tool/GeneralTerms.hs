@@ -65,24 +65,24 @@ data ConstructorDef
   deriving (Show, Eq)
 
 class Named a where
-  getname :: a -> String
+  getName :: a -> String
 
 instance Named SortDef where
-  getname (MkDefSort sname _ _ _) = sname
+  getName (MkDefSort sname _ _ _) = sname
 
 instance Named NameSpaceDef where
-  getname (MkNameSpace name _ _) = name
+  getName (MkNameSpace name _ _) = name
 
 instance Named ConstructorDef
     -- get the name of definition of a constructor
                                                    where
-  getname (MkDefConstructor cname _ _ _ _ _)    = cname
-  getname (MkVarConstructor cname _)            = cname
-  getname (MkBindConstructor cname _ _ _ _ _ _) = cname
+  getName (MkDefConstructor cname _ _ _ _ _)    = cname
+  getName (MkVarConstructor cname _)            = cname
+  getName (MkBindConstructor cname _ _ _ _ _ _) = cname
 
 instance Named NamespaceInstance where
-  getname (INH name _) = name
-  getname (SYN name _) = name
+  getName (INH name _) = name
+  getName (SYN name _) = name
 
 --get the defs of constructors in the sort
 getConstructorDefsSort :: SortDef -> [ConstructorDef]
@@ -124,20 +124,8 @@ getInstanceSorts :: SortDef -> [NamespaceInstance]
 getInstanceSorts (MkDefSort _ instances _ _) = instances
 
 --get the names   contexts and the namespaces it refers to for a sorts in a tuple
-getTableOfInstancesToNamespacesSortWithSortName ::
-     SortDef -> (SortName, [NamespaceInstance])
-getTableOfInstancesToNamespacesSortWithSortName s =
-  (getname s, getInstanceSorts s)
-
--- group the rules of one  identifier together
-collectRulesOfId ::
-     [NameSpaceRule] -> IdName -> [NameSpaceRule] -> (IdName, [NameSpaceRule])
-collectRulesOfId [] id acc = (id, acc)
-collectRulesOfId ((Sub fieldname ctxname, r):rest) id acc
-  | fieldname == id =
-    collectRulesOfId rest id ((Sub fieldname ctxname, r) : acc)
-  | otherwise = collectRulesOfId rest id acc
-collectRulesOfId (_:rest) id acc = collectRulesOfId rest id acc
+sortNameAndNSI :: SortDef -> (SortName, [NamespaceInstance])
+sortNameAndNSI s = (getName s, getInstanceSorts s)
 
 --collects all the rules of the identifiers used in the constructor and groups them in a list with each identifier getting a list of rules
 collectRulesAllField ::
@@ -148,6 +136,16 @@ collectRulesAllField ::
 collectRulesAllField rules [] acc = acc
 collectRulesAllField rules ((id, _):rest) acc =
   collectRulesAllField rules rest (acc ++ [collectRulesOfId rules id []])
+  where
+    -- group the rules of one  identifier together
+    collectRulesOfId ::
+        [NameSpaceRule] -> IdName -> [NameSpaceRule] -> (IdName, [NameSpaceRule])
+    collectRulesOfId [] id acc = (id, acc)
+    collectRulesOfId ((Sub fieldname ctxname, r):rest) id acc
+      | fieldname == id =
+        collectRulesOfId rest id ((Sub fieldname ctxname, r) : acc)
+      | otherwise = collectRulesOfId rest id acc
+    collectRulesOfId (_:rest) id acc = collectRulesOfId rest id acc
 
 collectRulesOfIdSyn ::
      [NameSpaceRule] -> IdName -> [NameSpaceRule] -> (IdName, [NameSpaceRule])
