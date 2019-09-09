@@ -17,7 +17,9 @@ type Function = (Name, [([Parameter], Expression)])
 -- | A complete program consists of type declarations, type class instances,
 -- and functions
 data Program = P {
+  imports :: [(String, [String])],
   types :: [(Type, [Constructor])],
   instances :: [(Type, Type, [Function])],
-  functions :: [Function]
-  }
+  functions :: [Function],
+  code :: [String]
+}
