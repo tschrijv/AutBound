@@ -2,6 +2,7 @@
 
 import Data.Text.Prettyprint.Doc
 import GeneralTerms
+import WellFormed
 import MyParser
 import Text.Parsec.String
 import ToHaskellPrint
