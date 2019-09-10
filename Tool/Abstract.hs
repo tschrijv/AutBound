@@ -9,7 +9,7 @@ type Name = String
 -- | Data types (including built-in and classes)
 type Type = String
 -- | Constructors are made up of a name and 0 or more type parameters
-type Constructor = (Name, [Type])
+data Constructor = Constr Name [Type]
 -- | Function parameters can be pure variables and pattern matches for constructors
 data Parameter = VarParam Name | ConstrParam Name [Parameter]
 -- | Expressions in function bodies can be
@@ -18,7 +18,7 @@ data Parameter = VarParam Name | ConstrParam Name [Parameter]
 data Expression = FnCall Name [Parameter] | ConstrInst Name [Parameter]
 -- | Functions are made up of a name and multiple head (parameter list)
 -- and body (expression) pairs
-type Function = (Name, [([Parameter], Expression)])
+data Function = Fn Name [([Parameter], Expression)]
 
 -- | A complete program consists of type declarations, type class instances,
 -- and functions
