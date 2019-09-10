@@ -34,7 +34,7 @@ printProgram name program =
     printImports (imports program),
     printTypeDecls (types program),
     printFunctions (functions program),
-    -- printInstances (instances program),
+    printInstances (instances program),
     printCode (code program)
   ]
 
@@ -67,6 +67,14 @@ printTypeDecls decls =
 
 printFunctions :: [Function] -> Doc String
 printFunctions fns = intoLines $ map pretty fns
+
+printInstances :: [(Type, Type, [Function])] -> Doc String
+printInstances ids = intoLines $ map (
+    \(cls, typ, fns) -> intoLines [
+      hsep [pretty "instance", pretty cls, pretty typ, pretty "where"],
+      printFunctions fns
+    ]
+  ) ids
 
 printCode :: [String] -> Doc String
 printCode lns = intoLines $ map pretty lns
