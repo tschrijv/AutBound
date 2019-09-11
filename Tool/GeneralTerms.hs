@@ -84,6 +84,17 @@ instance Named NamespaceInstance where
   getName (INH name _) = name
   getName (SYN name _) = name
 
+getConstrLists (MkDefConstructor _ lists _ _ _ _) = lists
+getConstrLists (MkBindConstructor _ lists _ _ _ _ _) = lists
+getConstrListSorts (MkDefConstructor _ _ listSorts _ _ _) = listSorts
+getConstrListSorts (MkBindConstructor _ _ listSorts _ _ _ _) = listSorts
+getConstrFolds (MkDefConstructor _ _ _ folds _ _) = folds
+getConstrFolds (MkBindConstructor _ _ _ folds _ _ _) = folds
+getConstrRules (MkDefConstructor _ _ _ _ rules _) = rules
+getConstrRules (MkBindConstructor _ _ _ _ _ rules _) = rules
+getConstrHTypes (MkDefConstructor _ _ _ _ _ hTypes) = hTypes
+getConstrHTypes (MkBindConstructor _ _ _ _ _ _ hTypes) = hTypes
+
 --get the defs of constructors in the sort
 getConstrDefs :: SortDef -> [ConstructorDef]
 getConstrDefs (MkDefSort _ _ cdefs _) = cdefs
