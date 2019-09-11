@@ -18,7 +18,7 @@ data Parameter = VarParam Name | ConstrParam Name [Parameter] | StringParam Stri
 -- | Expressions in function bodies can be
 -- function calls (function name + parameters)
 -- or constructor calls (constructor name + parameters)
-data Expression = FnCall Name [Expression] | ConstrInst Name [Expression] | VarExpr Name | Minus Expression Expression | IntExpr Int | StringExpr String
+data Expression = FnCall Name [Expression] | ConstrInst Name [Expression] | VarExpr Name | Minus Expression Expression | IntExpr Int | StringExpr String | IfExpr Expression Expression Expression | GTEExpr Expression Expression
 -- | Functions are made up of a name and multiple head (parameter list)
 -- and body (expression) pairs
 data Function = Fn Name [([Parameter], Expression)]
@@ -157,9 +157,6 @@ getMappings (nsd, sd, _, _) =
     --   where
     --     sortType = pretty (capitalize (lookForSortName namespaceName namespaces))
 
-    getVarAccessTable :: [SortDef] -> [(SortName, Bool)]
-    getVarAccessTable sList = map (sortCanAccessVariables sList []) sList
-
     getMapParamConstr :: ConstructorDef -> [Parameter]
     getMapParamConstr (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "hnat"]]
     getMapParamConstr cons = [ConstrParam (capitalize consName) (listToSpaceslower (foldToNormalList folds) ++ listToSpaceslower lists ++ listToSpaceslower listSorts ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1..]])]
@@ -195,50 +192,6 @@ getMappings (nsd, sd, _, _) =
         listSorts = getConstrListSorts cons
         hTypes = getConstrHTypes cons
         rules = getConstrRules cons
-
-    sortCanAccessVariables :: [SortDef] -> [SortName] -> SortDef -> (SortName, Bool)
-    sortCanAccessVariables allSorts listVisited s
-      | hasAccess = (sname, hasAccess)
-      | otherwise = (sname, findPathToVariable)
-      where
-        sname = getName s
-        hasAccess = fromJust (lookup sname (getTableOfHasVariable allSorts))
-        sortDefTable = map (\x -> (getName x, x)) allSorts
-        findPathToVariable =
-          or
-            (map
-              (constructorCanAccessVariables sortDefTable listVisited)
-              (getConstrDefs s))
-
-        getTableOfHasVariable :: [SortDef] -> [(SortName, Bool)]
-        getTableOfHasVariable sd = [(getName s, hasVariables s) | s <- sd]
-
-        -- function generating for each Sort, if it has access to some variable
-        hasVariables :: SortDef -> Bool
-        hasVariables s = or [True | (MkVarConstructor _ _) <- getConstrDefs s]
-
-        constructorCanAccessVariables :: [(SortName, SortDef)] -> [SortName] -> ConstructorDef -> Bool
-        constructorCanAccessVariables table visited (MkVarConstructor _ _) = True
-        constructorCanAccessVariables table visited (MkBindConstructor _ listSorts sorts folds _ _ _) =
-          or
-            (map
-              (hasAccessSortName table visited)
-              ((map snd sorts) ++ (map snd listSorts) ++ map (\(a, b, c) -> b) folds))
-        constructorCanAccessVariables table visited (MkDefConstructor _ listSorts sorts folds _ _) =
-          or
-            (map
-              (hasAccessSortName table visited)
-              ((map snd sorts) ++ (map snd listSorts) ++ map (\(a, b, c) -> b) folds))
-
-        hasAccessSortName :: [(SortName, SortDef)] -> [SortName] -> SortName -> Bool
-        hasAccessSortName table visited nextSort
-          | any (\x -> x == nextSort) visited = False
-          | otherwise =
-            snd
-              (sortCanAccessVariables
-                (map snd table)
-                (nextSort : visited)
-                (fromJust (lookup nextSort table)))
 
     sortMapName :: SortName -> String
     sortMapName sname = toLowerCaseFirst sname ++ "map"
@@ -374,3 +327,69 @@ getMappings (nsd, sd, _, _) =
         filterTableBySameNamespaceSort namespacename (sname, list) = (sname, newlist)
           where
             newlist = filter (\x -> getNamespaceNameInstance x == namespacename) list
+
+-- /////////////////////////////////////////////////////////////////////////////
+
+getShift :: Language -> [Function]
+getShift (nsd, sd, _, _) = let accessVarTable = getVarAccessTable sd
+  in concat [getShiftHelpers sd op accessVarTable nsd ++ getShiftFunctions sd nsd op accessVarTable | op <- ["plus", "minus"]]
+
+getShiftHelpers :: [SortDef] -> String -> [(SortName, Bool)] -> [NameSpaceDef] -> [Function]
+getShiftHelpers sd opName varAccessTable namespaces = let filtered = filter (\(MkDefSort sname inst cdefs _) -> (lookup sname varAccessTable) /= Nothing) sd
+  in concat $ map (\(MkDefSort sname inst cdefs _) -> constructorsToCheckShift cdefs sname opName namespaces inst) filtered
+  where
+    constructorsToCheckShift :: [ConstructorDef] -> SortName -> String -> [NameSpaceDef] -> [NamespaceInstance] -> [Function]
+    constructorsToCheckShift cdefs sname opName namespaces inst = let filtered = [MkVarConstructor c i | MkVarConstructor c i <- cdefs]
+      in map (\c -> constructorDefineCheckShift c sname opName namespaces inst) filtered
+
+    constructorDefineCheckShift :: ConstructorDef -> SortName -> String -> [NameSpaceDef] -> [NamespaceInstance] -> Function
+    constructorDefineCheckShift (MkVarConstructor consName instname) sname opName namespaces inst =
+      Fn ((toLowerCaseFirst sname) ++ "shiftHelp" ++ opName)
+        [
+          ([VarParam "d", VarParam "c", ConstrParam (capitalize consName) [VarParam "hnat"]],
+          IfExpr
+            (GTEExpr (VarExpr "hnat") (VarExpr "c"))
+            (ConstrInst (capitalize consName) [FnCall opName [VarExpr "hnat", VarExpr "d"]])
+            (ConstrInst (capitalize consName) [VarExpr "hnat"])
+          )
+        ]
+      where
+        instanceNamespace = lookforInstance inst (instname)
+        newname = lookForSortName (instanceNamespace) namespaces
+
+    lookforInstance :: [NamespaceInstance] -> String -> String
+    lookforInstance ((INH ctxname namespacename):rest) instname
+      | ctxname == instname = namespacename
+      | otherwise = lookforInstance rest instname
+    lookforInstance ((SYN ctxname namespacename):rest) instname =
+      lookforInstance rest instname
+
+-- generation of all shift functions
+getShiftFunctions :: [SortDef] -> [NameSpaceDef] -> String -> [(SortName, Bool)] -> [Function]
+getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> (lookup (getName s) varAccessTable) /= Nothing) sd
+  in map (\(MkDefSort sname namespaceDecl _ _) ->
+    -- generateTypingshift s defs opName <>
+    Fn
+      ((toLowerCaseFirst sname) ++ "shift" ++ opName)
+      [
+        ([VarParam "d", VarParam "t"],
+        FnCall
+          ((toLowerCaseFirst sname) ++ "map")
+          ((declarationsToFunctions namespaceDecl defs opName) ++ ([ConstrInst "Z" [], VarExpr "t"]))
+        )
+      ]
+  ) filtered
+  where
+    -- generateTypingshift :: SortDef -> [NameSpaceDef] -> String -> Doc String
+    -- generateTypingshift (MkDefSort sname _ _ _) namespaces str =
+    --   pretty (toLowerCaseFirst sname) <> pretty "shift" <> pretty str <+>
+    --   pretty "::" <+>
+    --   pretty "HNat ->" <+> sorttype <+> pretty "->" <+> sorttype <+> pretty "\n"
+    --   where
+    --     sorttype = pretty (capitalize sname)
+
+    declarationsToFunctions :: [NamespaceInstance] -> [NameSpaceDef] -> String -> [Expression]
+    declarationsToFunctions nsd defs opName = let filtered = [INH x y | INH x y <- nsd]
+      in map (\(INH _ namespaceName) ->
+        FnCall ((lookForSortName namespaceName defs) ++ "shiftHelp" ++ opName) [VarExpr "d"]
+      ) filtered

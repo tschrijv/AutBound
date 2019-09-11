@@ -1,6 +1,8 @@
 module Utility where
 
 import Data.Char
+import GeneralTerms
+import Data.Maybe
 
 --function to detect if all names are unique
 isUniqueInList :: [String] -> String -> Either String Bool
@@ -31,3 +33,55 @@ toLowerCaseFirst (first:rest) = ((toLower first) : rest)
 
 capitalize :: String -> String
 capitalize (first:rest) = ((toUpper first) : rest)
+
+lookForSortName :: NameSpaceName -> [NameSpaceDef] -> SortName
+lookForSortName name ((MkNameSpace name2 sortname _):rest)
+  | name2 == name = toLowerCaseFirst sortname
+  | otherwise = lookForSortName name rest
+
+getVarAccessTable :: [SortDef] -> [(SortName, Bool)]
+getVarAccessTable sList = map (sortCanAccessVariables sList []) sList
+  where
+    sortCanAccessVariables :: [SortDef] -> [SortName] -> SortDef -> (SortName, Bool)
+    sortCanAccessVariables allSorts listVisited s
+      | hasAccess = (sname, hasAccess)
+      | otherwise = (sname, findPathToVariable)
+      where
+        sname = getName s
+        hasAccess = fromJust (lookup sname (getTableOfHasVariable allSorts))
+        sortDefTable = map (\x -> (getName x, x)) allSorts
+        findPathToVariable =
+          or
+            (map
+              (constructorCanAccessVariables sortDefTable listVisited)
+              (getConstrDefs s))
+
+        getTableOfHasVariable :: [SortDef] -> [(SortName, Bool)]
+        getTableOfHasVariable sd = [(getName s, hasVariables s) | s <- sd]
+
+        -- function generating for each Sort, if it has access to some variable
+        hasVariables :: SortDef -> Bool
+        hasVariables s = or [True | (MkVarConstructor _ _) <- getConstrDefs s]
+
+        constructorCanAccessVariables :: [(SortName, SortDef)] -> [SortName] -> ConstructorDef -> Bool
+        constructorCanAccessVariables table visited (MkVarConstructor _ _) = True
+        constructorCanAccessVariables table visited (MkBindConstructor _ listSorts sorts folds _ _ _) =
+          or
+            (map
+              (hasAccessSortName table visited)
+              ((map snd sorts) ++ (map snd listSorts) ++ map (\(a, b, c) -> b) folds))
+        constructorCanAccessVariables table visited (MkDefConstructor _ listSorts sorts folds _ _) =
+          or
+            (map
+              (hasAccessSortName table visited)
+              ((map snd sorts) ++ (map snd listSorts) ++ map (\(a, b, c) -> b) folds))
+
+        hasAccessSortName :: [(SortName, SortDef)] -> [SortName] -> SortName -> Bool
+        hasAccessSortName table visited nextSort
+          | any (\x -> x == nextSort) visited = False
+          | otherwise =
+            snd
+              (sortCanAccessVariables
+                (map snd table)
+                (nextSort : visited)
+                (fromJust (lookup nextSort table)))
