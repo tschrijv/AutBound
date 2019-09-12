@@ -12,7 +12,7 @@ type Name = String
 -- | Data types (including built-in and classes)
 type Type = String
 -- | Constructors are made up of a name and 0 or more type parameters
-data Constructor = Constr Name [Type]
+data Constructor = Constr Name [Type] deriving Eq
 -- | Function parameters can be pure variables and pattern matches for constructors
 data Parameter = VarParam Name | ConstrParam Name [Parameter] | StringParam String | IntParam Int
 -- | Expressions in function bodies can be
@@ -74,12 +74,14 @@ getEnvType nsd = ("Env", (Constr "Nil" []) : map (
 -- /////////////////////////////////////////////////////////////////////////////
 
 getHNatOrd :: [NameSpaceDef] -> (Type, [Constructor]) -> (Type, Type, [Function])
-getHNatOrd nsd (_, hnatc) = ("Ord", "HNat", [
+getHNatOrd nsd (_, hnatc) =
+  let cs = delete (Constr "Z" []) hnatc
+  in ("Ord", "HNat", [
     Fn "compare" ([
       ([ConstrParam "Z" [], ConstrParam "_" []], ConstrInst "LT" []),
       ([ConstrParam "Z" [], ConstrParam "Z" []], ConstrInst "EQ" []),
       ([ConstrParam "_" [], ConstrParam "Z" []], ConstrInst "GT" [])
-    ] ++ (map generateCompare [(left, right) | left <- hnatc, right <- hnatc]))
+    ] ++ (map generateCompare [(left, right) | left <- cs, right <- cs]))
   ]) where
     generateCompare :: (Constructor, Constructor) -> ([Parameter], Expression)
     generateCompare ((Constr n1 _), (Constr n2 _))
@@ -89,17 +91,19 @@ getHNatOrd nsd (_, hnatc) = ("Ord", "HNat", [
 -- /////////////////////////////////////////////////////////////////////////////
 
 getHNatModifiers :: (Type, [Constructor]) -> [Function]
-getHNatModifiers (_, hnatc) = [
+getHNatModifiers (_, hnatc) =
+  let cs = delete (Constr "Z" []) hnatc
+  in [
     Fn "plus" ([
       ([ConstrParam "Z" [], VarParam "h"], VarExpr "h"),
       ([VarParam "h", ConstrParam "Z" []], VarExpr "h")
-    ] ++ (map generatePlus hnatc))
+    ] ++ (map generatePlus cs))
   ,
     Fn "minus" ([
       ([ConstrParam "Z" [], ConstrParam "Z" []], ConstrInst "Z" []),
       ([ConstrParam "_" [], ConstrParam "Z" []], FnCall "error" [StringExpr "You cannot substract zero with a positive number"]),
       ([VarParam "result", ConstrParam "Z" []], VarExpr "result")
-    ] ++ (map generateMinus [(left, right) | left <- hnatc, right <- hnatc]))
+    ] ++ (map generateMinus [(left, right) | left <- cs, right <- cs]))
   ]
   where
     generatePlus :: Constructor -> ([Parameter], Expression)
