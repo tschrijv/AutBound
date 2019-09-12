@@ -385,9 +385,11 @@ getSubstFunctions sd defs varAccessTable =
 getEnvFunctions :: Language -> [Function]
 getEnvFunctions (nsd, sd, _, _) = let table = map getNameAndNSI sd
   in concat $ map (\s ->
+    let nsi = [SYN x y | SYN x y <- (getNSI s)]
+    in if nsi == [] then [] else
     -- generateTypingsyn sname (getName x) <>
     map (\c ->
-      generateSortSynSystemOneConstructor (getName s) nsd table c (head ([SYN x y | SYN x y <- (getNSI s)]))
+      generateSortSynSystemOneConstructor (getName s) nsd table c (head nsi)
     ) (getConstrDefs s)
   ) sd
 

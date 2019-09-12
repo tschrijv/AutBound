@@ -11,10 +11,20 @@ instance Pretty Constructor where
 instance Pretty Parameter where
   pretty (VarParam n) = pretty n
   pretty (ConstrParam n ps) = parens (hsep (pretty n : map pretty ps))
+  pretty (StringParam s) = pretty "\"" <> pretty s <> pretty "\""
+  pretty (IntParam i) = pretty i
 
 instance Pretty Expression where
   pretty (FnCall n ps) = hsep (pretty n : map pretty ps)
   pretty (ConstrInst n ps) = hsep (pretty n : map pretty ps)
+  pretty (VarExpr x) = pretty x
+  pretty (Minus a b) = pretty a <+> pretty "-" <+> pretty b
+  pretty (IntExpr i) = pretty i
+  pretty (StringExpr s) = pretty "\"" <> pretty s <> pretty "\""
+  pretty (IfExpr c t f) = pretty "if" <+> pretty c <+> pretty "then" <+> pretty t <+> pretty "else" <+> pretty f
+  pretty (GTEExpr a b) = pretty a <+> pretty ">=" <+> pretty b
+  pretty (EQExpr a b) = pretty a <+> pretty "==" <+> pretty b
+  pretty (ListExpr l) = pretty "[" <> hcat (punctuate comma (map pretty l)) <> pretty "]"
 
 instance Pretty Function where
   pretty (Fn n lns) = intoLines (map oneLine lns) where
@@ -61,7 +71,7 @@ printTypeDecls decls =
         pretty "data",
         pretty t,
         pretty "=",
-        hsep $ punctuate (pretty "|") (map pretty cs),
+        hsep $ punctuate (pretty " |") (map pretty cs),
         pretty "deriving(Show, Eq)"
       ]
 
