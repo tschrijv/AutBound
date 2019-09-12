@@ -10,8 +10,8 @@ import Utility
 import Converter.Utility
 
 getMappings :: Language -> [Function]
-getMappings (nsd, sd, _, _) =
-  let filtered = filter (\(MkDefSort name inst constr _) -> lookup name (getVarAccessTable sd) /= Nothing) sd
+getMappings (_, sd, _, _) =
+  let filtered = filter (\(MkDefSort name _ _ _) -> isJust (lookup name (getVarAccessTable sd))) sd
       table = map getNameAndNSI sd
       accessVarTable = getVarAccessTable sd
   in map (
@@ -24,7 +24,7 @@ getMappings (nsd, sd, _, _) =
             [VarParam "c"] ++
             getMapParamConstr c
           ,
-            getMapExpr name inst c table nsd accessVarTable
+            getMapExpr name c table accessVarTable
           )
         ) constr)
   ) filtered
@@ -49,7 +49,7 @@ getMappings (nsd, sd, _, _) =
 
     getMapParamConstr :: ConstructorDef -> [Parameter]
     getMapParamConstr (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "hnat"]]
-    getMapParamConstr cons = [ConstrParam (capitalize consName) (listToSpaceslower (foldToNormalList folds) ++ listToSpaceslower lists ++ listToSpaceslower listSorts ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1..]])]
+    getMapParamConstr cons = [ConstrParam (capitalize consName) (listToSpaceslower (foldToNormalList folds) ++ listToSpaceslower lists ++ listToSpaceslower listSorts ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
       where
         consName = getName cons
         folds = getConstrFolds cons
@@ -57,24 +57,23 @@ getMappings (nsd, sd, _, _) =
         listSorts = getConstrListSorts cons
         hTypes = getConstrHTypes cons
 
-    getMapExpr :: SortName -> [NamespaceInstance] -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [NameSpaceDef] -> [(SortName, Bool)] -> Expression
-    getMapExpr sname inst (MkVarConstructor consName contextName) table namespaces accessVarTable =
+    getMapExpr :: SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> Expression
+    getMapExpr sname (MkVarConstructor consName _) table _ =
       FnCall ("on" ++ getNameInstancenamespace (head (fromJust (lookup (capitalize sname) table)))) [
         VarExpr "c",
         ConstrInst (capitalize consName) [VarExpr "hnat"]
       ]
-    getMapExpr sname inst cons table namespaces accessVarTable =
-      ConstrInst (capitalize consName) ((applyRulesIdentifiers
+    getMapExpr sname cons table accessVarTable =
+      ConstrInst (capitalize consName) (applyRulesIdentifiers
         sname
-        inst
         rules
         (collectRulesAllField rules (foldToNormalList folds ++ lists ++ listSorts))
         (foldToNormalList folds)
         lists
         listSorts
         table
-        accessVarTable) ++
-        [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1..]])
+        accessVarTable ++
+        [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])
       where
         consName = getName cons
         folds = getConstrFolds cons
@@ -93,26 +92,25 @@ getMappings (nsd, sd, _, _) =
     nsiExprs inst = [VarExpr ("on" ++ namespace) | INH _ namespace <- inst]
 
     --calculate the inherited namespace of an identifier and for every inherited namespace, check what happens
-    applyRulesIdentifiers :: SortName -> [NamespaceInstance] -> [NameSpaceRule] -> [(IdName, [NameSpaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
-    applyRulesIdentifiers sname inst rules idRules folds lists listSorts table accessVarTable = map process idRules where
-      process (id, idRules)
-        | fromJust (lookup (capitalize sortnameInUse) accessVarTable) && elem id (map fst folds) =
-          FnCall "fmap" [(FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders)), VarExpr (toLowerCaseFirst id)]
-        | fromJust (lookup (capitalize sortnameInUse) accessVarTable) && elem id (map fst lists) =
-          FnCall "map" [(FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders)), VarExpr (toLowerCaseFirst id)]
-        | fromJust (lookup (capitalize sortnameInUse) accessVarTable) && elem id (map fst listSorts) =
-          FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders ++ [VarExpr (toLowerCaseFirst id)])
-        | otherwise = VarExpr (toLowerCaseFirst id)
+    applyRulesIdentifiers :: SortName -> [NameSpaceRule] -> [(IdName, [NameSpaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
+    applyRulesIdentifiers sname rules idRules folds lists listSorts table accessVarTable = map process idRules where
+      process (iden, idr)
+        | fromJust (lookup (capitalize sortnameInUse) accessVarTable) && elem iden (map fst folds) =
+          FnCall "fmap" [FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders), VarExpr (toLowerCaseFirst iden)]
+        | fromJust (lookup (capitalize sortnameInUse) accessVarTable) && elem iden (map fst lists) =
+          FnCall "map" [FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders), VarExpr (toLowerCaseFirst iden)]
+        | fromJust (lookup (capitalize sortnameInUse) accessVarTable) && elem iden (map fst listSorts) =
+          FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders ++ [VarExpr (toLowerCaseFirst iden)])
+        | otherwise = VarExpr (toLowerCaseFirst iden)
         where
           addedBinders =
             applyRuleInheritedNamespaces
               sname
-              inst
               rules
-              (id, idRules)
+              (iden, idr)
               folds
               lists
               listSorts
               table
               (calculateInheritedNameSpace sortnameInUse table)
-          sortnameInUse = (lookupIdToSort id (folds ++ lists ++ listSorts))
+          sortnameInUse = lookupIdToSort iden (folds ++ lists ++ listSorts)

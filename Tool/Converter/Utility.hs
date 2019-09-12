@@ -10,40 +10,38 @@ import GeneralTerms
 import Utility
 
 calculateInheritedNameSpace :: SortName -> [(SortName, [NamespaceInstance])] -> [NamespaceInstance]
-calculateInheritedNameSpace sname table = [INH x y | INH x y <- instances]
+calculateInheritedNameSpace sname table = [INH x y | INH x y <- inst]
   where
-    instances = fromJust (lookup sname table)
+    inst = fromJust (lookup sname table)
 
 lookupIdToSort :: IdName -> [(IdName, SortName)] -> SortName
-lookupIdToSort id table = fromJust (lookup id table)
+lookupIdToSort iden table = fromJust (lookup iden table)
 
 listToSpaceslower :: [(String, String)] -> [Parameter]
-listToSpaceslower list = map (VarParam . toLowerCaseFirst . fst) list
+listToSpaceslower = map (VarParam . toLowerCaseFirst . fst)
 
 foldToNormalList :: [(String, String, String)] -> [(String, String)]
-foldToNormalList foldsWithFoldName = map (\(a, b, c) -> (a, b)) foldsWithFoldName
+foldToNormalList = map (\(a, b, _) -> (a, b))
 
-applyRuleInheritedNamespaces :: SortName -> [NamespaceInstance] -> [NameSpaceRule] -> (IdName, [NameSpaceRule]) -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [NamespaceInstance] -> [Expression]
-applyRuleInheritedNamespaces sname inst rules (id, rulesOfId) folds lists listSorts table ihns = recurse ihns
+applyRuleInheritedNamespaces :: SortName -> [NameSpaceRule] -> (IdName, [NameSpaceRule]) -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [NamespaceInstance] -> [Expression]
+applyRuleInheritedNamespaces sname rules (iden, rulesOfId) folds lists listSorts table = recurse
   where
-    newString x params =
+    newString =
       applyTheRuleOneInheritedNamespace
         sname
         rules
-        (id, rulesOfId)
+        (iden, rulesOfId)
         folds
         lists
         listSorts
         table
-        x
-        params
     recurse [] = [VarExpr "c"]
     recurse (x:xs) = case newString x (recurse xs) of
-      Just x -> [x] -- TODO: do we need list return?
+      Just ex -> [ex] -- TODO: do we need list return?
       Nothing -> recurse xs
 
-applyTheRuleOneInheritedNamespace :: SortName -> [NameSpaceRule] -> (IdName, [NameSpaceRule]) -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> NamespaceInstance -> [Expression] -> Maybe (Expression)
-applyTheRuleOneInheritedNamespace sname rules (id, rulesOfId) folds lists listSorts table currentinst params
+applyTheRuleOneInheritedNamespace :: SortName -> [NameSpaceRule] -> (IdName, [NameSpaceRule]) -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> NamespaceInstance -> [Expression] -> Maybe Expression
+applyTheRuleOneInheritedNamespace sname rules (_, rulesOfId) folds lists listSorts table currentinst params
   | isJust foundrule =
     applyOneRuleLogic sname currentinst newrules (fromJust foundrule) folds lists listSorts newtable params
   | otherwise = Nothing
@@ -52,38 +50,38 @@ applyTheRuleOneInheritedNamespace sname rules (id, rulesOfId) folds lists listSo
     newtable = filterTableBySameNamespace currentinst table
     newrules = getNewRules rules [] sname table (folds ++ lists ++ listSorts)
 
-applyOneRuleLogic :: SortName -> NamespaceInstance -> [NameSpaceRule] -> NameSpaceRule -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [Expression] -> Maybe (Expression)
-applyOneRuleLogic sname inst rules (l, RightLHS _) folds lists listSorts table params = Nothing
+applyOneRuleLogic :: SortName -> NamespaceInstance -> [NameSpaceRule] -> NameSpaceRule -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [Expression] -> Maybe Expression
+applyOneRuleLogic _ _ _ (_, RightLHS _) _ _ _ _ _ = Nothing
 applyOneRuleLogic sname inst rules (l, RightAdd expr _) folds lists listSorts table params =
-  return (ConstrInst ("S" ++ (getNameInstancenamespace inst)) ((stepLogic sname inst rules (l, expr) folds lists listSorts table) ++ params))
-applyOneRuleLogic sname inst rules (l, RightSub id context) folds lists listSorts table params
-  | (elem id (map fst lists) || elem id (map fst folds)) && (isJust newrule) =
-    return (FnCall ("generateHnat" ++ (getNameInstancenamespace inst)) ((FnCall "length" (VarExpr id : nextStep)) : params)) -- TODO: is removing the $ fine?
-  | (elem id (map fst lists) || elem id (map fst folds)) =
-    return (FnCall ("generateHnat" ++ (getNameInstancenamespace inst)) ((FnCall "length" [VarExpr id]) : params))
-  | (isJust newrule) =
-    return (FnCall ("addToEnvironment" ++ fromJust (lookup id listSorts) ++ context) ((VarExpr id : nextStep) ++ params)) -- TODO: is removing the $ fine?
+  return (ConstrInst ("S" ++ getNameInstancenamespace inst) (stepLogic sname inst rules (l, expr) folds lists listSorts table ++ params))
+applyOneRuleLogic sname inst rules (_, RightSub iden context) folds lists listSorts table params
+  | (elem iden (map fst lists) || elem iden (map fst folds)) && isJust newrule =
+    return (FnCall ("generateHnat" ++ getNameInstancenamespace inst) (FnCall "length" (VarExpr iden : nextStep) : params)) -- TODO: is removing the $ fine?
+  | elem iden (map fst lists) || elem iden (map fst folds) =
+    return (FnCall ("generateHnat" ++ getNameInstancenamespace inst) (FnCall "length" [VarExpr iden] : params))
+  | isJust newrule =
+    return (FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) ((VarExpr iden : nextStep) ++ params)) -- TODO: is removing the $ fine?
   | otherwise =
-    return (FnCall ("addToEnvironment" ++ fromJust (lookup id listSorts) ++ context) ((VarExpr id) : params))
+    return (FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) (VarExpr iden : params))
   where
-    newrule = find (\(l, r) -> (getLeftIdSub l) == id) rules
+    newrule = find (\(l, _) -> getLeftIdSub l == iden) rules
     nextStep = stepLogic sname inst rules (fromJust newrule) folds lists listSorts table
 
 stepLogic :: SortName -> NamespaceInstance -> [NameSpaceRule] -> NameSpaceRule -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [Expression]
-stepLogic sname inst rules (l, RightLHS _) folds lists listSorts table = []
+stepLogic _ _ _ (_, RightLHS _) _ _ _ _ = []
 stepLogic sname inst rules (l, RightAdd expr _) folds lists listSorts table =
-  [(ConstrInst ("S" ++ (getNameInstancenamespace inst)) (stepLogic sname inst rules (l, expr) folds lists listSorts table))]
-stepLogic sname inst rules (l, RightSub id context) folds lists listSorts table
-  | (elem id (map fst lists) || elem id (map fst folds)) && (isJust newrule) =
-    [(FnCall ("generateHnat" ++ (getNameInstancenamespace inst)) [FnCall "length" ((VarExpr id) : nextStep)])]
-  | (elem id (map fst lists) || elem id (map fst folds)) =
-    [(FnCall ("generateHnat" ++ (getNameInstancenamespace inst)) [FnCall "length" [VarExpr id]])]
-  | (isJust newrule) =
-    [(FnCall ("addToEnvironment" ++ fromJust (lookup id listSorts) ++ context) ((VarExpr id) : nextStep))]
+  [ConstrInst ("S" ++ getNameInstancenamespace inst) (stepLogic sname inst rules (l, expr) folds lists listSorts table)]
+stepLogic sname inst rules (_, RightSub iden context) folds lists listSorts table
+  | (elem iden (map fst lists) || elem iden (map fst folds)) && isJust newrule =
+    [FnCall ("generateHnat" ++ getNameInstancenamespace inst) [FnCall "length" (VarExpr iden : nextStep)]]
+  | elem iden (map fst lists) || elem iden (map fst folds) =
+    [FnCall ("generateHnat" ++ getNameInstancenamespace inst) [FnCall "length" [VarExpr iden]]]
+  | isJust newrule =
+    [FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) (VarExpr iden : nextStep)]
   | otherwise =
-    [(FnCall ("addToEnvironment" ++ fromJust (lookup id listSorts) ++ context) [VarExpr id])]
+    [FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) [VarExpr iden]]
   where
-    newrule = find (\(l, r) -> (getLeftIdSub l) == id) rules
+    newrule = find (\(l, _) -> getLeftIdSub l == iden) rules
     nextStep =
       stepLogic sname inst rules (fromJust newrule) folds lists listSorts table
 

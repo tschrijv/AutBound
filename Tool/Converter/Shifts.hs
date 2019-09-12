@@ -2,56 +2,48 @@
 
 module Converter.Shifts (getShift) where
 
+import Data.Maybe
+
 import Program
 import GeneralTerms
 import Utility
 
 getShift :: Language -> [Function]
 getShift (nsd, sd, _, _) = let accessVarTable = getVarAccessTable sd
-  in concat $ [getShiftHelpers sd op accessVarTable nsd ++ getShiftFunctions sd nsd op accessVarTable | op <- ["plus", "minus"]]
+  in concat [getShiftHelpers sd op accessVarTable ++ getShiftFunctions sd nsd op accessVarTable | op <- ["plus", "minus"]]
 
-getShiftHelpers :: [SortDef] -> String -> [(SortName, Bool)] -> [NameSpaceDef] -> [Function]
-getShiftHelpers sd opName varAccessTable namespaces = let filtered = filter (\(MkDefSort sname inst cdefs _) -> (lookup sname varAccessTable) /= Nothing) sd
-  in concat $ map (\(MkDefSort sname inst cdefs _) -> constructorsToCheckShift cdefs sname opName namespaces inst) filtered
+getShiftHelpers :: [SortDef] -> String -> [(SortName, Bool)] -> [Function]
+getShiftHelpers sd opName varAccessTable = let filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup sname varAccessTable)) sd
+  in concatMap (\(MkDefSort sname _ cdefs _) -> constructorsToCheckShift cdefs sname opName) filtered
   where
-    constructorsToCheckShift :: [ConstructorDef] -> SortName -> String -> [NameSpaceDef] -> [NamespaceInstance] -> [Function]
-    constructorsToCheckShift cdefs sname opName namespaces inst = let filtered = [MkVarConstructor c i | MkVarConstructor c i <- cdefs]
-      in map (\c -> constructorDefineCheckShift c sname opName namespaces inst) filtered
+    constructorsToCheckShift :: [ConstructorDef] -> SortName -> String -> [Function]
+    constructorsToCheckShift cdefs sname op = let filtered = [MkVarConstructor c i | MkVarConstructor c i <- cdefs]
+      in map (\c -> constructorDefineCheckShift c sname op) filtered
 
-    constructorDefineCheckShift :: ConstructorDef -> SortName -> String -> [NameSpaceDef] -> [NamespaceInstance] -> Function
-    constructorDefineCheckShift (MkVarConstructor consName instname) sname opName namespaces inst =
-      Fn ((toLowerCaseFirst sname) ++ "shiftHelp" ++ opName)
+    constructorDefineCheckShift :: ConstructorDef -> SortName -> String -> Function
+    constructorDefineCheckShift (MkVarConstructor consName _) sname op =
+      Fn (toLowerCaseFirst sname ++ "shiftHelp" ++ op)
         [
           ([VarParam "d", VarParam "c", ConstrParam (capitalize consName) [VarParam "hnat"]],
           IfExpr
             (GTEExpr (VarExpr "hnat") (VarExpr "c"))
-            (ConstrInst (capitalize consName) [FnCall opName [VarExpr "hnat", VarExpr "d"]])
+            (ConstrInst (capitalize consName) [FnCall op [VarExpr "hnat", VarExpr "d"]])
             (ConstrInst (capitalize consName) [VarExpr "hnat"])
           )
         ]
-      where
-        instanceNamespace = lookforInstance inst (instname)
-        newname = lookForSortName (instanceNamespace) namespaces
-
-    lookforInstance :: [NamespaceInstance] -> String -> String
-    lookforInstance ((INH ctxname namespacename):rest) instname
-      | ctxname == instname = namespacename
-      | otherwise = lookforInstance rest instname
-    lookforInstance ((SYN ctxname namespacename):rest) instname =
-      lookforInstance rest instname
 
 -- generation of all shift functions
 getShiftFunctions :: [SortDef] -> [NameSpaceDef] -> String -> [(SortName, Bool)] -> [Function]
-getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> (lookup (getName s) varAccessTable) /= Nothing) sd
+getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> isJust (lookup (getName s) varAccessTable)) sd
   in map (\(MkDefSort sname namespaceDecl _ _) ->
     -- generateTypingshift s defs opName <>
     Fn
-      ((toLowerCaseFirst sname) ++ "shift" ++ opName)
+      (toLowerCaseFirst sname ++ "shift" ++ opName)
       [
         ([VarParam "d", VarParam "t"],
         FnCall
-          ((toLowerCaseFirst sname) ++ "map")
-          ((declarationsToFunctions namespaceDecl defs opName) ++ ([ConstrInst "Z" [], VarExpr "t"]))
+          (toLowerCaseFirst sname ++ "map")
+          (declarationsToFunctions namespaceDecl defs opName ++ [ConstrInst "Z" [], VarExpr "t"])
         )
       ]
   ) filtered
@@ -65,7 +57,7 @@ getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> (
     --     sorttype = pretty (capitalize sname)
 
     declarationsToFunctions :: [NamespaceInstance] -> [NameSpaceDef] -> String -> [Expression]
-    declarationsToFunctions nsd defs opName = let filtered = [INH x y | INH x y <- nsd]
+    declarationsToFunctions nsi nsd op = let filtered = [INH x y | INH x y <- nsi]
       in map (\(INH _ namespaceName) ->
-        FnCall ((lookForSortName namespaceName defs) ++ "shiftHelp" ++ opName) [VarExpr "d"]
+        FnCall (lookForSortName namespaceName nsd ++ "shiftHelp" ++ op) [VarExpr "d"]
       ) filtered

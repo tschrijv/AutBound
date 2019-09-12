@@ -42,7 +42,7 @@ printProgram :: String -> Program -> Doc String
 printProgram name program =
   intoLines [
     printModuleDecl name,
-    printImports (("Data.List", []) : (imports program)),
+    printImports (("Data.List", []) : imports program),
     printTypeDecls (types program),
     nl,
     printFunctions (functions program),
@@ -67,7 +67,7 @@ printImports imp =
 
 printTypeDecls :: [(Type, [Constructor])] -> Doc String
 printTypeDecls decls =
-  intoLines $ punctuate nl $ (map printOneType decls) where
+  intoLines $ punctuate nl $ map printOneType decls where
     printOneType :: (Type, [Constructor]) -> Doc String
     printOneType (t, cs) = hsep [
         pretty "data",

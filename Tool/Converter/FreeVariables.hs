@@ -11,14 +11,14 @@ import Converter.Utility
 
 --generate free variable functions
 getFreeVar :: Language -> [Function]
-getFreeVar (nsd, sd, _, _) =
+getFreeVar (_, sd, _, _) =
   let table = map getNameAndNSI sd
       accessVarTable = getVarAccessTable sd
-      filtered = filter (\(MkDefSort sname _ cdefs _) -> (lookup (capitalize sname) accessVarTable) /= Nothing) sd
-  in concat $ map (\(MkDefSort sname inst cons _) ->
+      filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (capitalize sname) accessVarTable)) sd
+  in concatMap (\(MkDefSort sname _ cons _) ->
     -- generateTypingFreeVars sname <>
     map (\c ->
-      generateFreeVariableFunction sname inst c table nsd accessVarTable
+      generateFreeVariableFunction sname c table accessVarTable
     ) cons
   ) filtered
 
@@ -29,17 +29,16 @@ getFreeVar (nsd, sd, _, _) =
 --   pretty "HNat -> " <+>
 --   pretty (capitalize sname) <+> pretty " ->[HNat]" <+> pretty "\n"
 
-generateFreeVariableFunction :: SortName -> [NamespaceInstance] -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [NameSpaceDef] -> [(SortName, Bool)] -> Function
-generateFreeVariableFunction sname inst cons@(MkVarConstructor cname ctx) table namespaces accessVarTable =
-  Fn ("freeVariables" ++ sname) [([VarParam "c", generateFreeVariableConstructor sname inst cons table], IfExpr (GTEExpr (VarExpr "hnat") (VarExpr "c")) (ListExpr [FnCall "minus" [VarExpr "hnat", VarExpr "c"]]) (ListExpr []))]
-generateFreeVariableFunction sname inst cons table namespaces accessVarTable =
-  Fn ("freeVariables" ++ sname) [([VarParam "c", generateFreeVariableConstructor sname inst cons table],
+generateFreeVariableFunction :: SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> Function
+generateFreeVariableFunction sname cons@(MkVarConstructor _ _) _ _ =
+  Fn ("freeVariables" ++ sname) [([VarParam "c", generateFreeVariableConstructor cons], IfExpr (GTEExpr (VarExpr "hnat") (VarExpr "c")) (ListExpr [FnCall "minus" [VarExpr "hnat", VarExpr "c"]]) (ListExpr []))]
+generateFreeVariableFunction sname cons table accessVarTable =
+  Fn ("freeVariables" ++ sname) [([VarParam "c", generateFreeVariableConstructor cons],
     FnCall "nub" [
-      FnCall "concat" (
+      FnCall "concat"
         [ListExpr (
           applyRulesIdentifiersFreeVariables
             sname
-            inst
             rules
             (collectRulesAllField rules (foldToNormalList folds ++ lists ++ listSorts))
             (foldToNormalList folds)
@@ -48,20 +47,17 @@ generateFreeVariableFunction sname inst cons table namespaces accessVarTable =
             table
             accessVarTable
         )]
-      )
     ]
   )]
   where
-    consName = getName cons
     folds = getConstrFolds cons
     lists = getConstrLists cons
     listSorts = getConstrListSorts cons
-    hTypes = getConstrHTypes cons
     rules = getConstrRules cons
-generateFreeVariableConstructor :: SortName -> [NamespaceInstance] -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> Parameter
-generateFreeVariableConstructor sname inst (MkVarConstructor consName _) table =
+generateFreeVariableConstructor :: ConstructorDef -> Parameter
+generateFreeVariableConstructor (MkVarConstructor consName _) =
   ConstrParam (capitalize consName) [VarParam "hnat"]
-generateFreeVariableConstructor sname inst cons table =
+generateFreeVariableConstructor cons =
   ConstrParam (capitalize consName) (listToSpaceslower (foldToNormalList folds ++ lists ++ listSorts) ++ [VarParam "_" | _ <- hTypes])
   where
     consName = getName cons
@@ -69,31 +65,30 @@ generateFreeVariableConstructor sname inst cons table =
     lists = getConstrLists cons
     listSorts = getConstrListSorts cons
     hTypes = getConstrHTypes cons
-    rules = getConstrRules cons
 
-applyRulesIdentifiersFreeVariables :: SortName -> [NamespaceInstance] -> [NameSpaceRule] -> [(IdName, [NameSpaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
-applyRulesIdentifiersFreeVariables sname inst rules [] folds lists listSorts table accessVarTable = [ListExpr []]
-applyRulesIdentifiersFreeVariables sname inst rules ((id, idRules):[]) folds lists listSorts table accessVarTable
-  | fromJust (lookup sortnameInUse accessVarTable) = [FnCall ("freeVariables" ++ sortnameInUse) (addedBinders ++ [VarExpr (toLowerCaseFirst id)])]
+applyRulesIdentifiersFreeVariables :: SortName -> [NameSpaceRule] -> [(IdName, [NameSpaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
+applyRulesIdentifiersFreeVariables _ _ [] _ _ _ _ _ = [ListExpr []]
+applyRulesIdentifiersFreeVariables sname rules [(iden, idRules)] folds lists listSorts table accessVarTable
+  | fromJust (lookup sortnameInUse accessVarTable) = [FnCall ("freeVariables" ++ sortnameInUse) (addedBinders ++ [VarExpr (toLowerCaseFirst iden)])]
   | otherwise = [ListExpr []]
   where
-    addedBinders = applyRuleInheritedNamespaces sname inst rules (id, idRules) folds lists listSorts table (calculateInheritedNameSpace sortnameInUse table)
-    sortnameInUse = (lookupIdToSort id (lists ++ listSorts))
-applyRulesIdentifiersFreeVariables sname inst rules ((id, idRules):rest) folds lists listSorts table accessVarTable
-  | fromJust (lookup sortnameInUse accessVarTable) && (elem id (map fst folds)) =
-    FnCall "foldMap" [FnCall ("freeVariables" ++ sortnameInUse) addedBinders, VarExpr (toLowerCaseFirst id)]
+    addedBinders = applyRuleInheritedNamespaces sname rules (iden, idRules) folds lists listSorts table (calculateInheritedNameSpace sortnameInUse table)
+    sortnameInUse = lookupIdToSort iden (lists ++ listSorts)
+applyRulesIdentifiersFreeVariables sname rules ((iden, idRules):rest) folds lists listSorts table accessVarTable
+  | fromJust (lookup sortnameInUse accessVarTable) && (iden `elem` map fst folds) =
+    FnCall "foldMap" [FnCall ("freeVariables" ++ sortnameInUse) addedBinders, VarExpr (toLowerCaseFirst iden)]
     :
-    applyRulesIdentifiersFreeVariables sname inst rules rest folds lists listSorts table accessVarTable
-  | fromJust (lookup sortnameInUse accessVarTable) && (elem id (map fst lists)) =
-    FnCall "concatMap" [FnCall ("freeVariables" ++ sortnameInUse) addedBinders, VarExpr (toLowerCaseFirst id)]
+    applyRulesIdentifiersFreeVariables sname rules rest folds lists listSorts table accessVarTable
+  | fromJust (lookup sortnameInUse accessVarTable) && (iden `elem` map fst lists) =
+    FnCall "concatMap" [FnCall ("freeVariables" ++ sortnameInUse) addedBinders, VarExpr (toLowerCaseFirst iden)]
     :
-    applyRulesIdentifiersFreeVariables sname inst rules rest folds lists listSorts table accessVarTable
+    applyRulesIdentifiersFreeVariables sname rules rest folds lists listSorts table accessVarTable
   | fromJust (lookup sortnameInUse accessVarTable) =
-    FnCall ("freeVariables" ++ sortnameInUse) (addedBinders ++ [VarExpr (toLowerCaseFirst id)])
+    FnCall ("freeVariables" ++ sortnameInUse) (addedBinders ++ [VarExpr (toLowerCaseFirst iden)])
     :
-    applyRulesIdentifiersFreeVariables sname inst rules rest folds lists listSorts table accessVarTable
+    applyRulesIdentifiersFreeVariables sname rules rest folds lists listSorts table accessVarTable
   | otherwise =
-    applyRulesIdentifiersFreeVariables sname inst rules rest folds lists listSorts table accessVarTable
+    applyRulesIdentifiersFreeVariables sname rules rest folds lists listSorts table accessVarTable
   where
-    addedBinders = applyRuleInheritedNamespaces sname inst rules (id, idRules) folds lists listSorts table (calculateInheritedNameSpace sortnameInUse table)
-    sortnameInUse = (lookupIdToSort id (folds ++ lists ++ listSorts))
+    addedBinders = applyRuleInheritedNamespaces sname rules (iden, idRules) folds lists listSorts table (calculateInheritedNameSpace sortnameInUse table)
+    sortnameInUse = lookupIdToSort iden (folds ++ lists ++ listSorts)
