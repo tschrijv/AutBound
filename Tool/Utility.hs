@@ -85,3 +85,15 @@ getVarAccessTable sList = map (sortCanAccessVariables sList []) sList
                 (map snd table)
                 (nextSort : visited)
                 (fromJust (lookup nextSort table)))
+
+filterTableBySameNamespace :: NamespaceInstance -> [(SortName, [NamespaceInstance])] -> [(SortName, [NamespaceInstance])]
+filterTableBySameNamespace inst table = map (filterTableBySameNamespaceSort (getNamespaceNameInstance inst)) table
+  where
+    filterTableBySameNamespaceSort :: NameSpaceName -> (SortName, [NamespaceInstance]) -> (SortName, [NamespaceInstance])
+    filterTableBySameNamespaceSort namespacename (sname, list) = (sname, newlist)
+      where
+        newlist = filter (\x -> getNamespaceNameInstance x == namespacename) list
+
+getNameInstancenamespace :: NamespaceInstance -> NameSpaceName
+getNameInstancenamespace (INH _ name) = name
+getNameInstancenamespace (SYN _ name) = name

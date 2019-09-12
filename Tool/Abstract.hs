@@ -212,10 +212,6 @@ getMappings (nsd, sd, _, _) =
     foldToNormalList :: [(String, String, String)] -> [(String, String)]
     foldToNormalList foldsWithFoldName = map (\(a, b, c) -> (a, b)) foldsWithFoldName
 
-    getNameInstancenamespace :: NamespaceInstance -> NameSpaceName
-    getNameInstancenamespace (INH _ name) = name
-    getNameInstancenamespace (SYN _ name) = name
-
     --calculate the inherited namespace of an identifier and for every inherited namespace, check what happens
     applyRulesIdentifiers :: SortName -> [NamespaceInstance] -> [NameSpaceRule] -> [(IdName, [NameSpaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
     applyRulesIdentifiers sname inst rules idRules folds lists listSorts table accessVarTable = map process idRules where
@@ -323,14 +319,6 @@ getMappings (nsd, sd, _, _) =
 
     lookupIdToSort :: IdName -> [(IdName, SortName)] -> SortName
     lookupIdToSort id table = fromJust (lookup id table)
-
-    filterTableBySameNamespace :: NamespaceInstance -> [(SortName, [NamespaceInstance])] -> [(SortName, [NamespaceInstance])]
-    filterTableBySameNamespace inst table = map (filterTableBySameNamespaceSort (getNamespaceNameInstance inst)) table
-      where
-        filterTableBySameNamespaceSort :: NameSpaceName -> (SortName, [NamespaceInstance]) -> (SortName, [NamespaceInstance])
-        filterTableBySameNamespaceSort namespacename (sname, list) = (sname, newlist)
-          where
-            newlist = filter (\x -> getNamespaceNameInstance x == namespacename) list
 
 -- /////////////////////////////////////////////////////////////////////////////
 
@@ -477,3 +465,74 @@ getSubstFunctions sd defs varAccessTable =
           True -> FnCall ((lookForSortName namespaceName defs) ++ "SubstituteHelp") [VarExpr "sub"]
           False -> VarExpr "id" -- TODO: substituted from: \c x->x
       ) filtered
+
+-- /////////////////////////////////////////////////////////////////////////////
+
+-- generation for all syn contexts
+getEnvFunctions :: Language -> [Function]
+getEnvFunctions (nsd, sd, _, _) = let table = map getNameAndNSI sd
+  in concat $ map (\s ->
+    -- generateTypingsyn sname (getName x) <>
+    map (\c ->
+      generateSortSynSystemOneConstructor (getName s) nsd table c (head ([SYN x y | SYN x y <- (getNSI s)]))
+    ) (getConstrDefs s)
+  ) sd
+
+-- generateTypingsyn :: SortName -> InstanceName -> Doc String
+-- generateTypingsyn sname instname =
+--   pretty "addToEnvironment" <> pretty sname <> pretty instname <+>
+--   pretty "::" <+>
+--   pretty (capitalize sname) <+> pretty "->HNat -> HNat" <+> pretty "\n"
+
+generateSortSynSystemOneConstructor :: SortName -> [NameSpaceDef] -> [(SortName, [NamespaceInstance])] -> ConstructorDef -> NamespaceInstance -> Function
+generateSortSynSystemOneConstructor sname namespaces table (MkVarConstructor consName _) inst =
+  Fn ("addToEnvironment" ++ sname) [([ConstrParam (capitalize consName) [VarParam "hnat"], VarParam "c"], VarExpr "c")]
+generateSortSynSystemOneConstructor sname namespaces table cons inst =
+  Fn ("addToEnvironment" ++ sname ++ (getName inst)) [([ConstrParam (capitalize consName) (listToSpaceslower listSorts ++ [VarParam "_" | _ <- hTypes]), VarParam "c"], getEnvFunctionGenerate sname inst namespaces newtable listSorts rules)]
+  where
+    newtable = filterTableBySameNamespace inst table
+    consName = getName cons
+    folds = getConstrFolds cons
+    lists = getConstrLists cons
+    listSorts = getConstrListSorts cons
+    hTypes = getConstrHTypes cons
+    rules = getConstrRules cons
+
+    listToSpaceslower :: [(String, String)] -> [Parameter]
+    listToSpaceslower list = map (VarParam . toLowerCaseFirst . fst) list
+
+--after = part logic of the syn functions
+getEnvFunctionGenerate :: SortName -> NamespaceInstance -> [NameSpaceDef] -> [(SortName, [NamespaceInstance])] -> [(IdName, SortName)]  -> [NameSpaceRule] -> Expression
+getEnvFunctionGenerate sname inst namespaces table listSorts rules
+  | fromJust (lookup "lhs" allrules) == [] = VarExpr "c"
+  | otherwise = navigateRules sname inst namespaces table listSorts rules start
+  where
+    allrules = (collectRulesSyn rules listSorts)
+    start = fromJust (
+      find
+        (\x -> getInstanceNamesOfRuleLeft (fst x) == getName inst)
+        (fromJust (lookup "lhs" allrules))
+      )
+
+navigateRules :: SortName -> NamespaceInstance -> [NameSpaceDef] -> [(SortName, [NamespaceInstance])] -> [(IdName, SortName)] -> [NameSpaceRule] -> NameSpaceRule -> Expression
+navigateRules sname inst namespaces table listSorts rules (l, RightAdd expr _) =
+  FnCall ("S" ++ (getNameInstancenamespace inst)) [navigateRules sname inst namespaces table listSorts rules (l, expr)]
+navigateRules sname inst namespaces table listSorts rules (LeftLHS _, RightLHS _) =
+  VarExpr "c"
+navigateRules sname inst namespaces table listSorts rules (LeftLHS _, RightSub id _)
+  | isJust newrule =
+    FnCall functionName [VarExpr id, navigateRules sname inst namespaces table listSorts rules (fromJust newrule)]
+  | otherwise = FnCall functionName [VarExpr id, VarExpr "c"]
+  where
+    newrule = find (\(l, r) -> (getLeftIdSub l) == id) rules
+    functionName = "addToEnvironment" ++ fromJust (lookup id listSorts) ++ (getName inst) -- TODO: id was included in function name with a space?? included here both, below once + twice!!
+navigateRules sname inst namespaces table listSorts rules (LeftSub _ _, RightLHS _) =
+  VarExpr "c"
+navigateRules sname inst namespaces table listSorts rules (LeftSub _ _, RightSub id _)
+  | isJust newrule =
+    FnCall functionName [VarExpr id, navigateRules sname inst namespaces table listSorts rules (fromJust newrule)]
+  | otherwise = FnCall functionName [VarExpr id, VarExpr "c"]
+  where
+    newrule = find (\(l, r) -> (getLeftIdSub l) == id) rules
+    functionName =
+      "addToEnvironment" ++ fromJust (lookup id listSorts) ++ (getName inst)
