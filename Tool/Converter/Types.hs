@@ -79,6 +79,6 @@ getGenerators nsd = map (
       in
       Fn fnName [
         ([IntParam 0, VarParam "c"], VarExpr "c"),
-        ([VarParam "n", VarParam "c"], ConstrInst constr [FnCall fnName [Minus (VarExpr "n") (IntExpr 1)], VarExpr "c"])
+        ([VarParam "n", VarParam "c"], ConstrInst constr [FnCall fnName [Minus (VarExpr "n") (IntExpr 1), VarExpr "c"]])
       ]
   ) nsd

@@ -19,7 +19,7 @@ main = do
       toWrite <- toFileHaskell lang
       case toWrite of
         Left err    -> print err
-        Right value -> writeFile "HaskellOutput.hs" (show (printProgram "haskellOutput" value))
+        Right value -> writeFile "HaskellOutput.hs" (show (printProgram "HaskellOutput" value))
 
 toFileHaskell :: Language -> IO (Either String Program)
 toFileHaskell lang =

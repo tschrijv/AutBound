@@ -34,20 +34,22 @@ generateFreeVariableFunction sname inst cons@(MkVarConstructor cname ctx) table 
   Fn ("freeVariables" ++ sname) [([VarParam "c", generateFreeVariableConstructor sname inst cons table], IfExpr (GTEExpr (VarExpr "hnat") (VarExpr "c")) (ListExpr [FnCall "minus" [VarExpr "hnat", VarExpr "c"]]) (ListExpr []))]
 generateFreeVariableFunction sname inst cons table namespaces accessVarTable =
   Fn ("freeVariables" ++ sname) [([VarParam "c", generateFreeVariableConstructor sname inst cons table],
-    FnCall "nub" (
-      applyRulesIdentifiersFreeVariables
-        sname
-        inst
-        rules
-        (collectRulesAllField
-          rules
-          (foldToNormalList folds ++ lists ++ listSorts))
-        (foldToNormalList folds)
-        lists
-        listSorts
-        table
-        accessVarTable
-    )
+    FnCall "nub" [
+      FnCall "concat" (
+        [ListExpr (
+          applyRulesIdentifiersFreeVariables
+            sname
+            inst
+            rules
+            (collectRulesAllField rules (foldToNormalList folds ++ lists ++ listSorts))
+            (foldToNormalList folds)
+            lists
+            listSorts
+            table
+            accessVarTable
+        )]
+      )
+    ]
   )]
   where
     consName = getName cons
@@ -56,7 +58,6 @@ generateFreeVariableFunction sname inst cons table namespaces accessVarTable =
     listSorts = getConstrListSorts cons
     hTypes = getConstrHTypes cons
     rules = getConstrRules cons
-
 generateFreeVariableConstructor :: SortName -> [NamespaceInstance] -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> Parameter
 generateFreeVariableConstructor sname inst (MkVarConstructor consName _) table =
   ConstrParam (capitalize consName) [VarParam "hnat"]
@@ -96,4 +97,3 @@ applyRulesIdentifiersFreeVariables sname inst rules ((id, idRules):rest) folds l
   where
     addedBinders = applyRuleInheritedNamespaces sname inst rules (id, idRules) folds lists listSorts table (calculateInheritedNameSpace sortnameInUse table)
     sortnameInUse = (lookupIdToSort id (folds ++ lists ++ listSorts))
-
