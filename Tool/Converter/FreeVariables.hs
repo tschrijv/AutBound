@@ -4,7 +4,7 @@ module Converter.FreeVariables (getFreeVar) where
 
 import Data.Maybe
 
-import Abstract
+import Program
 import GeneralTerms
 import Utility
 import Converter.Utility

@@ -3,7 +3,7 @@
 import GeneralTerms
 import WellFormed
 import MyParser
-import Abstract
+import Program
 import Converter
 import Text.Parsec.String
 import HaskellPrinter

@@ -2,7 +2,7 @@
 
 module Converter.Shifts (getShift) where
 
-import Abstract
+import Program
 import GeneralTerms
 import Utility
 

@@ -1,11 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Abstract where
-
-import GeneralTerms
-import Data.Maybe
-import Data.List
-import Utility
+module Program where
 
 -- | Variable, function and constructor names
 type Name = String

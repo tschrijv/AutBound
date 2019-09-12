@@ -2,7 +2,7 @@
 
 module Converter.Substitutions (getSubst) where
 
-import Abstract
+import Program
 import GeneralTerms
 import Utility
 

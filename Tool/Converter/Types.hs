@@ -4,7 +4,7 @@ module Converter.Types where
 
 import Data.List
 
-import Abstract
+import Program
 import GeneralTerms
 
 getTypes :: Language -> [(Type, [Constructor])]

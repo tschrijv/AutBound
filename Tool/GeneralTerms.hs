@@ -84,16 +84,30 @@ instance Named NamespaceInstance where
   getName (INH name _) = name
   getName (SYN name _) = name
 
+getConstrLists :: ConstructorDef -> [(IdName, SortName)]
 getConstrLists (MkDefConstructor _ lists _ _ _ _) = lists
 getConstrLists (MkBindConstructor _ lists _ _ _ _ _) = lists
+getConstrLists MkVarConstructor{} = error "invalid method for var constructor"
+
+getConstrListSorts :: ConstructorDef -> [(IdName, SortName)]
 getConstrListSorts (MkDefConstructor _ _ listSorts _ _ _) = listSorts
 getConstrListSorts (MkBindConstructor _ _ listSorts _ _ _ _) = listSorts
+getConstrListSorts MkVarConstructor{} = error "invalid method for var constructor"
+
+getConstrFolds :: ConstructorDef -> [(IdName, SortName, FoldName)]
 getConstrFolds (MkDefConstructor _ _ _ folds _ _) = folds
 getConstrFolds (MkBindConstructor _ _ _ folds _ _ _) = folds
+getConstrFolds MkVarConstructor{} = error "invalid method for var constructor"
+
+getConstrRules :: ConstructorDef -> [NameSpaceRule]
 getConstrRules (MkDefConstructor _ _ _ _ rules _) = rules
 getConstrRules (MkBindConstructor _ _ _ _ _ rules _) = rules
+getConstrRules MkVarConstructor{} = error "invalid method for var constructor"
+
+getConstrHTypes :: ConstructorDef -> [HaskellTypeName]
 getConstrHTypes (MkDefConstructor _ _ _ _ _ hTypes) = hTypes
 getConstrHTypes (MkBindConstructor _ _ _ _ _ _ hTypes) = hTypes
+getConstrHTypes MkVarConstructor{} = error "invalid method for var constructor"
 
 --get the defs of constructors in the sort
 getConstrDefs :: SortDef -> [ConstructorDef]

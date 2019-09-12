@@ -1,6 +1,6 @@
 module Converter where
 
-import Abstract
+import Program
 import GeneralTerms
 import Converter.Environments
 import Converter.FreeVariables

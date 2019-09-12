@@ -3,7 +3,7 @@
 module HaskellPrinter where
 
 import Data.Text.Prettyprint.Doc
-import Abstract
+import Program
 
 instance Pretty Constructor where
   pretty (Constr n ts) = hsep (pretty n : map pretty ts)
