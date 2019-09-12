@@ -15,15 +15,15 @@ instance Pretty Parameter where
   pretty (IntParam i) = pretty i
 
 instance Pretty Expression where
-  pretty (FnCall n ps) = hsep (pretty n : map pretty ps)
-  pretty (ConstrInst n ps) = hsep (pretty n : map pretty ps)
+  pretty (FnCall n ps) = parens $ hsep (pretty n : map pretty ps)
+  pretty (ConstrInst n ps) = parens $ hsep (pretty n : map pretty ps)
   pretty (VarExpr x) = pretty x
-  pretty (Minus a b) = pretty a <+> pretty "-" <+> pretty b
+  pretty (Minus a b) = parens (pretty a <+> pretty "-" <+> pretty b)
   pretty (IntExpr i) = pretty i
   pretty (StringExpr s) = pretty "\"" <> pretty s <> pretty "\""
   pretty (IfExpr c t f) = pretty "if" <+> pretty c <+> pretty "then" <+> pretty t <+> pretty "else" <+> pretty f
-  pretty (GTEExpr a b) = pretty a <+> pretty ">=" <+> pretty b
-  pretty (EQExpr a b) = pretty a <+> pretty "==" <+> pretty b
+  pretty (GTEExpr a b) = parens (pretty a <+> pretty ">=" <+> pretty b)
+  pretty (EQExpr a b) = parens (pretty a <+> pretty "==" <+> pretty b)
   pretty (ListExpr l) = pretty "[" <> hcat (punctuate comma (map pretty l)) <> pretty "]"
 
 instance Pretty Function where
@@ -41,8 +41,9 @@ printProgram :: String -> Program -> Doc String
 printProgram name program =
   intoLines [
     printModuleDecl name,
-    printImports (imports program),
+    printImports (("Data.List", []) : (imports program)),
     printTypeDecls (types program),
+    nl,
     printFunctions (functions program),
     printInstances (instances program),
     printCode (code program)
@@ -65,7 +66,7 @@ printImports imp =
 
 printTypeDecls :: [(Type, [Constructor])] -> Doc String
 printTypeDecls decls =
-  intoLines (map printOneType decls) where
+  intoLines $ punctuate nl $ (map printOneType decls) where
     printOneType :: (Type, [Constructor]) -> Doc String
     printOneType (t, cs) = hsep [
         pretty "data",
@@ -76,13 +77,13 @@ printTypeDecls decls =
       ]
 
 printFunctions :: [Function] -> Doc String
-printFunctions fns = intoLines $ map pretty fns
+printFunctions fns = intoLines $ punctuate nl (map pretty fns)
 
 printInstances :: [(Type, Type, [Function])] -> Doc String
 printInstances ids = intoLines $ map (
     \(cls, typ, fns) -> intoLines [
       hsep [pretty "instance", pretty cls, pretty typ, pretty "where"],
-      printFunctions fns
+      printFunctions (map (\(Fn n lns) -> Fn ("  " ++ n) lns) fns)
     ]
   ) ids
 
