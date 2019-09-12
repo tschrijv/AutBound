@@ -25,6 +25,7 @@ instance Pretty Expression where
   pretty (GTEExpr a b) = parens (pretty a <+> pretty ">=" <+> pretty b)
   pretty (EQExpr a b) = parens (pretty a <+> pretty "==" <+> pretty b)
   pretty (ListExpr l) = pretty "[" <> hcat (punctuate comma (map pretty l)) <> pretty "]"
+  pretty (LambdaExpr ps ex) = parens (pretty "\\" <> hsep (map pretty ps) <+> pretty "->" <+> pretty ex)
 
 instance Pretty Function where
   pretty (Fn n lns) = intoLines (map oneLine lns) where

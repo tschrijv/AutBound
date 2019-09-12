@@ -18,7 +18,7 @@ data Parameter = VarParam Name | ConstrParam Name [Parameter] | StringParam Stri
 -- | Expressions in function bodies can be
 -- function calls (function name + parameters)
 -- or constructor calls (constructor name + parameters)
-data Expression = FnCall Name [Expression] | ConstrInst Name [Expression] | VarExpr Name | Minus Expression Expression | IntExpr Int | StringExpr String | IfExpr Expression Expression Expression | GTEExpr Expression Expression | EQExpr Expression Expression | ListExpr [Expression]
+data Expression = FnCall Name [Expression] | ConstrInst Name [Expression] | VarExpr Name | Minus Expression Expression | IntExpr Int | StringExpr String | IfExpr Expression Expression Expression | GTEExpr Expression Expression | EQExpr Expression Expression | ListExpr [Expression] | LambdaExpr [Parameter] Expression
 -- | Functions are made up of a name and multiple head (parameter list)
 -- and body (expression) pairs
 data Function = Fn Name [([Parameter], Expression)]

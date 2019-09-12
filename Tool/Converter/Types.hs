@@ -34,9 +34,9 @@ getHNatOrd nsd (_, hnatc) =
   let cs = delete (Constr "Z" []) hnatc
   in ("Ord", "HNat", [
     Fn "compare" ([
-      ([ConstrParam "Z" [], ConstrParam "_" []], ConstrInst "LT" []),
       ([ConstrParam "Z" [], ConstrParam "Z" []], ConstrInst "EQ" []),
-      ([ConstrParam "_" [], ConstrParam "Z" []], ConstrInst "GT" [])
+      ([ConstrParam "Z" [], VarParam "_"], ConstrInst "LT" []),
+      ([VarParam "_", ConstrParam "Z" []], ConstrInst "GT" [])
     ] ++ (map generateCompare [(left, right) | left <- cs, right <- cs]))
   ]) where
     generateCompare :: (Constructor, Constructor) -> ([Parameter], Expression)
@@ -57,7 +57,7 @@ getHNatModifiers (_, hnatc) =
   ,
     Fn "minus" ([
       ([ConstrParam "Z" [], ConstrParam "Z" []], ConstrInst "Z" []),
-      ([ConstrParam "_" [], ConstrParam "Z" []], FnCall "error" [StringExpr "You cannot substract zero with a positive number"]),
+      ([ConstrParam "Z" [], VarParam "_"], FnCall "error" [StringExpr "You cannot substract zero with a positive number"]),
       ([VarParam "result", ConstrParam "Z" []], VarExpr "result")
     ] ++ (map generateMinus [(left, right) | left <- cs, right <- cs]))
   ]

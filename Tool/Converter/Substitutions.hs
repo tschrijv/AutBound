@@ -81,5 +81,5 @@ getSubstFunctions sd defs varAccessTable =
       in map (\(INH instname2 _) ->
         case instname1 == instname2 of
           True -> FnCall ((lookForSortName namespaceName defs) ++ "SubstituteHelp") [VarExpr "sub"]
-          False -> VarExpr "id" -- TODO: substituted from: \c x->x
+          False -> LambdaExpr [VarParam "c", VarParam "x"] (VarExpr "x")
       ) filtered
