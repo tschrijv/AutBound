@@ -4,6 +4,7 @@ import GeneralTerms
 import WellFormed
 import MyParser
 import Abstract
+import Converter
 import Text.Parsec.String
 import HaskellPrinter
 
