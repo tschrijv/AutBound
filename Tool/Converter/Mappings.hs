@@ -48,7 +48,7 @@ getMappings (_, sd, _, _) =
     --     sortType = pretty (capitalize (lookForSortName namespaceName namespaces))
 
     getMapParamConstr :: ConstructorDef -> [Parameter]
-    getMapParamConstr (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "hnat"]]
+    getMapParamConstr (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "var"]]
     getMapParamConstr cons = [ConstrParam (capitalize consName) (listToSpaceslower (foldToNormalList folds) ++ listToSpaceslower lists ++ listToSpaceslower listSorts ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
       where
         consName = getName cons
@@ -61,7 +61,7 @@ getMappings (_, sd, _, _) =
     getMapExpr sname (MkVarConstructor consName _) table _ =
       FnCall ("on" ++ getNameInstancenamespace (head (fromJust (lookup (capitalize sname) table)))) [
         VarExpr "c",
-        ConstrInst (capitalize consName) [VarExpr "hnat"]
+        ConstrInst (capitalize consName) [VarExpr "var"]
       ]
     getMapExpr sname cons table accessVarTable =
       ConstrInst (capitalize consName) (applyRulesIdentifiers

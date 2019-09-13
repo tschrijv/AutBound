@@ -32,7 +32,7 @@ getFreeVar (_, sd, _, _) =
 
 generateFreeVariableFunction :: SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [([Parameter], Expression)]
 generateFreeVariableFunction _ cons@(MkVarConstructor _ _) _ _ =
-  [([VarParam "c", generateFreeVariableConstructor cons], IfExpr (GTEExpr (VarExpr "hnat") (VarExpr "c")) (ListExpr [FnCall "minus" [VarExpr "hnat", VarExpr "c"]]) (ListExpr []))]
+  [([VarParam "c", generateFreeVariableConstructor cons], IfExpr (GTEExpr (VarExpr "var") (VarExpr "c")) (ListExpr [FnCall "minus" [VarExpr "var", VarExpr "c"]]) (ListExpr []))]
 generateFreeVariableFunction sname cons table accessVarTable =
   [([VarParam "c", generateFreeVariableConstructor cons],
     FnCall "nub" [
@@ -57,7 +57,7 @@ generateFreeVariableFunction sname cons table accessVarTable =
     rules = getConstrRules cons
 generateFreeVariableConstructor :: ConstructorDef -> Parameter
 generateFreeVariableConstructor (MkVarConstructor consName _) =
-  ConstrParam (capitalize consName) [VarParam "hnat"]
+  ConstrParam (capitalize consName) [VarParam "var"]
 generateFreeVariableConstructor cons =
   ConstrParam (capitalize consName) (listToSpaceslower (foldToNormalList folds ++ lists ++ listSorts) ++ [VarParam "_" | _ <- hTypes])
   where

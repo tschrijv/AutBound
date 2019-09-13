@@ -11,13 +11,13 @@ import Converter.Types
 
 convert :: Language -> Program
 convert lan@(nsd, sd, imp, cd) =
-  let hnat = getHNatType nsd
+  let var = getHNatType nsd
       env  = getEnvType nsd
   in P {
     imports = imp,
-    types = hnat : env : getTypes lan,
-    instances = [getHNatOrd hnat],
-    functions = getHNatModifiers hnat ++
+    types = var : env : getTypes lan,
+    instances = [getHNatOrd var],
+    functions = getHNatModifiers var ++
                 getGenerators nsd ++
                 getMappings lan ++
                 getShift lan ++

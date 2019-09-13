@@ -17,10 +17,10 @@ getTypes (_, sd, _, _) = map (
     getConstr (MkBindConstructor n lists listSorts folds _ _ hTypes) =
       Constr n (map (\(_, s, f) -> "(" ++ f ++ " " ++ s ++ ")") folds ++ map (\(_, t) -> "[" ++ t ++ "]") lists ++ map snd listSorts ++ hTypes)
     getConstr (MkVarConstructor n _) =
-      Constr n ["HNat"]
+      Constr n ["Variable"]
 
 getHNatType :: [NameSpaceDef] -> (Type, [Constructor])
-getHNatType nsd = ("HNat", Constr "Z" [] : map (\ns -> Constr ('S' : getName ns) ["HNat"]) nsd)
+getHNatType nsd = ("Variable", Constr "Z" [] : map (\ns -> Constr ('S' : getName ns) ["Variable"]) nsd)
 
 getEnvType :: [NameSpaceDef] -> (Type, [Constructor])
 getEnvType nsd = ("Env", Constr "Nil" [] : map (
@@ -32,7 +32,7 @@ getEnvType nsd = ("Env", Constr "Nil" [] : map (
 getHNatOrd :: (Type, [Constructor]) -> (Type, Type, [Function])
 getHNatOrd (_, hnatc) =
   let cs = delete (Constr "Z" []) hnatc
-  in ("Ord", "HNat", [
+  in ("Ord", "Variable", [
     Fn "compare" ([
       ([ConstrParam "Z" [], ConstrParam "Z" []], ConstrInst "EQ" []),
       ([ConstrParam "Z" [], VarParam "_"], ConstrInst "LT" []),

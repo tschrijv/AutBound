@@ -30,7 +30,7 @@ getEnvFunctions (nsd, sd, _, _) = let table = map getNameAndNSI sd
 
 generateSortSynSystemOneConstructor :: SortName -> [NameSpaceDef] -> [(SortName, [NamespaceInstance])] -> ConstructorDef -> NamespaceInstance -> Function
 generateSortSynSystemOneConstructor sname _ _ (MkVarConstructor consName _) _ =
-  Fn ("addToEnvironment" ++ sname) [([ConstrParam (capitalize consName) [VarParam "hnat"], VarParam "c"], VarExpr "c")]
+  Fn ("addToEnvironment" ++ sname) [([ConstrParam (capitalize consName) [VarParam "var"], VarParam "c"], VarExpr "c")]
 generateSortSynSystemOneConstructor sname namespaces table cons inst =
   Fn ("addToEnvironment" ++ sname ++ getName inst) [([ConstrParam (capitalize consName) (listToSpaceslower listSorts ++ [VarParam "_" | _ <- hTypes]), VarParam "c"], getEnvFunctionGenerate sname inst namespaces newtable listSorts rules)]
   where

@@ -24,11 +24,11 @@ getShiftHelpers sd opName varAccessTable = let filtered = filter (\(MkDefSort sn
     constructorDefineCheckShift (MkVarConstructor consName _) sname op =
       Fn (toLowerCaseFirst sname ++ "shiftHelp" ++ op)
         [
-          ([VarParam "d", VarParam "c", ConstrParam (capitalize consName) [VarParam "hnat"]],
+          ([VarParam "d", VarParam "c", ConstrParam (capitalize consName) [VarParam "var"]],
           IfExpr
-            (GTEExpr (VarExpr "hnat") (VarExpr "c"))
-            (ConstrInst (capitalize consName) [FnCall op [VarExpr "hnat", VarExpr "d"]])
-            (ConstrInst (capitalize consName) [VarExpr "hnat"])
+            (GTEExpr (VarExpr "var") (VarExpr "c"))
+            (ConstrInst (capitalize consName) [FnCall op [VarExpr "var", VarExpr "d"]])
+            (ConstrInst (capitalize consName) [VarExpr "var"])
           )
         ]
 

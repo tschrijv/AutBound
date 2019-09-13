@@ -25,11 +25,11 @@ getSubstHelpers sd varAccessTable =
       Fn (toLowerCaseFirst sname ++ "SubstituteHelp")
         [
           (
-            [VarParam "sub", VarParam "c", ConstrParam (capitalize consName) [VarParam "hnat"]],
+            [VarParam "sub", VarParam "c", ConstrParam (capitalize consName) [VarParam "var"]],
             IfExpr
-              (EQExpr (VarExpr "hnat") (VarExpr "c"))
+              (EQExpr (VarExpr "var") (VarExpr "c"))
               (FnCall (toLowerCaseFirst sname ++ "shiftplus") [VarExpr "c", VarExpr "sub"])
-              (ConstrInst (capitalize consName) [VarExpr "hnat"])
+              (ConstrInst (capitalize consName) [VarExpr "var"])
           )
         ]
 
