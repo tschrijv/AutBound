@@ -1,1 +1,4 @@
 playground
+*.hi
+*.o
+Tool/autbound
