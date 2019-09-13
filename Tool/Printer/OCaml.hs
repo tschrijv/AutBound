@@ -6,17 +6,18 @@ import Data.Text.Prettyprint.Doc
 import Program
 
 instance Pretty Constructor where
-  pretty (Constr n ts) = hsep (pretty n : punctuate (pretty " *") (map (\t -> pretty ('t' : t)) ts))
+  pretty (Constr n []) = pretty n
+  pretty (Constr n ts) = hsep (pretty (n ++ " of") : punctuate (pretty " *") (map (\t -> pretty ('t' : t)) ts))
 
 instance Pretty Parameter where
   pretty (VarParam n) = pretty n
-  pretty (ConstrParam n ps) = parens (hsep (pretty n : map pretty ps))
+  pretty (ConstrParam n ps) = parens (hsep (pretty n : (punctuate comma (map pretty ps))))
   pretty (StringParam s) = pretty "\"" <> pretty s <> pretty "\""
   pretty (IntParam i) = pretty i
 
 instance Pretty Expression where
   pretty (FnCall n ps) = parens $ hsep (pretty n : map pretty ps)
-  pretty (ConstrInst n ps) = parens $ hsep (pretty n : map pretty ps)
+  pretty (ConstrInst n ps) = parens $ hsep (pretty n : (punctuate comma (map pretty ps)))
   pretty (VarExpr x) = pretty x
   pretty (Minus a b) = parens (pretty a <+> pretty "-" <+> pretty b)
   pretty (IntExpr i) = pretty i
