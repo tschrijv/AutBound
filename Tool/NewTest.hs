@@ -6,25 +6,31 @@ import MyParser
 import Program
 import Converter
 import Text.Parsec.String
-import HaskellPrinter
+import Printer.Haskell as PHS
+import Printer.OCaml as POC
 
 import System.Environment
 
 main :: IO ()
 main = do
   [inputName, outputLanguage, outputName] <- getArgs
-  result <- parseFromFile pLanguage inputName
-  case result of
+  parsingResult <- parseFromFile pLanguage inputName
+  case parsingResult of
     Left err -> print err
     Right lang -> do
-      toWrite <- toFileHaskell lang
-      case toWrite of
+      conversionResult <- checkAndConvert lang
+      case conversionResult of
         Left err    -> print err
-        Right value -> writeFile (outputName ++ ".hs") (show (printProgram outputName value))
+        Right program -> writeToLanguage program outputLanguage outputName
 
-toFileHaskell :: Language -> IO (Either String Program)
-toFileHaskell lang =
+checkAndConvert :: Language -> IO (Either String Program)
+checkAndConvert lang =
   case wellFormed lang of
     Left failtxt2 -> return (Left failtxt2)
     Right True -> return (Right (convert lang))
     Right False -> error "Language is not well formed!"
+
+writeToLanguage :: Program -> String -> String -> IO ()
+writeToLanguage program lang name = case lang of
+  "Haskell" -> writeFile (name ++ ".hs") (show (PHS.printProgram name program))
+  "OCaml" -> writeFile (name ++ ".ml") (show (POC.printProgram name program))

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module HaskellPrinter where
+module Printer.Haskell where
 
 import Data.Text.Prettyprint.Doc
 import Program
