@@ -6,7 +6,7 @@ import Data.Text.Prettyprint.Doc
 import Program
 
 instance Pretty Constructor where
-  pretty (Constr n ts) = hsep (pretty n : map pretty ts)
+  pretty (Constr n ts) = hsep (pretty n : punctuate (pretty " *") (map (\t -> pretty ('t' : t)) ts))
 
 instance Pretty Parameter where
   pretty (VarParam n) = pretty n
@@ -28,9 +28,34 @@ instance Pretty Expression where
   pretty (LambdaExpr ps ex) = parens (pretty "fun" <+> hsep (map pretty ps) <+> pretty "->" <+> pretty ex)
 
 instance Pretty Function where
-  pretty (Fn n lns) = intoLines ((pretty "let rec" <+> pretty n <+> pretty "= match * with") : map oneLine lns) where
-    oneLine :: ([Parameter], Expression) -> Doc a
-    oneLine (ps, ex) = hsep $ (pretty "|") : (map pretty ps) ++ [pretty "->", pretty ex]
+  pretty (Fn n lns) =
+    let matchedParams = mapMatchedParams (map (\(ps, _) -> ps) lns)
+        params = fst (head lns)
+        replacedParams = replaceMatched matchedParams params
+        matchedParamNames = [param | (param, b) <- zip replacedParams matchedParams, b]
+    in if or matchedParams
+        then intoLines ((pretty "let rec" <+> pretty n <+> (hsep $ map pretty replacedParams) <+> pretty "= match" <+> hsep (punctuate comma (map pretty matchedParamNames)) <+> pretty "with") : map (oneMatchedLine matchedParams) lns)
+        else pretty "let rec" <+> pretty n <+> hsep (map pretty (fst (head lns))) <+> pretty "=" <+> pretty (snd (head lns)) -- if no matched params, it should only have one line
+    where
+        mapMatchedParams :: [[Parameter]] -> [Bool]
+        mapMatchedParams []      = []
+        mapMatchedParams [params]    = map isMatched params
+        mapMatchedParams (params:px) = [x || y | (x, y) <- zip (map isMatched params) (mapMatchedParams px)]
+
+        isMatched :: Parameter -> Bool
+        isMatched (ConstrParam _ _) = True
+        isMatched (StringParam _)   = True
+        isMatched (IntParam _)      = True
+        isMatched _                 = False
+
+        replaceMatched :: [Bool] -> [Parameter] -> [Parameter]
+        replaceMatched ms params = [if matched then VarParam ("plv" ++ show i) else x | (matched, x, i) <- zip3 ms params [1..]]
+
+        oneMatchedLine :: [Bool] -> ([Parameter], Expression) -> Doc a
+        oneMatchedLine matched (ps, ex) = hsep $ (pretty "  |") : (punctuate comma [pretty p | (p, b) <- zip ps matched, b]) ++ [pretty "->", pretty ex]
+
+        oneLine :: ([Parameter], Expression) -> Doc a
+        oneLine (ps, ex) = pretty ex
 
 nl :: Doc a
 nl = pretty "\n"
@@ -65,7 +90,7 @@ printTypeDecls decls =
     printOneType :: (Type, [Constructor]) -> Doc String
     printOneType (t, cs) = hsep [
         pretty "type",
-        pretty t,
+        pretty ('t' : t),
         pretty "=",
         hsep $ punctuate (pretty " |") (map pretty cs)
       ]
