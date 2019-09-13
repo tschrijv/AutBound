@@ -3,6 +3,7 @@
 -- parser mostly inspired by the inbound haskell parser
 module MyParser (pLanguage) where
 
+import Data.List
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Language
 import Text.ParserCombinators.Parsec.Token
@@ -25,20 +26,32 @@ myDef =
         , "import"
         , "HaskellCode"
         ]
-    , reservedOpNames = ["@", "=", ",", ".", ";"]
+    , reservedOpNames = ["@", "=", ",", ".", ";", ":", "|"]
     }
 
+inboundTokenParser :: TokenParser st
 inboundTokenParser = makeTokenParser myDef
+
+pIdentifier :: Parser String
 pIdentifier        = identifier inboundTokenParser
+
+pBrackets :: Parser a -> Parser a
 pBrackets          = brackets inboundTokenParser
-pSymbol            = symbol inboundTokenParser
-pColon             = colon inboundTokenParser
-pDot               = dot inboundTokenParser
-pComma             = comma inboundTokenParser
+
+pReserved :: String -> Parser ()
 pReserved          = reserved inboundTokenParser
+
+pParens :: Parser a -> Parser a
 pParens            = parens inboundTokenParser
+
+pBraces :: Parser a -> Parser a
 pBraces            = braces inboundTokenParser
+
+pWhiteSpace :: Parser ()
 pWhiteSpace        = whiteSpace inboundTokenParser
+
+pReservedOp :: String -> Parser ()
+pReservedOp = reservedOp inboundTokenParser
 
 pLanguage :: Parser Language
 pLanguage = do
@@ -52,6 +65,7 @@ pLanguage = do
 -- * Imports
 -- ----------------------------------------------------------------------------
 
+-- | Parse one complete import line
 pImports :: Parser (String, [String])
 pImports = do
   pReserved "import"
@@ -59,99 +73,109 @@ pImports = do
   chooselist <- pImportChoose
   return (name, chooselist)
 
+-- | Parse the module name (dot-separated strings)
 pImportsName :: Parser String
 pImportsName =
   pParens $ do
     list <- many pNameDot
     a <- pIdentifier
-    return (listToString list ++ a)
+    return (intercalate "." (list ++ [a]))
 
+-- | Parse one section of the module name
 pNameDot :: Parser String
 pNameDot =
   try
     (do a <- pIdentifier
-        _ <- pDot
+        pReservedOp "."
         return a)
 
-listToString :: [String] -> String
-listToString []       = ""
-listToString (x:rest) = x ++ "." ++ listToString rest
-
+-- | Parse specifically selected entities from the module
 pImportChoose :: Parser [String]
-pImportChoose = try pSpecifically <|> return []
-
-pSpecifically :: Parser [String]
-pSpecifically =
-  pParens $ many pIdentifier
+pImportChoose = try (pParens $ many pIdentifier) <|> return []
 
 -- * Namespaces
 -- ----------------------------------------------------------------------------
 
+-- | Parse a namespace declaration
 pNameSpaceDecl :: Parser NameSpaceDef
 pNameSpaceDecl =
-  MkNameSpace <$ pReserved "namespace" <*> pNameSpaceName <* pColon <*>
+  MkNameSpace <$ pReserved "namespace" <*> pNameSpaceName <* pReservedOp ":" <*>
   pSortName <*>
   pEnvAdd
 
+-- | Parse a namespace's name
 pNameSpaceName :: Parser NameSpaceName
 pNameSpaceName = pIdentifier
 
+-- | Parse a sort's name
+pSortName :: Parser SortName
+pSortName = pIdentifier
+
+-- | TODO: ???
 pEnvAdd :: Parser [String]
 pEnvAdd =
   many $ do
-    _ <- pComma
+    pReservedOp ","
     pIdentifier
 
 -- * Sort declarations
 -- ----------------------------------------------------------------------------
 
+-- | Parse a sort declaration
 pSortDecl :: Parser SortDef
 pSortDecl = try pSortDeclRewrite <|> pSortDeclNoRewrite
 
+-- | Parse a sort declaration with a rewrite rule
 pSortDeclRewrite :: Parser SortDef
 pSortDeclRewrite = do
-  _ <- pReserved "sort"
+  pReserved "sort"
   b <- pSortName
-  _ <- pReserved "rewrite"
+  pReserved "rewrite"
   c <- many pInstance
   d <- many pCtorDecl
   return (MkDefSort b c d True)
 
+-- | Parse a sort declaration with no rewrite rule
 pSortDeclNoRewrite :: Parser SortDef
 pSortDeclNoRewrite = do
-  _ <- pReserved "sort"
+  pReserved "sort"
   b <- pSortName
   c <- many pInstance
   d <- many pCtorDecl
   return (MkDefSort b c d False)
 
-pSortName :: Parser SortName
-pSortName = pIdentifier
-
+-- | Parse a namespace instance
 pInstance :: Parser NamespaceInstance
 pInstance = pInh <|> pSyn
 
+-- | Parse an inherited namespace instance
+pInh :: Parser NamespaceInstance
+pInh = do
+  pReserved "inh"
+  a <- pInstanceName
+  b <- pNameSpaceName
+  return (INH a b)
+
+-- | Parse a synthesized namespace instance
+pSyn :: Parser NamespaceInstance
+pSyn = do
+  pReserved "syn"
+  a <- pInstanceName
+  b <- pNameSpaceName
+  return (SYN a b)
+
+-- | Parse a namespace instance's name
+pInstanceName :: Parser SortName
+pInstanceName = pIdentifier
+
+-- | Parse a constructor definition
 pCtorDecl :: Parser ConstructorDef
 pCtorDecl = do
-  _ <- pSymbol "|"
+  pReservedOp "|"
   a <- pCtorName
   try (pCtorVar a) <|>
    try (pCtorBindState (MkBindConstructor a [] [] [] ("", "") [] [])) <|>
    pCtorNotVarState (MkDefConstructor a [] [] [] [] [])
-
-pInh :: Parser NamespaceInstance
-pInh = do
-  pReserved "inh"
-  a <- pIdentifier
-  b <- pIdentifier
-  return (INH a b)
-
-pSyn :: Parser NamespaceInstance
-pSyn = do
-  pReserved "syn"
-  a <- pIdentifier
-  b <- pIdentifier
-  return (SYN a b)
 
 pCtorName :: Parser ConstructorName
 pCtorName = pIdentifier
@@ -183,7 +207,7 @@ pVarNameSpace :: Parser NameSpaceName
 pVarNameSpace =
   pParens $ do
     _ <- pIdentifier
-    _ <- pSymbol "@"
+    pReservedOp "@"
     pIdentifier
 
 pConstructorListsNameState :: ConstructorDef -> Parser ConstructorDef
@@ -269,7 +293,7 @@ pConstructorListsName :: Parser (String, SortName)
 pConstructorListsName =
   pParens $ do
     a <- pIdentifier
-    _ <- pColon
+    pReservedOp ":"
     b <- pBracketSort
     return (a, b)
 
@@ -277,16 +301,16 @@ pFolds :: Parser (String, SortName, FoldName)
 pFolds =
   pParens $ do
     iden <- pIdentifier
-    _ <- pColon
+    pReservedOp ":"
     foldname <- pIdentifier
-    sort <- pIdentifier
-    return (iden, sort, foldname)
+    sortName <- pIdentifier
+    return (iden, sortName, foldname)
 
 pConstructorSortName :: Parser (String, SortName)
 pConstructorSortName =
   pParens $ do
     a <- pIdentifier
-    _ <- pColon
+    pReservedOp ":"
     b <- pIdentifier
     return (a, b)
 
@@ -297,14 +321,14 @@ pConstructorNameSpaceName :: Parser (String, NameSpaceName)
 pConstructorNameSpaceName =
   pBrackets $ do
     a <- pIdentifier
-    _ <- pSymbol ":"
+    pReservedOp ":"
     b <- pIdentifier
     return (a, b)
 
 pRule :: Parser NameSpaceRule
 pRule = do
   a <- pLeftExpr
-  _ <- pSymbol "="
+  pReservedOp "="
   b <- pRightExpr
   return (a, b)
 
@@ -320,35 +344,35 @@ pRightExpr = try pRightExprAdd <|> pRightExprLHS <|> pRightExprSub
 pLHSLeftExpr :: Parser LeftExpr
 pLHSLeftExpr = do
   pReserved "lhs"
-  _ <- pDot
+  pReservedOp "."
   a <- pIdentifier
   return (LeftLHS a)
 
 pSubLeftExpr :: Parser LeftExpr
 pSubLeftExpr = do
   a <- pIdentifier
-  _ <- pDot
+  pReservedOp "."
   b <- pIdentifier
   return (LeftSub a b)
 
 pRightExprAdd :: Parser RightExpr
 pRightExprAdd = do
   a <- pRightExprLHS <|> pRightExprSub
-  _ <- pSymbol ","
+  pReservedOp ","
   b <- pIdentifier
   return (RightAdd a b)
 
 pRightExprLHS :: Parser RightExpr
 pRightExprLHS = do
   pReserved "lhs"
-  _ <- pSymbol "."
+  pReservedOp "."
   a <- pIdentifier
   return (RightLHS a)
 
 pRightExprSub :: Parser RightExpr
 pRightExprSub = do
   a <- pIdentifier
-  _ <- pSymbol "."
+  pReservedOp "."
   b <- pIdentifier
   return (RightSub a b)
 
