@@ -8,21 +8,23 @@ import Converter
 import Text.Parsec.String
 import HaskellPrinter
 
+import System.Environment
+
 main :: IO ()
 main = do
-  putStrLn "Name of input file:"
-  name <- getLine
-  result <- parseFromFile pLanguage name
+  [inputName, outputLanguage, outputName] <- getArgs
+  result <- parseFromFile pLanguage inputName
   case result of
     Left err -> print err
     Right lang -> do
       toWrite <- toFileHaskell lang
       case toWrite of
         Left err    -> print err
-        Right value -> writeFile "HaskellOutput.hs" (show (printProgram "HaskellOutput" value))
+        Right value -> writeFile (outputName ++ ".hs") (show (printProgram outputName value))
 
 toFileHaskell :: Language -> IO (Either String Program)
 toFileHaskell lang =
   case wellFormed lang of
     Left failtxt2 -> return (Left failtxt2)
-    Right _ -> return (Right (convert lang)) -- TODO: what about non well-formedness?
+    Right True -> return (Right (convert lang))
+    Right False -> error "Language is not well formed!"
