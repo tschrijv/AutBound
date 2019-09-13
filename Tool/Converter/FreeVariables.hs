@@ -15,11 +15,12 @@ getFreeVar (_, sd, _, _) =
   let table = map getNameAndNSI sd
       accessVarTable = getVarAccessTable sd
       filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (capitalize sname) accessVarTable)) sd
-  in concatMap (\(MkDefSort sname _ cons _) ->
+  in map (\(MkDefSort sname _ cons _) ->
     -- generateTypingFreeVars sname <>
-    map (\c ->
+    Fn ("freeVariables" ++ sname)
+    (concatMap (\c ->
       generateFreeVariableFunction sname c table accessVarTable
-    ) cons
+    ) cons)
   ) filtered
 
 -- generateTypingFreeVars :: SortName -> Doc String
@@ -29,11 +30,11 @@ getFreeVar (_, sd, _, _) =
 --   pretty "HNat -> " <+>
 --   pretty (capitalize sname) <+> pretty " ->[HNat]" <+> pretty "\n"
 
-generateFreeVariableFunction :: SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> Function
-generateFreeVariableFunction sname cons@(MkVarConstructor _ _) _ _ =
-  Fn ("freeVariables" ++ sname) [([VarParam "c", generateFreeVariableConstructor cons], IfExpr (GTEExpr (VarExpr "hnat") (VarExpr "c")) (ListExpr [FnCall "minus" [VarExpr "hnat", VarExpr "c"]]) (ListExpr []))]
+generateFreeVariableFunction :: SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [([Parameter], Expression)]
+generateFreeVariableFunction _ cons@(MkVarConstructor _ _) _ _ =
+  [([VarParam "c", generateFreeVariableConstructor cons], IfExpr (GTEExpr (VarExpr "hnat") (VarExpr "c")) (ListExpr [FnCall "minus" [VarExpr "hnat", VarExpr "c"]]) (ListExpr []))]
 generateFreeVariableFunction sname cons table accessVarTable =
-  Fn ("freeVariables" ++ sname) [([VarParam "c", generateFreeVariableConstructor cons],
+  [([VarParam "c", generateFreeVariableConstructor cons],
     FnCall "nub" [
       FnCall "concat"
         [ListExpr (
