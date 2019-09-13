@@ -8,41 +8,41 @@ import Program
 import GeneralTerms
 
 getTypes :: Language -> [(Type, [Constructor])]
-getTypes (nsd, sd, imp, cd) = map (
+getTypes (_, sd, _, _) = map (
     \(MkDefSort name _ cds _) -> (name, map getConstr cds)
   ) sd where
     getConstr :: ConstructorDef -> Constructor
     getConstr (MkDefConstructor n lists listSorts folds _ hTypes) =
-      Constr n ((map (\(i, s, f) -> "(" ++ f ++ " " ++ s ++ ")") folds) ++ (map (\(_, t) -> "[" ++ t ++ "]") lists) ++ (map snd listSorts) ++ hTypes)
+      Constr n (map (\(_, s, f) -> "(" ++ f ++ " " ++ s ++ ")") folds ++ map (\(_, t) -> "[" ++ t ++ "]") lists ++ map snd listSorts ++ hTypes)
     getConstr (MkBindConstructor n lists listSorts folds _ _ hTypes) =
-      Constr n ((map (\(i, s, f) -> "(" ++ f ++ " " ++ s ++ ")") folds) ++ (map (\(_, t) -> "[" ++ t ++ "]") lists) ++ (map snd listSorts) ++ hTypes)
+      Constr n (map (\(_, s, f) -> "(" ++ f ++ " " ++ s ++ ")") folds ++ map (\(_, t) -> "[" ++ t ++ "]") lists ++ map snd listSorts ++ hTypes)
     getConstr (MkVarConstructor n _) =
       Constr n ["HNat"]
 
 getHNatType :: [NameSpaceDef] -> (Type, [Constructor])
-getHNatType nsd = ("HNat", (Constr "Z" []) : map (\ns -> Constr ('S' : getName ns) ["HNat"]) nsd)
+getHNatType nsd = ("HNat", Constr "Z" [] : map (\ns -> Constr ('S' : getName ns) ["HNat"]) nsd)
 
 getEnvType :: [NameSpaceDef] -> (Type, [Constructor])
-getEnvType nsd = ("Env", (Constr "Nil" []) : map (
+getEnvType nsd = ("Env", Constr "Nil" [] : map (
     \(MkNameSpace ns _ inEnv) -> Constr ('E' : ns) (inEnv ++ ["Env"])
   ) nsd)
 
 -- /////////////////////////////////////////////////////////////////////////////
 
-getHNatOrd :: [NameSpaceDef] -> (Type, [Constructor]) -> (Type, Type, [Function])
-getHNatOrd nsd (_, hnatc) =
+getHNatOrd :: (Type, [Constructor]) -> (Type, Type, [Function])
+getHNatOrd (_, hnatc) =
   let cs = delete (Constr "Z" []) hnatc
   in ("Ord", "HNat", [
     Fn "compare" ([
       ([ConstrParam "Z" [], ConstrParam "Z" []], ConstrInst "EQ" []),
       ([ConstrParam "Z" [], VarParam "_"], ConstrInst "LT" []),
       ([VarParam "_", ConstrParam "Z" []], ConstrInst "GT" [])
-    ] ++ (map generateCompare [(left, right) | left <- cs, right <- cs]))
+    ] ++ map generateCompare [(left, right) | left <- cs, right <- cs])
   ]) where
     generateCompare :: (Constructor, Constructor) -> ([Parameter], Expression)
-    generateCompare ((Constr n1 _), (Constr n2 _))
-      | n1 == n2 = ([(ConstrParam n1 [(VarParam "h1")]), (ConstrParam n2 [(VarParam "h2")])], FnCall "compare" [(VarExpr "h1"), (VarExpr "h2")])
-      | otherwise = ([(ConstrParam n1 [(VarParam "h1")]), (ConstrParam n2 [(VarParam "h2")])], FnCall "error" [StringExpr "differing namespace found in compare"])
+    generateCompare (Constr n1 _, Constr n2 _)
+      | n1 == n2 = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "compare" [VarExpr "h1", VarExpr "h2"])
+      | otherwise = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "error" [StringExpr "differing namespace found in compare"])
 
 -- /////////////////////////////////////////////////////////////////////////////
 
@@ -53,25 +53,25 @@ getHNatModifiers (_, hnatc) =
     Fn "plus" ([
       ([ConstrParam "Z" [], VarParam "h"], VarExpr "h"),
       ([VarParam "h", ConstrParam "Z" []], VarExpr "h")
-    ] ++ (map generatePlus cs))
+    ] ++ map generatePlus cs)
   ,
     Fn "minus" ([
       ([ConstrParam "Z" [], ConstrParam "Z" []], ConstrInst "Z" []),
       ([ConstrParam "Z" [], VarParam "_"], FnCall "error" [StringExpr "You cannot substract zero with a positive number"]),
       ([VarParam "result", ConstrParam "Z" []], VarExpr "result")
-    ] ++ (map generateMinus [(left, right) | left <- cs, right <- cs]))
+    ] ++ map generateMinus [(left, right) | left <- cs, right <- cs])
   ]
   where
     generatePlus :: Constructor -> ([Parameter], Expression)
     generatePlus (Constr n _) = ([VarParam "x1", ConstrParam n [VarParam "x2"]], ConstrInst n [FnCall "plus" [VarExpr "x1", VarExpr "x2"]])
 
     generateMinus :: (Constructor, Constructor) -> ([Parameter], Expression)
-    generateMinus ((Constr n1 _), (Constr n2 _))
-      | n1 == n2 = ([(ConstrParam n1 [(VarParam "h1")]), (ConstrParam n2 [(VarParam "h2")])], FnCall "minus" [(VarExpr "h1"), (VarExpr "h2")])
-      | otherwise = ([(ConstrParam n1 [(VarParam "h1")]), (ConstrParam n2 [(VarParam "h2")])], FnCall "error" [StringExpr "differing namespace found in minus"])
+    generateMinus (Constr n1 _, Constr n2 _)
+      | n1 == n2 = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "minus" [VarExpr "h1", VarExpr "h2"])
+      | otherwise = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "error" [StringExpr "differing namespace found in minus"])
 
 getGenerators :: [NameSpaceDef] -> [Function]
-getGenerators nsd = map (
+getGenerators = map (
     \ns ->
       let name = getName ns
           fnName = "generateHnat" ++ name
@@ -81,4 +81,4 @@ getGenerators nsd = map (
         ([IntParam 0, VarParam "c"], VarExpr "c"),
         ([VarParam "n", VarParam "c"], ConstrInst constr [FnCall fnName [Minus (VarExpr "n") (IntExpr 1), VarExpr "c"]])
       ]
-  ) nsd
+  )

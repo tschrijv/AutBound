@@ -16,7 +16,7 @@ convert lan@(nsd, sd, imp, cd) =
   in P {
     imports = imp,
     types = hnat : env : getTypes lan,
-    instances = [getHNatOrd nsd hnat],
+    instances = [getHNatOrd hnat],
     functions = getHNatModifiers hnat ++
                 getGenerators nsd ++
                 getMappings lan ++
