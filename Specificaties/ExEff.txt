@@ -6,7 +6,7 @@ namespace TypeVar : ValueType , SkeletonType
 namespace CoVar : Coercion , SimpleCoercionType
 
 sort Value
-    inh ctx  TermVar 
+    inh ctx  TermVar
     inh tctx  TypeVar
     inh skelctx SkelTypeVar
     inh dctx DirtVar
@@ -15,8 +15,8 @@ sort Value
  | TmFun (x:Computation) (t:ValueType) [z:TermVar]
             x.ctx = lhs.ctx,z
  | TmTSkellAbs (t1 : Value) [T:SkelTypeVar]
-        t1.skelctx = lhs.skelctx, T 
- |  TmTSkelApp (t1 : Value) (ty : SkeletonType) 
+        t1.skelctx = lhs.skelctx, T
+ |  TmTSkelApp (t1 : Value) (ty : SkeletonType)
  | TmValueTypeAbs (t:Value) (ty:SkeletonType) [Z:TypeVar]
             t.tctx=lhs.tctx,Z
  | TmValueTypeApp (t:Value) (ty:ValueType)
@@ -26,12 +26,12 @@ sort Value
  |TmCoAbs (t:Value) (coty:SimpleCoercionType) [Z:CoVar]
     t.coctx=lhs.coctx,Z
  | TmCoApp (t:Value) (Co:Coercion)
- | TmCast (val:Value) (Co:Coercion) 
+ | TmCast (val:Value) (Co:Coercion)
  |TmUnit
  |TmHandler (h:Handler)
- 
+
 sort OperationCompTuple
-    inh ctx  TermVar 
+    inh ctx  TermVar
     inh tctx  TypeVar
     inh skelctx SkelTypeVar
     inh dctx DirtVar
@@ -39,21 +39,21 @@ sort OperationCompTuple
     |OpAndComp (comp:Computation)  {Op} [k:TermVar]
             comp.ctx=lhs.ctx,k
 sort Handler
-    inh ctx  TermVar 
+    inh ctx  TermVar
     inh tctx  TypeVar
     inh skelctx SkelTypeVar
     inh dctx DirtVar
     inh coctx CoVar
-    |ReturnHandler (ty:ValueType) (cr:Computation) (opsc:[OperationCompTuple]) [x:TermVar]
+    |ReturnHandler (opsc:[OperationCompTuple]) (ty:ValueType) (cr:Computation) [x:TermVar]
                 cr.ctx=lhs.ctx,x
                 opsc.ctx=lhs.ctx,x
 
 sort Computation
-    inh ctx  TermVar 
+    inh ctx  TermVar
     inh tctx  TypeVar
     inh skelctx SkelTypeVar
     inh dctx DirtVar
-    inh coctx CoVar    
+    inh coctx CoVar
     |ReturnComp (v:Value)
     |HandleComp (comp:Computation) (v:Value)
     |ComputationApp (t1 : Value) (t2 : Value)
@@ -65,7 +65,7 @@ sort Computation
     |OpComp (v:Value) (ty:ValueType) (co:Computation) {Op}[y:TermVar]
             co.ctx=lhs.ctx,y
 
-sort ValueType 
+sort ValueType
     inh tctx TypeVar
     inh skelctx SkelTypeVar
     inh dctx DirtVar
@@ -86,7 +86,7 @@ sort CoercionType
     inh dctx DirtVar
     | CoSimple (co: SimpleCoercionType)
     |CoComp (v1:ComputationType) (v2: ComputationType)
-    
+
 sort SimpleCoercionType
     inh tctx  TypeVar
     inh skelctx SkelTypeVar
@@ -106,13 +106,13 @@ sort Dirt
     |DirtVariable (d@dctx)
     |EmptyDirt
     |UnionDirt (d:Dirt) {Op}
-  
+
 sort ComputationType
     inh tctx  TypeVar
     inh skelctx SkelTypeVar
     inh dctx DirtVar
     | ComputationTy (t:ValueType) (d:Dirt)
-sort Coercion rewrite 
+sort Coercion rewrite
     inh coctx CoVar
     inh tctx TypeVar
     inh skelctx SkelTypeVar
@@ -133,7 +133,7 @@ sort Coercion rewrite
             co.dctx=lhs.dctx,Z
     |CoCoArrow  (pi: SimpleCoercionType) (Co:Coercion)
     |CoComputation (co1:Coercion) (co2:Coercion)
-    
+
 
 HaskellCode
 
@@ -152,7 +152,7 @@ rewriteCoercion :: Coercion->Coercion
 rewriteCoercion (CoTypeVar ty) = rewriteTypeToCoercion ty
 rewriteCoercion  (CoArrow co1 co2) = CoArrow (rewriteCoercion co1) (rewriteCoercion co2)
 rewriteCoercion (CoHandler co1 co2) = CoHandler  (rewriteCoercion co1) (rewriteCoercion co2)
-rewriteCoercion (UnionOp co1 op) = UnionOp (rewriteCoercion co1) op 
+rewriteCoercion (UnionOp co1 op) = UnionOp (rewriteCoercion co1) op
 rewriteCoercion (CoskeletonAll co) = CoskeletonAll (rewriteCoercion co)
 rewriteCoercion (CoTypeAll co skel) = CoTypeAll (rewriteCoercion co ) skel
 rewriteCoercion (CoCoArrow pi co) = CoCoArrow pi (rewriteCoercion co )

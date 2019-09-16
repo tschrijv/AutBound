@@ -199,106 +199,24 @@ pVarCtor = do
 pBindCtor :: Parser ConstructorDef
 pBindCtor = do
   name <- pCtorName
-  pCtorBindState (MkBindConstructor name [] [] [] ("", "") [] [])
+  lists <- many (try pConstructorListsName)
+  folds <- many (try pFolds)
+  sorts <- many pConstructorSortName
+  haskellTypes <- many pHaskellTypes
+  namespace <- pConstructorNameSpaceName
+  rules <- many pRule
+  return (MkBindConstructor name lists sorts folds namespace rules haskellTypes)
 
 -- | Parse a non-binder constructor
 pDefCtor :: Parser ConstructorDef
 pDefCtor = do
   name <- pCtorName
-  pCtorNotVarState (MkDefConstructor name [] [] [] [] [])
-
-pCtorBindState :: ConstructorDef -> Parser ConstructorDef
-pCtorBindState cons =
-  try (pConstructorListsNameState cons) <|> try (pFoldState cons) <|>
-  pConstructorSortNameState cons <|>
-  pHaskellTypesState cons <|>
-  pRuleStateBind cons
-
-pCtorNotVarState :: ConstructorDef -> Parser ConstructorDef
-pCtorNotVarState cons =
-  try (pConstructorListsNameState cons) <|> try (pFoldState cons) <|>
-  pConstructorSortNameState cons <|>
-  pHaskellTypesState cons <|>
-  pRuleState cons
-
-pConstructorListsNameState :: ConstructorDef -> Parser ConstructorDef
-pConstructorListsNameState (MkDefConstructor name lists sorts folds rules haskelltypes) = do
-  a <- pConstructorListsName
-  pCtorNotVarState
-    (MkDefConstructor name (lists ++ [a]) sorts folds rules haskelltypes)
-pConstructorListsNameState (MkBindConstructor name lists sorts folds namespace rules haskelltypes) = do
-  a <- pConstructorListsName
-  pCtorBindState
-    (MkBindConstructor
-        name
-        (lists ++ [a])
-        sorts
-        folds
-        namespace
-        rules
-        haskelltypes)
-
-pFoldState :: ConstructorDef -> Parser ConstructorDef
-pFoldState (MkDefConstructor name lists sorts folds rules haskelltypes) = do
-  a <- pFolds
-  pCtorNotVarState
-    (MkDefConstructor name lists sorts (folds ++ [a]) rules haskelltypes)
-pFoldState (MkBindConstructor name lists sorts folds namespace rules haskelltypes) = do
-  a <- pFolds
-  pCtorBindState
-    (MkBindConstructor
-        name
-        lists
-        sorts
-        (folds ++ [a])
-        namespace
-        rules
-        haskelltypes)
-
-pConstructorSortNameState :: ConstructorDef -> Parser ConstructorDef
-pConstructorSortNameState (MkDefConstructor name lists sorts folds rules haskelltypes) = do
-  a <- pConstructorSortName
-  pCtorNotVarState
-    (MkDefConstructor name lists (sorts ++ [a]) folds rules haskelltypes)
-pConstructorSortNameState (MkBindConstructor name lists sorts folds namespace rules haskelltypes) = do
-  a <- pConstructorSortName
-  pCtorBindState
-    (MkBindConstructor
-        name
-        lists
-        (sorts ++ [a])
-        folds
-        namespace
-        rules
-        haskelltypes)
-
-pHaskellTypesState :: ConstructorDef -> Parser ConstructorDef
-pHaskellTypesState (MkDefConstructor name lists sorts folds rules haskelltypes) = do
-  a <- pHaskellTypes
-  pCtorNotVarState
-    (MkDefConstructor name lists sorts folds rules (haskelltypes ++ [a]))
-pHaskellTypesState (MkBindConstructor name lists sorts folds namespace rules haskelltypes) = do
-  a <- pHaskellTypes
-  pCtorBindState
-    (MkBindConstructor
-        name
-        lists
-        sorts
-        folds
-        namespace
-        rules
-        (haskelltypes ++ [a]))
-
-pRuleStateBind :: ConstructorDef -> Parser ConstructorDef
-pRuleStateBind (MkBindConstructor name lists sorts folds _namespace _rules haskelltypes) = do
-  a <- pConstructorNameSpaceName
-  b <- many pRule
-  return (MkBindConstructor name lists sorts folds a b haskelltypes)
-
-pRuleState :: ConstructorDef -> Parser ConstructorDef
-pRuleState (MkDefConstructor name lists sorts folds _rules haskelltypes) = do
-  a <- many pRule
-  return (MkDefConstructor name lists sorts folds a haskelltypes)
+  lists <- many (try pConstructorListsName)
+  folds <- many (try pFolds)
+  sorts <- many pConstructorSortName
+  haskellTypes <- many pHaskellTypes
+  rules <- many pRule
+  return (MkDefConstructor name lists sorts folds rules haskellTypes)
 
 pConstructorListsName :: Parser (String, SortName)
 pConstructorListsName =
