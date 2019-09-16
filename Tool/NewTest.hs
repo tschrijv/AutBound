@@ -8,26 +8,30 @@ import Converter
 import Text.Parsec.String
 import Printer.Haskell as PHS
 import Printer.OCaml as POC
+import Variable.DeBruijn as VDB
+import Variable.String as VS
 
 import System.Environment
 
 main :: IO ()
 main = do
-  [inputName, outputLanguage, outputName] <- getArgs
+  [inputName, outputLanguage, varType, outputName] <- getArgs
   parsingResult <- parseFromFile pLanguage inputName
   case parsingResult of
     Left err -> print err
     Right lang -> do
-      conversionResult <- checkAndConvert lang
+      conversionResult <- checkAndConvert lang varType
       case conversionResult of
         Left err    -> print err
         Right program -> writeToLanguage program outputLanguage outputName
 
-checkAndConvert :: Language -> IO (Either String Program)
-checkAndConvert lang =
+checkAndConvert :: Language -> String -> IO (Either String Program)
+checkAndConvert lang varType =
   case wellFormed lang of
     Left failtxt2 -> return (Left failtxt2)
-    Right True -> return (Right (convert lang))
+    Right True -> case varType of
+      "DeBruijn" -> return (Right (convert lang (VF {variableType = VDB.getVariableType, variableInstances = VDB.getVariableInstances, variableFunctions = VDB.getVariableFunctions})))
+      "String" -> return (Right (convert lang (VF {variableType = VS.getVariableType, variableInstances = VS.getVariableInstances, variableFunctions = VS.getVariableFunctions})))
     Right False -> error "Language is not well formed!"
 
 writeToLanguage :: Program -> String -> String -> IO ()

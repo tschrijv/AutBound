@@ -9,16 +9,21 @@ import Converter.Shifts
 import Converter.Substitutions
 import Converter.Types
 
-convert :: Language -> Program
-convert lan@(nsd, sd, imp, cd) =
-  let var = getHNatType nsd
+data VariableFunctions = VF {
+  variableType :: [NameSpaceDef] -> (Type, [Constructor]),
+  variableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])],
+  variableFunctions :: Language -> (Type, [Constructor]) -> [Function]
+}
+
+convert :: Language -> VariableFunctions -> Program
+convert lan@(nsd, sd, imp, cd) vf =
+  let var = (variableType vf) nsd
       env  = getEnvType nsd
   in P {
     imports = imp,
     types = var : env : getTypes lan,
-    instances = [getHNatOrd var],
-    functions = getHNatModifiers var ++
-                getGenerators nsd ++
+    instances = (variableInstances vf) var,
+    functions = (variableFunctions vf) lan var ++
                 getMappings lan ++
                 getShift lan ++
                 getSubst lan ++
