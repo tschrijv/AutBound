@@ -172,43 +172,54 @@ pInstanceName = pIdentifier
 pCtorDecl :: Parser ConstructorDef
 pCtorDecl = do
   pReservedOp "|"
-  a <- pCtorName
-  try (pCtorVar a) <|>
-   try (pCtorBindState (MkBindConstructor a [] [] [] ("", "") [] [])) <|>
-   pCtorNotVarState (MkDefConstructor a [] [] [] [] [])
+  try pVarCtor <|>
+   try pBindCtor <|>
+   pDefCtor
 
+-- | Parse a constructor's name
 pCtorName :: Parser ConstructorName
 pCtorName = pIdentifier
 
-pCtorVar :: String -> Parser ConstructorDef
-pCtorVar name = do
+-- | Parse a variable constructor
+pVarCtor :: Parser ConstructorDef
+pVarCtor = do
+  name <- pCtorName
   a <- pVarNameSpace
   return (MkVarConstructor name a)
+  where
+    -- | Parse a namespace variable
+    pVarNameSpace :: Parser NameSpaceName
+    pVarNameSpace =
+      pParens $ do
+        _ <- pIdentifier
+        pReservedOp "@"
+        pIdentifier
+
+-- | Parse a binder constructor
+pBindCtor :: Parser ConstructorDef
+pBindCtor = do
+  name <- pCtorName
+  pCtorBindState (MkBindConstructor name [] [] [] ("", "") [] [])
+
+-- | Parse a non-binder constructor
+pDefCtor :: Parser ConstructorDef
+pDefCtor = do
+  name <- pCtorName
+  pCtorNotVarState (MkDefConstructor name [] [] [] [] [])
 
 pCtorBindState :: ConstructorDef -> Parser ConstructorDef
-pCtorBindState (MkBindConstructor name lists sorts folds namespace rules haskelltypes) =
+pCtorBindState cons =
   try (pConstructorListsNameState cons) <|> try (pFoldState cons) <|>
   pConstructorSortNameState cons <|>
   pHaskellTypesState cons <|>
   pRuleStateBind cons
-  where
-    cons = MkBindConstructor name lists sorts folds namespace rules haskelltypes
 
 pCtorNotVarState :: ConstructorDef -> Parser ConstructorDef
-pCtorNotVarState (MkDefConstructor name lists sorts folds rules haskelltypes) =
+pCtorNotVarState cons =
   try (pConstructorListsNameState cons) <|> try (pFoldState cons) <|>
   pConstructorSortNameState cons <|>
   pHaskellTypesState cons <|>
   pRuleState cons
-  where
-    cons = MkDefConstructor name lists sorts folds rules haskelltypes
-
-pVarNameSpace :: Parser NameSpaceName
-pVarNameSpace =
-  pParens $ do
-    _ <- pIdentifier
-    pReservedOp "@"
-    pIdentifier
 
 pConstructorListsNameState :: ConstructorDef -> Parser ConstructorDef
 pConstructorListsNameState (MkDefConstructor name lists sorts folds rules haskelltypes) = do

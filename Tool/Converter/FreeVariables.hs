@@ -9,26 +9,17 @@ import GeneralTerms
 import Utility
 import Converter.Utility
 
---generate free variable functions
 getFreeVar :: Language -> [Function]
 getFreeVar (_, sd, _, _) =
   let table = map getNameAndNSI sd
       accessVarTable = getVarAccessTable sd
       filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (capitalize sname) accessVarTable)) sd
   in map (\(MkDefSort sname _ cons _) ->
-    -- generateTypingFreeVars sname <>
     Fn ("freeVariables" ++ sname)
     (concatMap (\c ->
       generateFreeVariableFunction sname c table accessVarTable
     ) cons)
   ) filtered
-
--- generateTypingFreeVars :: SortName -> Doc String
--- generateTypingFreeVars sname =
---   pretty "freeVariables" <> pretty sname <+>
---   pretty "::" <+>
---   pretty "HNat -> " <+>
---   pretty (capitalize sname) <+> pretty " ->[HNat]" <+> pretty "\n"
 
 generateFreeVariableFunction :: SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [([Parameter], Expression)]
 generateFreeVariableFunction _ cons@(MkVarConstructor _ _) _ _ =
@@ -55,6 +46,7 @@ generateFreeVariableFunction sname cons table accessVarTable =
     lists = getConstrLists cons
     listSorts = getConstrListSorts cons
     rules = getConstrRules cons
+
 generateFreeVariableConstructor :: ConstructorDef -> Parameter
 generateFreeVariableConstructor (MkVarConstructor consName _) =
   ConstrParam (capitalize consName) [VarParam "var"]
