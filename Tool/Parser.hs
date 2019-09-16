@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 -- parser mostly inspired by the inbound haskell parser
-module MyParser (pLanguage) where
+module Parser (pLanguage) where
 
 import Data.List
 import Text.ParserCombinators.Parsec
@@ -58,8 +58,8 @@ pLanguage = do
   pWhiteSpace
   idecls <- many pImports
   ndecls <- many pNameSpaceDecl
-  sdecls <- manyTill pSortDecl pHaskellLiteral
-  hsCode <- pEnd
+  sdecls <- many pSortDecl
+  hsCode <- pHaskellCode
   return (ndecls, sdecls, idecls, hsCode)
 
 -- * Imports
@@ -218,6 +218,7 @@ pDefCtor = do
   rules <- many pRule
   return (MkDefConstructor name lists sorts folds rules haskellTypes)
 
+-- | Parse a constructor parameter with a list type
 pConstructorListsName :: Parser (String, SortName)
 pConstructorListsName =
   pParens $ do
@@ -225,7 +226,11 @@ pConstructorListsName =
     pReservedOp ":"
     b <- pBracketSort
     return (a, b)
+  where
+    pBracketSort :: Parser SortName
+    pBracketSort = pBrackets pIdentifier
 
+-- | Parse a constructor parameter with a fold type (??)
 pFolds :: Parser (String, SortName, FoldName)
 pFolds =
   pParens $ do
@@ -235,6 +240,7 @@ pFolds =
     sortName <- pIdentifier
     return (iden, sortName, foldname)
 
+-- | Parse a constructor parameter with a regular sort type
 pConstructorSortName :: Parser (String, SortName)
 pConstructorSortName =
   pParens $ do
@@ -243,9 +249,11 @@ pConstructorSortName =
     b <- pIdentifier
     return (a, b)
 
+-- | Parse a constructor parameter with a built-in type
 pHaskellTypes :: Parser HaskellTypeName
 pHaskellTypes = pBraces pIdentifier
 
+-- | Parse the binding parameter for a constructor
 pConstructorNameSpaceName :: Parser (String, NameSpaceName)
 pConstructorNameSpaceName =
   pBrackets $ do
@@ -254,6 +262,7 @@ pConstructorNameSpaceName =
     b <- pIdentifier
     return (a, b)
 
+-- | Parse namespace rules for a constructor
 pRule :: Parser NameSpaceRule
 pRule = do
   a <- pLeftExpr
@@ -261,27 +270,33 @@ pRule = do
   b <- pRightExpr
   return (a, b)
 
-pBracketSort :: Parser SortName
-pBracketSort = pBrackets pIdentifier
-
 pLeftExpr :: Parser LeftExpr
 pLeftExpr = pLHSLeftExpr <|> pSubLeftExpr
 
 pRightExpr :: Parser RightExpr
 pRightExpr = try pRightExprAdd <|> pRightExprLHS <|> pRightExprSub
 
-pLHSLeftExpr :: Parser LeftExpr
-pLHSLeftExpr = do
+pLHSExpr :: Parser String
+pLHSExpr = do
   pReserved "lhs"
   pReservedOp "."
+  pIdentifier
+
+pSubExpr :: Parser (String, String)
+pSubExpr = do
   a <- pIdentifier
+  pReservedOp "."
+  b <- pIdentifier
+  return (a, b)
+
+pLHSLeftExpr :: Parser LeftExpr
+pLHSLeftExpr = do
+  a <- pLHSExpr
   return (LeftLHS a)
 
 pSubLeftExpr :: Parser LeftExpr
 pSubLeftExpr = do
-  a <- pIdentifier
-  pReservedOp "."
-  b <- pIdentifier
+  (a, b) <- pSubExpr
   return (LeftSub a b)
 
 pRightExprAdd :: Parser RightExpr
@@ -293,28 +308,24 @@ pRightExprAdd = do
 
 pRightExprLHS :: Parser RightExpr
 pRightExprLHS = do
-  pReserved "lhs"
-  pReservedOp "."
-  a <- pIdentifier
+  a <- pLHSExpr
   return (RightLHS a)
 
 pRightExprSub :: Parser RightExpr
 pRightExprSub = do
-  a <- pIdentifier
-  pReservedOp "."
-  b <- pIdentifier
+  (a, b) <- pSubExpr
   return (RightSub a b)
 
 -- * Haskell code
 -- ----------------------------------------------------------------------------
 
-pHaskellLiteral :: Parser ()
-pHaskellLiteral =
-  pReserved "HaskellCode" <|> eof
+-- | Parse native code if not at the end of file
+pHaskellCode :: Parser [String]
+pHaskellCode = parseEOF <|> do
+  pReserved "HaskellCode"
+  pHsCode
 
-pEnd :: Parser [String]
-pEnd = try pHsCode <|> parseEOF
-
+-- | Parse lines until the end of the file
 pHsCode :: Parser [String]
 pHsCode = do
   x <- line
@@ -325,10 +336,12 @@ pHsCode = do
   eof
   return (x : xs)
 
+-- | Return an empty array if at the end of the file
 parseEOF :: Parser [String]
 parseEOF = do
   eof
   return []
 
+-- | Parse a line
 line :: Parser String
 line = many $ noneOf "\n"

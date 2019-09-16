@@ -2,7 +2,7 @@
 
 import GeneralTerms
 import WellFormed
-import MyParser
+import Parser
 import Program
 import Converter
 import Text.Parsec.String
