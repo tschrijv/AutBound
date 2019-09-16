@@ -62,22 +62,22 @@ generateFreeVariableConstructor cons =
 applyRulesIdentifiersFreeVariables :: SortName -> [NameSpaceRule] -> [(IdName, [NameSpaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
 applyRulesIdentifiersFreeVariables _ _ [] _ _ _ _ _ = [ListExpr []]
 applyRulesIdentifiersFreeVariables sname rules [(iden, idRules)] folds lists listSorts table accessVarTable
-  | fromJust (lookup sortnameInUse accessVarTable) = [FnCall ("freeVariables" ++ sortnameInUse) (addedBinders ++ [VarExpr (toLowerCaseFirst iden)])]
+  | fromJust (lookup sortnameInUse accessVarTable) = [FnCall ("freeVariables" ++ sortnameInUse) (addedBinders : [VarExpr (toLowerCaseFirst iden)])]
   | otherwise = [ListExpr []]
   where
     addedBinders = applyRuleInheritedNamespaces sname rules (iden, idRules) folds lists listSorts table (calculateInheritedNameSpace sortnameInUse table)
     sortnameInUse = lookupIdToSort iden (lists ++ listSorts)
 applyRulesIdentifiersFreeVariables sname rules ((iden, idRules):rest) folds lists listSorts table accessVarTable
   | fromJust (lookup sortnameInUse accessVarTable) && (iden `elem` map fst folds) =
-    FnCall "foldMap" [FnCall ("freeVariables" ++ sortnameInUse) addedBinders, VarExpr (toLowerCaseFirst iden)]
+    FnCall "foldMap" [FnCall ("freeVariables" ++ sortnameInUse) [addedBinders], VarExpr (toLowerCaseFirst iden)]
     :
     applyRulesIdentifiersFreeVariables sname rules rest folds lists listSorts table accessVarTable
   | fromJust (lookup sortnameInUse accessVarTable) && (iden `elem` map fst lists) =
-    FnCall "concatMap" [FnCall ("freeVariables" ++ sortnameInUse) addedBinders, VarExpr (toLowerCaseFirst iden)]
+    FnCall "concatMap" [FnCall ("freeVariables" ++ sortnameInUse) [addedBinders], VarExpr (toLowerCaseFirst iden)]
     :
     applyRulesIdentifiersFreeVariables sname rules rest folds lists listSorts table accessVarTable
   | fromJust (lookup sortnameInUse accessVarTable) =
-    FnCall ("freeVariables" ++ sortnameInUse) (addedBinders ++ [VarExpr (toLowerCaseFirst iden)])
+    FnCall ("freeVariables" ++ sortnameInUse) (addedBinders : [VarExpr (toLowerCaseFirst iden)])
     :
     applyRulesIdentifiersFreeVariables sname rules rest folds lists listSorts table accessVarTable
   | otherwise =

@@ -121,20 +121,9 @@ getNSI (MkDefSort _ instances _ _) = instances
 getNameAndNSI :: SortDef -> (SortName, [NamespaceInstance])
 getNameAndNSI s = (getName s, getNSI s)
 
--- get the name on the left expression
-getLeftExprId :: LeftExpr -> [IdName]
-getLeftExprId (LeftLHS _)    = []
-getLeftExprId (LeftSub iden _) = [iden]
-
 getLeftIdSub :: LeftExpr -> IdName
 getLeftIdSub (LeftLHS _)    = ""
 getLeftIdSub (LeftSub iden _) = iden
-
---gets the idName of the rightexpr
-getRightExprId :: RightExpr -> [IdName]
-getRightExprId (RightLHS _)      = []
-getRightExprId (RightSub name _) = [name]
-getRightExprId (RightAdd expr _) = getRightExprId expr
 
 -- get the namespaceName where the instance is referring to
 getNamespaceNameInstance :: NamespaceInstance -> NameSpaceName
@@ -146,12 +135,6 @@ getInstanceNamesOfRuleLeft :: LeftExpr -> InstanceName
 getInstanceNamesOfRuleLeft (LeftLHS name)   = name
 getInstanceNamesOfRuleLeft (LeftSub _ name) = name
 
---get the name of the context of a right expr
-getInstanceNamesOfRuleRight :: RightExpr -> InstanceName
-getInstanceNamesOfRuleRight (RightAdd expr _) = getInstanceNamesOfRuleRight expr
-getInstanceNamesOfRuleRight (RightLHS name) = name
-getInstanceNamesOfRuleRight (RightSub _ name) = name
-
 --collects all the rules of the identifiers used in the constructor and groups them in a list with each identifier getting a list of rules
 collectRulesAllField :: [NameSpaceRule] -> [(IdName, SortName)] -> [(IdName, [NameSpaceRule])]
 collectRulesAllField rules = map (\(i, _) -> collectRulesOfId rules i)
@@ -159,13 +142,3 @@ collectRulesAllField rules = map (\(i, _) -> collectRulesOfId rules i)
     -- group the rules of one  identifier together
     collectRulesOfId :: [NameSpaceRule] -> IdName -> (IdName, [NameSpaceRule])
     collectRulesOfId nsr i = (i, filter (\(LeftSub fieldname _, _) -> fieldname == i) nsr)
-
-collectRulesSyn :: [NameSpaceRule] -> [(IdName, SortName)] -> [(IdName, [NameSpaceRule])]
-collectRulesSyn rules ids =
-  foldl
-    (++)
-    [("lhs", [(LeftLHS c, r) | (LeftLHS c, r) <- rules])]
-    (map (\(iden, _) -> [collectRulesOfIdSyn rules iden]) ids)
-  where
-    collectRulesOfIdSyn :: [NameSpaceRule] -> IdName -> (IdName, [NameSpaceRule])
-    collectRulesOfIdSyn nsr i = (i, filter (\(LeftSub fieldname _, RightSub _ _) -> fieldname == i) nsr)

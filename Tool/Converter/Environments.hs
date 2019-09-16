@@ -10,23 +10,15 @@ import GeneralTerms
 import Utility
 import Converter.Utility
 
--- generation for all syn contexts
 getEnvFunctions :: Language -> [Function]
 getEnvFunctions (nsd, sd, _, _) = let table = map getNameAndNSI sd
   in concatMap (\s ->
     let nsi = [SYN x y | SYN x y <- getNSI s]
     in if null nsi then [] else
-    -- generateTypingsyn sname (getName x) <>
     map (\c ->
       generateSortSynSystemOneConstructor (getName s) nsd table c (head nsi)
     ) (getConstrDefs s)
   ) sd
-
--- generateTypingsyn :: SortName -> InstanceName -> Doc String
--- generateTypingsyn sname instname =
---   pretty "addToEnvironment" <> pretty sname <> pretty instname <+>
---   pretty "::" <+>
---   pretty (capitalize sname) <+> pretty "->HNat -> HNat" <+> pretty "\n"
 
 generateSortSynSystemOneConstructor :: SortName -> [NameSpaceDef] -> [(SortName, [NamespaceInstance])] -> ConstructorDef -> NamespaceInstance -> Function
 generateSortSynSystemOneConstructor sname _ _ (MkVarConstructor consName _) _ =
@@ -40,7 +32,6 @@ generateSortSynSystemOneConstructor sname namespaces table cons inst =
     hTypes = getConstrHTypes cons
     rules = getConstrRules cons
 
---after = part logic of the syn functions
 getEnvFunctionGenerate :: SortName -> NamespaceInstance -> [NameSpaceDef] -> [(SortName, [NamespaceInstance])] -> [(IdName, SortName)]  -> [NameSpaceRule] -> Expression
 getEnvFunctionGenerate sname inst namespaces table listSorts rules
   | null $ fromJust (lookup "lhs" allrules) = VarExpr "c"
@@ -52,6 +43,16 @@ getEnvFunctionGenerate sname inst namespaces table listSorts rules
         (\x -> getInstanceNamesOfRuleLeft (fst x) == getName inst)
         (fromJust (lookup "lhs" allrules))
       )
+
+    collectRulesSyn :: [NameSpaceRule] -> [(IdName, SortName)] -> [(IdName, [NameSpaceRule])]
+    collectRulesSyn rules ids =
+      foldl
+        (++)
+        [("lhs", [(LeftLHS c, r) | (LeftLHS c, r) <- rules])]
+        (map (\(iden, _) -> [collectRulesOfIdSyn rules iden]) ids)
+      where
+        collectRulesOfIdSyn :: [NameSpaceRule] -> IdName -> (IdName, [NameSpaceRule])
+        collectRulesOfIdSyn nsr i = (i, filter (\(LeftSub fieldname _, RightSub _ _) -> fieldname == i) nsr)
 
 navigateRules :: SortName -> NamespaceInstance -> [NameSpaceDef] -> [(SortName, [NamespaceInstance])] -> [(IdName, SortName)] -> [NameSpaceRule] -> NameSpaceRule -> Expression
 navigateRules sname inst namespaces table listSorts rules (l, RightAdd expr _) =

@@ -55,9 +55,6 @@ instance Pretty Function where
         oneMatchedLine :: [Bool] -> ([Parameter], Expression) -> Doc a
         oneMatchedLine matched (ps, ex) = hsep $ (pretty "  |") : (punctuate comma [pretty p | (p, b) <- zip ps matched, b]) ++ [pretty "->", pretty ex]
 
-        oneLine :: ([Parameter], Expression) -> Doc a
-        oneLine (ps, ex) = pretty ex
-
 nl :: Doc a
 nl = pretty "\n"
 
@@ -65,7 +62,7 @@ intoLines :: [Doc a] -> Doc a
 intoLines = hcat . punctuate nl
 
 printProgram :: String -> Program -> Doc String
-printProgram name program =
+printProgram _ program =
   intoLines [
     printImports (imports program),
     printTypeDecls (types program),
@@ -101,7 +98,7 @@ printFunctions fns = intoLines $ punctuate nl (map pretty fns)
 
 printInstances :: [(Type, Type, [Function])] -> Doc String
 printInstances ids = intoLines $ map (
-    \(cls, typ, fns) -> intoLines [
+    \(_, _, fns) -> intoLines [
       printFunctions (map (\(Fn n lns) -> Fn n lns) fns)
     ]
   ) ids

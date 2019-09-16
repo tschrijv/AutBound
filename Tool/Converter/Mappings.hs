@@ -16,7 +16,6 @@ getMappings (_, sd, _, _) =
       accessVarTable = getVarAccessTable sd
   in map (
     \(MkDefSort name inst constr _) ->
-        -- generateTypingmap name inst nsd <>
         Fn (sortMapName name)
         (map (\c ->
           (
@@ -29,24 +28,6 @@ getMappings (_, sd, _, _) =
         ) constr)
   ) filtered
   where
-    -- generateTypingmap :: SortName -> [NamespaceInstance] -> [NameSpaceDef] -> Doc String
-    -- generateTypingmap sname instances namespaces =
-    --   pretty (toLowerCaseFirst sname) <> pretty "map" <+>
-    --   pretty "::" <+>
-    --   generateTypingInstancemap (filter isInh instances) namespaces <+>
-    --   pretty "HNat ->" <+> sorttype <+> pretty "->" <+> sorttype <+> pretty "\n"
-    --   where
-    --     sorttype = pretty (capitalize sname)
-
-    -- generateTypingInstancemap :: [NamespaceInstance] -> [NameSpaceDef] -> Doc String
-    -- generateTypingInstancemap [] _ = pretty ""
-    -- generateTypingInstancemap (INH _ namespaceName:rest) namespaces =
-    --   pretty "(HNat->" <> sortType <+>
-    --   pretty "->" <+>
-    --   sortType <> pretty ")->" <+> generateTypingInstancemap rest namespaces
-    --   where
-    --     sortType = pretty (capitalize (lookForSortName namespaceName namespaces))
-
     getMapParamConstr :: ConstructorDef -> [Parameter]
     getMapParamConstr (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "var"]]
     getMapParamConstr cons = [ConstrParam (capitalize consName) (listToSpaceslower (foldToNormalList folds) ++ listToSpaceslower lists ++ listToSpaceslower listSorts ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
@@ -91,7 +72,6 @@ getMappings (_, sd, _, _) =
     nsiExprs :: [NamespaceInstance] -> [Expression]
     nsiExprs inst = [VarExpr ("on" ++ namespace) | INH _ namespace <- inst]
 
-    --calculate the inherited namespace of an identifier and for every inherited namespace, check what happens
     applyRulesIdentifiers :: SortName -> [NameSpaceRule] -> [(IdName, [NameSpaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
     applyRulesIdentifiers sname rules idRules folds lists listSorts table accessVarTable = map process idRules where
       process (iden, idr)
@@ -104,7 +84,7 @@ getMappings (_, sd, _, _) =
         | otherwise = VarExpr (toLowerCaseFirst iden)
         where
           addedBinders =
-            applyRuleInheritedNamespaces
+            [applyRuleInheritedNamespaces
               sname
               rules
               (iden, idr)
@@ -112,5 +92,5 @@ getMappings (_, sd, _, _) =
               lists
               listSorts
               table
-              (calculateInheritedNameSpace sortnameInUse table)
+              (calculateInheritedNameSpace sortnameInUse table)]
           sortnameInUse = lookupIdToSort iden (folds ++ lists ++ listSorts)

@@ -17,26 +17,20 @@ getShiftHelpers sd opName varAccessTable = let filtered = filter (\(MkDefSort sn
   in concatMap (\(MkDefSort sname _ cdefs _) -> constructorsToCheckShift cdefs sname opName) filtered
   where
     constructorsToCheckShift :: [ConstructorDef] -> SortName -> String -> [Function]
-    constructorsToCheckShift cdefs sname op = let filtered = [MkVarConstructor c i | MkVarConstructor c i <- cdefs]
-      in map (\c -> constructorDefineCheckShift c sname op) filtered
-
-    constructorDefineCheckShift :: ConstructorDef -> SortName -> String -> Function
-    constructorDefineCheckShift (MkVarConstructor consName _) sname op =
+    constructorsToCheckShift cdefs sname op = [
       Fn (toLowerCaseFirst sname ++ "shiftHelp" ++ op)
-        [
-          ([VarParam "d", VarParam "c", ConstrParam (capitalize consName) [VarParam "var"]],
-          IfExpr
-            (GTEExpr (VarExpr "var") (VarExpr "c"))
-            (ConstrInst (capitalize consName) [FnCall op [VarExpr "var", VarExpr "d"]])
-            (ConstrInst (capitalize consName) [VarExpr "var"])
-          )
-        ]
+      [
+        ([VarParam "d", VarParam "c", ConstrParam (capitalize consName) [VarParam "var"]],
+        IfExpr
+          (GTEExpr (VarExpr "var") (VarExpr "c"))
+          (ConstrInst (capitalize consName) [FnCall op [VarExpr "var", VarExpr "d"]])
+          (ConstrInst (capitalize consName) [VarExpr "var"])
+        )
+      ] | MkVarConstructor consName _ <- cdefs]
 
--- generation of all shift functions
 getShiftFunctions :: [SortDef] -> [NameSpaceDef] -> String -> [(SortName, Bool)] -> [Function]
 getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> isJust (lookup (getName s) varAccessTable)) sd
   in map (\(MkDefSort sname namespaceDecl _ _) ->
-    -- generateTypingshift s defs opName <>
     Fn
       (toLowerCaseFirst sname ++ "shift" ++ opName)
       [
@@ -48,14 +42,6 @@ getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> i
       ]
   ) filtered
   where
-    -- generateTypingshift :: SortDef -> [NameSpaceDef] -> String -> Doc String
-    -- generateTypingshift (MkDefSort sname _ _ _) namespaces str =
-    --   pretty (toLowerCaseFirst sname) <> pretty "shift" <> pretty str <+>
-    --   pretty "::" <+>
-    --   pretty "HNat ->" <+> sorttype <+> pretty "->" <+> sorttype <+> pretty "\n"
-    --   where
-    --     sorttype = pretty (capitalize sname)
-
     declarationsToFunctions :: [NamespaceInstance] -> [NameSpaceDef] -> String -> [Expression]
     declarationsToFunctions nsi nsd op = let filtered = [INH x y | INH x y <- nsi]
       in map (\(INH _ namespaceName) ->

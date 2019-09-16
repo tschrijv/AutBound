@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wall #-}
+-- {-# OPTIONS_GHC -Wall #-}
 
 module WellFormed (wellFormed) where
 
@@ -660,3 +660,20 @@ helpWellFormedRulesInstances sdefs table
      [ Left x
      | Left x <- concatMap (helpWellFormedRulesInstancesSort table) sdefs
      ]
+
+-- get the name on the left expression
+getLeftExprId :: LeftExpr -> [IdName]
+getLeftExprId (LeftLHS _)    = []
+getLeftExprId (LeftSub iden _) = [iden]
+
+--gets the idName of the rightexpr
+getRightExprId :: RightExpr -> [IdName]
+getRightExprId (RightLHS _)      = []
+getRightExprId (RightSub name _) = [name]
+getRightExprId (RightAdd expr _) = getRightExprId expr
+
+--get the name of the context of a right expr
+getInstanceNamesOfRuleRight :: RightExpr -> InstanceName
+getInstanceNamesOfRuleRight (RightAdd expr _) = getInstanceNamesOfRuleRight expr
+getInstanceNamesOfRuleRight (RightLHS name) = name
+getInstanceNamesOfRuleRight (RightSub _ name) = name
