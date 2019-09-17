@@ -32,8 +32,8 @@ generateFreeVariableFunction sname cons table accessVarTable =
           applyRulesIdentifiersFreeVariables
             sname
             rules
-            (groupRulesByIden rules (foldToNormalList folds ++ lists ++ listSorts))
-            (foldToNormalList folds)
+            (groupRulesByIden rules (dropFold folds ++ lists ++ listSorts))
+            (dropFold folds)
             lists
             listSorts
             table
@@ -51,7 +51,7 @@ generateFreeVariableConstructor :: ConstructorDef -> Parameter
 generateFreeVariableConstructor (MkVarConstructor consName _) =
   ConstrParam (capitalize consName) [VarParam "var"]
 generateFreeVariableConstructor cons =
-  ConstrParam (capitalize consName) (listToSpaceslower (foldToNormalList folds ++ lists ++ listSorts) ++ [VarParam "_" | _ <- hTypes])
+  ConstrParam (capitalize consName) (firstToVarParams (dropFold folds ++ lists ++ listSorts) ++ [VarParam "_" | _ <- hTypes])
   where
     consName = getName cons
     folds = getCtorFolds cons
@@ -65,8 +65,8 @@ applyRulesIdentifiersFreeVariables sname rules [(iden, idRules)] folds lists lis
   | fromJust (lookup sortnameInUse accessVarTable) = [FnCall ("freeVariables" ++ sortnameInUse) (addedBinders : [VarExpr (toLowerCaseFirst iden)])]
   | otherwise = [ListExpr []]
   where
-    addedBinders = applyRuleInheritedNamespaces sname rules (iden, idRules) folds lists listSorts table (calculateInheritedNameSpace sortnameInUse table)
-    sortnameInUse = lookupIdToSort iden (lists ++ listSorts)
+    addedBinders = applyRuleInheritedNamespaces sname rules (iden, idRules) folds lists listSorts table (getSortInheritedInstances sortnameInUse table)
+    sortnameInUse = getSortForId iden (lists ++ listSorts)
 applyRulesIdentifiersFreeVariables sname rules ((iden, idRules):rest) folds lists listSorts table accessVarTable
   | fromJust (lookup sortnameInUse accessVarTable) && (iden `elem` map fst folds) =
     FnCall "foldMap" [FnCall ("freeVariables" ++ sortnameInUse) [addedBinders], VarExpr (toLowerCaseFirst iden)]
@@ -83,5 +83,5 @@ applyRulesIdentifiersFreeVariables sname rules ((iden, idRules):rest) folds list
   | otherwise =
     applyRulesIdentifiersFreeVariables sname rules rest folds lists listSorts table accessVarTable
   where
-    addedBinders = applyRuleInheritedNamespaces sname rules (iden, idRules) folds lists listSorts table (calculateInheritedNameSpace sortnameInUse table)
-    sortnameInUse = lookupIdToSort iden (folds ++ lists ++ listSorts)
+    addedBinders = applyRuleInheritedNamespaces sname rules (iden, idRules) folds lists listSorts table (getSortInheritedInstances sortnameInUse table)
+    sortnameInUse = getSortForId iden (folds ++ lists ++ listSorts)

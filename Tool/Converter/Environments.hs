@@ -24,7 +24,7 @@ generateSortSynSystemOneConstructor :: SortName -> [NamespaceDef] -> [(SortName,
 generateSortSynSystemOneConstructor sname _ _ (MkVarConstructor consName _) _ =
   Fn ("addToEnvironment" ++ sname) [([ConstrParam (capitalize consName) [VarParam "var"], VarParam "c"], VarExpr "c")]
 generateSortSynSystemOneConstructor sname namespaces table cons inst =
-  Fn ("addToEnvironment" ++ sname ++ getName inst) [([ConstrParam (capitalize consName) (listToSpaceslower listSorts ++ [VarParam "_" | _ <- hTypes]), VarParam "c"], getEnvFunctionGenerate sname inst namespaces newtable listSorts rules)]
+  Fn ("addToEnvironment" ++ sname ++ getName inst) [([ConstrParam (capitalize consName) (firstToVarParams listSorts ++ [VarParam "_" | _ <- hTypes]), VarParam "c"], getEnvFunctionGenerate sname inst namespaces newtable listSorts rules)]
   where
     newtable = filterTableBySameNamespace inst table
     consName = getName cons
@@ -56,7 +56,7 @@ getEnvFunctionGenerate sname inst namespaces table listSorts rules
 
 navigateRules :: SortName -> NamespaceInstance -> [NamespaceDef] -> [(SortName, [NamespaceInstance])] -> [(IdName, SortName)] -> [NamespaceRule] -> NamespaceRule -> Expression
 navigateRules sname inst namespaces table listSorts rules (l, RightAdd expr _) =
-  FnCall ("S" ++ getNameInstancenamespace inst) [navigateRules sname inst namespaces table listSorts rules (l, expr)]
+  FnCall ("S" ++ getInstanceNameSpace inst) [navigateRules sname inst namespaces table listSorts rules (l, expr)]
 navigateRules _ _ _ _ _ _ (LeftLHS _, RightLHS _) =
   VarExpr "c"
 navigateRules sname inst namespaces table listSorts rules (LeftLHS _, RightSub iden _)

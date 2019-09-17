@@ -19,78 +19,64 @@ getMappings (_, sd, _, _) =
         Fn (sortMapName name)
         (map (\c ->
           (
-            nsiParams inst ++
+            [VarParam ("on" ++ namespace) | INH _ namespace <- inst] ++
             [VarParam "c"] ++
-            getMapParamConstr c
+            getCtorParams c
           ,
-            getMapExpr name c table accessVarTable
+            getExpr name c table accessVarTable
           )
         ) constr)
   ) filtered
   where
-    getMapParamConstr :: ConstructorDef -> [Parameter]
-    getMapParamConstr (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "var"]]
-    getMapParamConstr cons = [ConstrParam (capitalize consName) (listToSpaceslower (foldToNormalList folds) ++ listToSpaceslower lists ++ listToSpaceslower listSorts ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
-      where
-        consName = getName cons
-        folds = getCtorFolds cons
-        lists = getCtorLists cons
-        listSorts = getCtorSorts cons
-        hTypes = getCtorHTypes cons
-
-    getMapExpr :: SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> Expression
-    getMapExpr sname (MkVarConstructor consName _) table _ =
-      FnCall ("on" ++ getNameInstancenamespace (head (fromJust (lookup (capitalize sname) table)))) [
-        VarExpr "c",
-        ConstrInst (capitalize consName) [VarExpr "var"]
-      ]
-    getMapExpr sname cons table accessVarTable =
-      ConstrInst (capitalize consName) (applyRulesIdentifiers
-        sname
-        rules
-        (groupRulesByIden rules (foldToNormalList folds ++ lists ++ listSorts))
-        (foldToNormalList folds)
-        lists
-        listSorts
-        table
-        accessVarTable ++
-        [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])
-      where
-        consName = getName cons
-        folds = getCtorFolds cons
-        lists = getCtorLists cons
-        listSorts = getCtorSorts cons
-        hTypes = getCtorHTypes cons
-        rules = getCtorRules cons
-
     sortMapName :: SortName -> String
     sortMapName sname = toLowerCaseFirst sname ++ "map"
 
-    nsiParams :: [NamespaceInstance] -> [Parameter]
-    nsiParams inst = [VarParam ("on" ++ namespace) | INH _ namespace <- inst]
+    getCtorParams :: ConstructorDef -> [Parameter]
+    getCtorParams (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "var"]]
+    getCtorParams cons = [ConstrParam (capitalize consName) (firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
+      where
+        consName = getName cons
+        folds = getCtorFolds cons
+        lists = getCtorLists cons
+        sorts = getCtorSorts cons
+        hTypes = getCtorHTypes cons
 
-    nsiExprs :: [NamespaceInstance] -> [Expression]
-    nsiExprs inst = [VarExpr ("on" ++ namespace) | INH _ namespace <- inst]
+    getExpr :: SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> Expression
+    getExpr sname (MkVarConstructor consName _) table _ =
+      FnCall ("on" ++ getInstanceNameSpace (head (fromJust (lookup sname table)))) [
+        VarExpr "c",
+        ConstrInst (capitalize consName) [VarExpr "var"]
+      ]
+    getExpr sname cons table accessVarTable =
+      ConstrInst (capitalize (getName cons)) (map process idRules ++ [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip (getCtorHTypes cons) [1 :: Int ..]])
+      where
+        rules = getCtorRules cons
+        idRules = groupRulesByIden rules (folds ++ lists ++ sorts)
+        folds = dropFold (getCtorFolds cons)
+        lists = getCtorLists cons
+        sorts = getCtorSorts cons
+        accessVarTable = accessVarTable
 
-    applyRulesIdentifiers :: SortName -> [NamespaceRule] -> [(IdName, [NamespaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
-    applyRulesIdentifiers sname rules idRules folds lists listSorts table accessVarTable = map process idRules where
-      process (iden, idr)
-        | fromJust (lookup (capitalize sortnameInUse) accessVarTable) && elem iden (map fst folds) =
-          FnCall "fmap" [FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders), VarExpr (toLowerCaseFirst iden)]
-        | fromJust (lookup (capitalize sortnameInUse) accessVarTable) && elem iden (map fst lists) =
-          FnCall "map" [FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders), VarExpr (toLowerCaseFirst iden)]
-        | fromJust (lookup (capitalize sortnameInUse) accessVarTable) && elem iden (map fst listSorts) =
-          FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders ++ [VarExpr (toLowerCaseFirst iden)])
-        | otherwise = VarExpr (toLowerCaseFirst iden)
-        where
-          addedBinders =
-            [applyRuleInheritedNamespaces
-              sname
-              rules
-              (iden, idr)
-              folds
-              lists
-              listSorts
-              table
-              (calculateInheritedNameSpace sortnameInUse table)]
-          sortnameInUse = lookupIdToSort iden (folds ++ lists ++ listSorts)
+        process (iden, idenRules)
+          | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst folds) =
+            FnCall "fmap" [FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders), VarExpr (toLowerCaseFirst iden)]
+          | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst lists) =
+            FnCall "map" [FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders), VarExpr (toLowerCaseFirst iden)]
+          | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst sorts) =
+            FnCall (sortMapName sortnameInUse) (nsiExprs (fromJust (lookup sortnameInUse table)) ++ addedBinders ++ [VarExpr (toLowerCaseFirst iden)])
+          | otherwise = VarExpr (toLowerCaseFirst iden)
+          where
+            addedBinders =
+              [applyRuleInheritedNamespaces
+                sname
+                rules
+                (iden, idenRules)
+                folds
+                lists
+                sorts
+                table
+                (getSortInheritedInstances sortnameInUse table)]
+            sortnameInUse = getSortForId iden (folds ++ lists ++ sorts)
+
+            nsiExprs :: [NamespaceInstance] -> [Expression]
+            nsiExprs inst = [VarExpr ("on" ++ namespace) | INH _ namespace <- inst]
