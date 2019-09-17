@@ -55,7 +55,6 @@ getMappings (_, sd, _, _) =
         folds = dropFold (getCtorFolds cons)
         lists = getCtorLists cons
         sorts = getCtorSorts cons
-        accessVarTable = accessVarTable
 
         process (iden, idenRules)
           | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst folds) =
