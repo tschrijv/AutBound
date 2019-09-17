@@ -5,7 +5,6 @@ import GeneralTerms
 import Converter.Environments
 import Converter.FreeVariables
 import Converter.Mappings
-import Converter.Shifts
 import Converter.Substitutions
 import Converter.Types
 
@@ -25,7 +24,6 @@ convert lan@(nsd, sd, imp, cd) vf =
     instances = (variableInstances vf) var,
     functions = (variableFunctions vf) lan var ++
                 getMappings lan ++
-                getShift lan ++
                 getSubst lan ++
                 getEnvFunctions lan ++
                 getFreeVar lan,
