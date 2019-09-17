@@ -43,19 +43,15 @@ applyRuleInheritedNamespaces sname rules (iden, rulesOfId) folds lists listSorts
 
     applyTheRuleOneInheritedNamespace :: SortName -> [NamespaceRule] -> (IdName, [NamespaceRule]) -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> NamespaceInstance -> Expression -> Maybe Expression
     applyTheRuleOneInheritedNamespace sname rules (_, rulesOfId) folds lists listSorts table currentinst param
-      | isJust foundrule =
-        applyOneRuleLogic sname currentinst newrules (fromJust foundrule) folds lists listSorts newtable [param]
+      | isJust foundrule = applyOneRuleLogic sname currentinst newrules (fromJust foundrule) folds lists listSorts newtable [param]
       | otherwise = Nothing
       where
         foundrule = find (\x -> getLeftSubInstanceName (fst x) == getName currentinst) rulesOfId
         newtable = filterTableBySameNamespace currentinst table
-        newrules = getNewRules rules sname table (folds ++ lists ++ listSorts)
-
-        getNewRules :: [NamespaceRule] -> SortName -> [(SortName, [NamespaceInstance])] -> [(IdName, SortName)] -> [NamespaceRule]
-        getNewRules rules sname table listSorts = filter (\(l, r) ->
+        newrules = filter (\(l, r) ->
             let sortnameId = getLeftSubIden l
                 snameLookup = fromJust (lookup (capitalize sname) table)
-                sortnameIdlookup = fromJust (lookup (getSortForId sortnameId listSorts) table)
+                sortnameIdlookup = fromJust (lookup (getSortForId sortnameId (folds ++ lists ++ listSorts)) table)
             in (sortnameId == "" && any (\x -> getLeftSubInstanceName l == getName x) snameLookup)
             || any (\x -> getLeftSubInstanceName l == getName x) sortnameIdlookup
           ) rules
