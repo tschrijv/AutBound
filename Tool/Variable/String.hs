@@ -1,10 +1,23 @@
-module Variable.String where
+module Variable.String (getFunctions) where
 
 import GeneralTerms
 import Program
+import Converter
+import Variable.Common
 
-getVariableType :: [NamespaceDef] -> (Type, [Constructor])
-getVariableType nsd = ("Variable", map (\ns -> Constr ('S' : getName ns) ["String"]) nsd)
+getFunctions :: ConvertFunctions
+getFunctions
+  = VF {
+    variableType = getVariableType,
+    envType = getEnvType,
+    userTypes = getTypes,
+    variableInstances = getVariableInstances,
+    variableFunctions = getVariableFunctions,
+    envFunctions = getEnvFunctions
+  }
+
+getVariableType :: Language -> (Type, [Constructor])
+getVariableType (nsd, _, _, _) = ("Variable", map (\ns -> Constr ('S' : getName ns) ["String"]) nsd)
 
 getVariableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])]
 getVariableInstances _ = []

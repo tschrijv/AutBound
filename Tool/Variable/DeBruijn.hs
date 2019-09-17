@@ -1,4 +1,4 @@
-module Variable.DeBruijn where
+module Variable.DeBruijn (getFunctions) where
 
 import Data.List
 import Data.Maybe
@@ -6,9 +6,22 @@ import Data.Maybe
 import GeneralTerms
 import Program
 import Utility
+import Converter
+import Variable.Common
 
-getVariableType :: [NamespaceDef] -> (Type, [Constructor])
-getVariableType nsd = ("Variable", Constr "Z" [] : map (\ns -> Constr ('S' : getName ns) ["Variable"]) nsd)
+getFunctions :: ConvertFunctions
+getFunctions
+  = VF {
+    variableType = getVariableType,
+    envType = getEnvType,
+    userTypes = getTypes,
+    variableInstances = getVariableInstances,
+    variableFunctions = getVariableFunctions,
+    envFunctions = getEnvFunctions
+  }
+
+getVariableType :: Language -> (Type, [Constructor])
+getVariableType (nsd, _, _, _) = ("Variable", Constr "Z" [] : map (\ns -> Constr ('S' : getName ns) ["Variable"]) nsd)
 
 getVariableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])]
 getVariableInstances (_, hnatc) =
@@ -26,7 +39,7 @@ getVariableInstances (_, hnatc) =
       | otherwise = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "error" [StringExpr "differing namespace found in compare"])
 
 getVariableFunctions :: Language -> (Type, [Constructor]) -> [Function]
-getVariableFunctions lan@(nsd, _, _, _) varT = getHNatModifiers varT ++ getGenerators nsd ++ getShift lan
+getVariableFunctions lan@(nsd, _, _, _) varT = getHNatModifiers varT ++ getGenerators nsd ++ getShift lan ++ getMappings lan ++ getSubst lan ++ getFreeVar lan
 
 getHNatModifiers :: (Type, [Constructor]) -> [Function]
 getHNatModifiers (_, hnatc) =

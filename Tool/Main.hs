@@ -30,8 +30,8 @@ checkAndConvert lang varType =
   case wellFormed lang of
     Left failtxt2 -> return (Left failtxt2)
     Right True -> case varType of
-      "DeBruijn" -> return (Right (convert lang (VF {variableType = VDB.getVariableType, variableInstances = VDB.getVariableInstances, variableFunctions = VDB.getVariableFunctions})))
-      "String" -> return (Right (convert lang (VF {variableType = VS.getVariableType, variableInstances = VS.getVariableInstances, variableFunctions = VS.getVariableFunctions})))
+      "DeBruijn" -> return (Right (convert lang VDB.getFunctions))
+      "String" -> return (Right (convert lang VS.getFunctions))
     Right False -> error "Language is not well formed!"
 
 writeToLanguage :: Program -> String -> String -> IO ()

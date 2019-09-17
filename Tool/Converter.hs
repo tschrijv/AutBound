@@ -2,33 +2,28 @@ module Converter where
 
 import Program
 import GeneralTerms
-import Converter.Environments
-import Converter.FreeVariables
-import Converter.Mappings
-import Converter.Substitutions
-import Converter.Types
 
 -- | Data type for storing the functions that depend on the
 -- variable representation
-data VariableFunctions = VF {
-  variableType :: [NamespaceDef] -> (Type, [Constructor]),
+data ConvertFunctions = VF {
+  variableType :: Language -> (Type, [Constructor]),
+  envType :: Language -> (Type, [Constructor]),
+  userTypes :: Language -> [(Type, [Constructor])],
   variableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])],
-  variableFunctions :: Language -> (Type, [Constructor]) -> [Function]
+  variableFunctions :: Language -> (Type, [Constructor]) -> [Function],
+  envFunctions :: Language -> [Function]
 }
 
 -- | Convert a language into a program using the specified variable functions
-convert :: Language -> VariableFunctions -> Program
+convert :: Language -> ConvertFunctions -> Program
 convert lan@(nsd, sd, imp, cd) vf =
-  let var = (variableType vf) nsd
-      env  = getEnvType nsd
+  let var = (variableType vf) lan
+      env = (envType vf) lan
   in P {
     imports = imp,
-    types = var : env : getTypes lan,
+    types = var : env : (userTypes vf) lan,
     instances = (variableInstances vf) var,
     functions = (variableFunctions vf) lan var ++
-                getMappings lan ++
-                getSubst lan ++
-                getEnvFunctions lan ++
-                getFreeVar lan,
+                (envFunctions vf) lan,
     code = cd
   }
