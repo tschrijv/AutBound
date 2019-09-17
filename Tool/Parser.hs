@@ -33,22 +33,22 @@ inboundTokenParser :: TokenParser st
 inboundTokenParser = makeTokenParser myDef
 
 pIdentifier :: Parser String
-pIdentifier        = identifier inboundTokenParser
+pIdentifier = identifier inboundTokenParser
 
 pBrackets :: Parser a -> Parser a
-pBrackets          = brackets inboundTokenParser
+pBrackets = brackets inboundTokenParser
 
 pReserved :: String -> Parser ()
-pReserved          = reserved inboundTokenParser
+pReserved = reserved inboundTokenParser
 
 pParens :: Parser a -> Parser a
-pParens            = parens inboundTokenParser
+pParens = parens inboundTokenParser
 
 pBraces :: Parser a -> Parser a
-pBraces            = braces inboundTokenParser
+pBraces = braces inboundTokenParser
 
 pWhiteSpace :: Parser ()
-pWhiteSpace        = whiteSpace inboundTokenParser
+pWhiteSpace = whiteSpace inboundTokenParser
 
 pReservedOp :: String -> Parser ()
 pReservedOp = reservedOp inboundTokenParser
@@ -97,14 +97,14 @@ pImportChoose = try (pParens $ many pIdentifier) <|> return []
 -- ----------------------------------------------------------------------------
 
 -- | Parse a namespace declaration
-pNameSpaceDecl :: Parser NameSpaceDef
+pNameSpaceDecl :: Parser NamespaceDef
 pNameSpaceDecl =
   MkNameSpace <$ pReserved "namespace" <*> pNameSpaceName <* pReservedOp ":" <*>
   pSortName <*>
   pEnvAdd
 
 -- | Parse a namespace's name
-pNameSpaceName :: Parser NameSpaceName
+pNameSpaceName :: Parser NamespaceName
 pNameSpaceName = pIdentifier
 
 -- | Parse a sort's name
@@ -188,7 +188,7 @@ pVarCtor = do
   return (MkVarConstructor name a)
   where
     -- | Parse a namespace variable
-    pVarNameSpace :: Parser NameSpaceName
+    pVarNameSpace :: Parser NamespaceName
     pVarNameSpace =
       pParens $ do
         _ <- pIdentifier
@@ -254,7 +254,7 @@ pHaskellTypes :: Parser HaskellTypeName
 pHaskellTypes = pBraces pIdentifier
 
 -- | Parse the binding parameter for a constructor
-pConstructorNameSpaceName :: Parser (String, NameSpaceName)
+pConstructorNameSpaceName :: Parser (String, NamespaceName)
 pConstructorNameSpaceName =
   pBrackets $ do
     a <- pIdentifier
@@ -263,25 +263,56 @@ pConstructorNameSpaceName =
     return (a, b)
 
 -- | Parse namespace rules for a constructor
-pRule :: Parser NameSpaceRule
+pRule :: Parser NamespaceRule
 pRule = do
   a <- pLeftExpr
   pReservedOp "="
   b <- pRightExpr
   return (a, b)
 
+-- | Parse the left side of a namespace rule
 pLeftExpr :: Parser LeftExpr
 pLeftExpr = pLHSLeftExpr <|> pSubLeftExpr
+  where
+    pLHSLeftExpr :: Parser LeftExpr
+    pLHSLeftExpr = do
+      a <- pLHSExpr
+      return (LeftLHS a)
 
+    pSubLeftExpr :: Parser LeftExpr
+    pSubLeftExpr = do
+      (a, b) <- pSubExpr
+      return (LeftSub a b)
+
+-- | Parse the right side of a namespace rule
 pRightExpr :: Parser RightExpr
 pRightExpr = try pRightExprAdd <|> pRightExprLHS <|> pRightExprSub
+  where
+    pRightExprAdd :: Parser RightExpr
+    pRightExprAdd = do
+      a <- pRightExprLHS <|> pRightExprSub
+      pReservedOp ","
+      b <- pIdentifier
+      return (RightAdd a b)
 
+    pRightExprLHS :: Parser RightExpr
+    pRightExprLHS = do
+      a <- pLHSExpr
+      return (RightLHS a)
+
+    pRightExprSub :: Parser RightExpr
+    pRightExprSub = do
+      (a, b) <- pSubExpr
+      return (RightSub a b)
+
+-- | Parse an lhs expression (??)
 pLHSExpr :: Parser String
 pLHSExpr = do
   pReserved "lhs"
   pReservedOp "."
   pIdentifier
 
+-- | Parse a subexpression (??)
 pSubExpr :: Parser (String, String)
 pSubExpr = do
   a <- pIdentifier
@@ -289,34 +320,7 @@ pSubExpr = do
   b <- pIdentifier
   return (a, b)
 
-pLHSLeftExpr :: Parser LeftExpr
-pLHSLeftExpr = do
-  a <- pLHSExpr
-  return (LeftLHS a)
-
-pSubLeftExpr :: Parser LeftExpr
-pSubLeftExpr = do
-  (a, b) <- pSubExpr
-  return (LeftSub a b)
-
-pRightExprAdd :: Parser RightExpr
-pRightExprAdd = do
-  a <- pRightExprLHS <|> pRightExprSub
-  pReservedOp ","
-  b <- pIdentifier
-  return (RightAdd a b)
-
-pRightExprLHS :: Parser RightExpr
-pRightExprLHS = do
-  a <- pLHSExpr
-  return (RightLHS a)
-
-pRightExprSub :: Parser RightExpr
-pRightExprSub = do
-  (a, b) <- pSubExpr
-  return (RightSub a b)
-
--- * Haskell code
+-- * Native code
 -- ----------------------------------------------------------------------------
 
 -- | Parse native code if not at the end of file

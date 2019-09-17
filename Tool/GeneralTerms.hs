@@ -5,16 +5,16 @@ module GeneralTerms where
 type FoldName         = String
 type ConstructorName  = String
 type SortName         = String
-type NameSpaceName    = String
+type NamespaceName    = String
 type IdName           = String
 type HaskellTypeName  = String
-type Language         = ([NameSpaceDef], [SortDef], [(String, [String])], [String])
+type Language         = ([NamespaceDef], [SortDef], [(String, [String])], [String])
 type InstanceName     = String
 
 --the inherited or synthesised contexts
 data NamespaceInstance
-  = INH InstanceName NameSpaceName
-  | SYN InstanceName NameSpaceName
+  = INH InstanceName NamespaceName
+  | SYN InstanceName NamespaceName
   deriving (Show, Eq)
 
 --the left part of an expression like t1.ctx=lhs.ctx
@@ -31,11 +31,11 @@ data RightExpr
   deriving (Show, Eq)
 
 --the complete expression of like t1.ctx=lhs.ctx
-type NameSpaceRule = (LeftExpr, RightExpr)
+type NamespaceRule = (LeftExpr, RightExpr)
 
 --the definition of a namespace declaration
-data NameSpaceDef
-  = MkNameSpace NameSpaceName SortName [String]
+data NamespaceDef
+  = MkNameSpace NamespaceName SortName [String]
   deriving (Show, Eq)
 
 --definition of a sort
@@ -47,18 +47,18 @@ data SortDef
 data ConstructorDef
   = MkDefConstructor
       ConstructorName
-      [(IdName, SortName)] --list where all is inherited
-      [(IdName, SortName)] -- just this
-      [(IdName, SortName, FoldName)] -- for Foldables
-      [NameSpaceRule]
+      [(IdName, SortName)] -- lists
+      [(IdName, SortName)] -- sorts
+      [(IdName, SortName, FoldName)] -- folds
+      [NamespaceRule] -- rules
       [HaskellTypeName]
   | MkBindConstructor
       ConstructorName
-      [(IdName, SortName)] --list where all is inherited
-      [(IdName, SortName)]
-      [(IdName, SortName, FoldName)] -- for Foldables
-      (String, NameSpaceName)
-      [NameSpaceRule]
+      [(IdName, SortName)] -- lists
+      [(IdName, SortName)] -- sorts
+      [(IdName, SortName, FoldName)] -- folds
+      (String, NamespaceName) -- namespace
+      [NamespaceRule]
       [HaskellTypeName]
   | MkVarConstructor
       ConstructorName
@@ -71,7 +71,7 @@ class Named a where
 instance Named SortDef where
   getName (MkDefSort sname _ _ _) = sname
 
-instance Named NameSpaceDef where
+instance Named NamespaceDef where
   getName (MkNameSpace name _ _) = name
 
 -- get the name of definition of a constructor
@@ -84,61 +84,59 @@ instance Named NamespaceInstance where
   getName (INH name _) = name
   getName (SYN name _) = name
 
-getConstrLists :: ConstructorDef -> [(IdName, SortName)]
-getConstrLists (MkDefConstructor _ lists _ _ _ _) = lists
-getConstrLists (MkBindConstructor _ lists _ _ _ _ _) = lists
-getConstrLists MkVarConstructor{} = error "invalid method for var constructor"
+getCtorLists :: ConstructorDef -> [(IdName, SortName)]
+getCtorLists (MkDefConstructor _ lists _ _ _ _) = lists
+getCtorLists (MkBindConstructor _ lists _ _ _ _ _) = lists
+getCtorLists MkVarConstructor{} = error "invalid method for var constructor"
 
-getConstrListSorts :: ConstructorDef -> [(IdName, SortName)]
-getConstrListSorts (MkDefConstructor _ _ listSorts _ _ _) = listSorts
-getConstrListSorts (MkBindConstructor _ _ listSorts _ _ _ _) = listSorts
-getConstrListSorts MkVarConstructor{} = error "invalid method for var constructor"
+getCtorSorts :: ConstructorDef -> [(IdName, SortName)]
+getCtorSorts (MkDefConstructor _ _ listSorts _ _ _) = listSorts
+getCtorSorts (MkBindConstructor _ _ listSorts _ _ _ _) = listSorts
+getCtorSorts MkVarConstructor{} = error "invalid method for var constructor"
 
-getConstrFolds :: ConstructorDef -> [(IdName, SortName, FoldName)]
-getConstrFolds (MkDefConstructor _ _ _ folds _ _) = folds
-getConstrFolds (MkBindConstructor _ _ _ folds _ _ _) = folds
-getConstrFolds MkVarConstructor{} = error "invalid method for var constructor"
+getCtorFolds :: ConstructorDef -> [(IdName, SortName, FoldName)]
+getCtorFolds (MkDefConstructor _ _ _ folds _ _) = folds
+getCtorFolds (MkBindConstructor _ _ _ folds _ _ _) = folds
+getCtorFolds MkVarConstructor{} = error "invalid method for var constructor"
 
-getConstrRules :: ConstructorDef -> [NameSpaceRule]
-getConstrRules (MkDefConstructor _ _ _ _ rules _) = rules
-getConstrRules (MkBindConstructor _ _ _ _ _ rules _) = rules
-getConstrRules MkVarConstructor{} = error "invalid method for var constructor"
+getCtorRules :: ConstructorDef -> [NamespaceRule]
+getCtorRules (MkDefConstructor _ _ _ _ rules _) = rules
+getCtorRules (MkBindConstructor _ _ _ _ _ rules _) = rules
+getCtorRules MkVarConstructor{} = error "invalid method for var constructor"
 
-getConstrHTypes :: ConstructorDef -> [HaskellTypeName]
-getConstrHTypes (MkDefConstructor _ _ _ _ _ hTypes) = hTypes
-getConstrHTypes (MkBindConstructor _ _ _ _ _ _ hTypes) = hTypes
-getConstrHTypes MkVarConstructor{} = error "invalid method for var constructor"
+getCtorHTypes :: ConstructorDef -> [HaskellTypeName]
+getCtorHTypes (MkDefConstructor _ _ _ _ _ hTypes) = hTypes
+getCtorHTypes (MkBindConstructor _ _ _ _ _ _ hTypes) = hTypes
+getCtorHTypes MkVarConstructor{} = error "invalid method for var constructor"
 
 --get the defs of constructors in the sort
-getConstrDefs :: SortDef -> [ConstructorDef]
-getConstrDefs (MkDefSort _ _ cdefs _) = cdefs
+getSortCtors :: SortDef -> [ConstructorDef]
+getSortCtors (MkDefSort _ _ cdefs _) = cdefs
 
 -- get the instances by the sorts in the
-getNSI :: SortDef -> [NamespaceInstance]
-getNSI (MkDefSort _ instances _ _) = instances
+getSortInstances :: SortDef -> [NamespaceInstance]
+getSortInstances (MkDefSort _ instances _ _) = instances
 
 --get the names   contexts and the namespaces it refers to for a sorts in a tuple
-getNameAndNSI :: SortDef -> (SortName, [NamespaceInstance])
-getNameAndNSI s = (getName s, getNSI s)
+getSortNameAndInstances :: SortDef -> (SortName, [NamespaceInstance])
+getSortNameAndInstances s = (getName s, getSortInstances s)
 
-getLeftIdSub :: LeftExpr -> IdName
-getLeftIdSub (LeftLHS _)    = ""
-getLeftIdSub (LeftSub iden _) = iden
+getLeftSubIden :: LeftExpr -> IdName
+getLeftSubIden (LeftLHS _)    = ""
+getLeftSubIden (LeftSub iden _) = iden
 
 -- get the namespaceName where the instance is referring to
-getNamespaceNameInstance :: NamespaceInstance -> NameSpaceName
-getNamespaceNameInstance (INH _ name) = name
-getNamespaceNameInstance (SYN _ name) = name
+getInstanceNameSpace :: NamespaceInstance -> NamespaceName
+getInstanceNameSpace (INH _ name) = name
+getInstanceNameSpace (SYN _ name) = name
 
 --get the name of the context of a left expr
-getInstanceNamesOfRuleLeft :: LeftExpr -> InstanceName
-getInstanceNamesOfRuleLeft (LeftLHS name)   = name
-getInstanceNamesOfRuleLeft (LeftSub _ name) = name
+getLeftSubInstanceName :: LeftExpr -> InstanceName
+getLeftSubInstanceName (LeftLHS name)   = name
+getLeftSubInstanceName (LeftSub _ name) = name
 
 --collects all the rules of the identifiers used in the constructor and groups them in a list with each identifier getting a list of rules
-collectRulesAllField :: [NameSpaceRule] -> [(IdName, SortName)] -> [(IdName, [NameSpaceRule])]
-collectRulesAllField rules = map (\(i, _) -> collectRulesOfId rules i)
-  where
-    -- group the rules of one  identifier together
-    collectRulesOfId :: [NameSpaceRule] -> IdName -> (IdName, [NameSpaceRule])
-    collectRulesOfId nsr i = (i, filter (\(LeftSub fieldname _, _) -> fieldname == i) nsr)
+groupRulesByIden :: [NamespaceRule] -> [(IdName, SortName)] -> [(IdName, [NamespaceRule])]
+groupRulesByIden rules sorts = [
+    (iden, filter (\(l, r) -> getLeftSubIden l == iden) rules)
+  | (iden, _) <- sorts]

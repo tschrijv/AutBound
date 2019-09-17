@@ -34,7 +34,7 @@ toLowerCaseFirst (first:rest) = ((toLower first) : rest)
 capitalize :: String -> String
 capitalize (first:rest) = ((toUpper first) : rest)
 
-lookForSortName :: NameSpaceName -> [NameSpaceDef] -> SortName
+lookForSortName :: NamespaceName -> [NamespaceDef] -> SortName
 lookForSortName name ((MkNameSpace name2 sortname _):rest)
   | name2 == name = toLowerCaseFirst sortname
   | otherwise = lookForSortName name rest
@@ -54,14 +54,14 @@ getVarAccessTable sList = map (sortCanAccessVariables sList []) sList
           or
             (map
               (constructorCanAccessVariables sortDefTable listVisited)
-              (getConstrDefs s))
+              (getSortCtors s))
 
         getTableOfHasVariable :: [SortDef] -> [(SortName, Bool)]
         getTableOfHasVariable sd = [(getName s, hasVariables s) | s <- sd]
 
         -- function generating for each Sort, if it has access to some variable
         hasVariables :: SortDef -> Bool
-        hasVariables s = or [True | (MkVarConstructor _ _) <- getConstrDefs s]
+        hasVariables s = or [True | (MkVarConstructor _ _) <- getSortCtors s]
 
         constructorCanAccessVariables :: [(SortName, SortDef)] -> [SortName] -> ConstructorDef -> Bool
         constructorCanAccessVariables table visited (MkVarConstructor _ _) = True
@@ -87,13 +87,13 @@ getVarAccessTable sList = map (sortCanAccessVariables sList []) sList
                 (fromJust (lookup nextSort table)))
 
 filterTableBySameNamespace :: NamespaceInstance -> [(SortName, [NamespaceInstance])] -> [(SortName, [NamespaceInstance])]
-filterTableBySameNamespace inst table = map (filterTableBySameNamespaceSort (getNamespaceNameInstance inst)) table
+filterTableBySameNamespace inst table = map (filterTableBySameNamespaceSort (getInstanceNameSpace inst)) table
   where
-    filterTableBySameNamespaceSort :: NameSpaceName -> (SortName, [NamespaceInstance]) -> (SortName, [NamespaceInstance])
+    filterTableBySameNamespaceSort :: NamespaceName -> (SortName, [NamespaceInstance]) -> (SortName, [NamespaceInstance])
     filterTableBySameNamespaceSort namespacename (sname, list) = (sname, newlist)
       where
-        newlist = filter (\x -> getNamespaceNameInstance x == namespacename) list
+        newlist = filter (\x -> getInstanceNameSpace x == namespacename) list
 
-getNameInstancenamespace :: NamespaceInstance -> NameSpaceName
+getNameInstancenamespace :: NamespaceInstance -> NamespaceName
 getNameInstancenamespace (INH _ name) = name
 getNameInstancenamespace (SYN _ name) = name

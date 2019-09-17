@@ -10,7 +10,7 @@ import Converter.Substitutions
 import Converter.Types
 
 data VariableFunctions = VF {
-  variableType :: [NameSpaceDef] -> (Type, [Constructor]),
+  variableType :: [NamespaceDef] -> (Type, [Constructor]),
   variableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])],
   variableFunctions :: Language -> (Type, [Constructor]) -> [Function]
 }

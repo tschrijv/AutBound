@@ -5,7 +5,7 @@ import Data.List
 import GeneralTerms
 import Program
 
-getVariableType :: [NameSpaceDef] -> (Type, [Constructor])
+getVariableType :: [NamespaceDef] -> (Type, [Constructor])
 getVariableType nsd = ("Variable", Constr "Z" [] : map (\ns -> Constr ('S' : getName ns) ["Variable"]) nsd)
 
 getVariableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])]
@@ -50,7 +50,7 @@ getHNatModifiers (_, hnatc) =
       | n1 == n2 = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "minus" [VarExpr "h1", VarExpr "h2"])
       | otherwise = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "error" [StringExpr "differing namespace found in minus"])
 
-getGenerators :: [NameSpaceDef] -> [Function]
+getGenerators :: [NamespaceDef] -> [Function]
 getGenerators = map (
     \ns ->
       let name = getName ns

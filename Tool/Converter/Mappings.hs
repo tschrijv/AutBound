@@ -12,7 +12,7 @@ import Converter.Utility
 getMappings :: Language -> [Function]
 getMappings (_, sd, _, _) =
   let filtered = filter (\(MkDefSort name _ _ _) -> isJust (lookup name (getVarAccessTable sd))) sd
-      table = map getNameAndNSI sd
+      table = map getSortNameAndInstances sd
       accessVarTable = getVarAccessTable sd
   in map (
     \(MkDefSort name inst constr _) ->
@@ -33,10 +33,10 @@ getMappings (_, sd, _, _) =
     getMapParamConstr cons = [ConstrParam (capitalize consName) (listToSpaceslower (foldToNormalList folds) ++ listToSpaceslower lists ++ listToSpaceslower listSorts ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
       where
         consName = getName cons
-        folds = getConstrFolds cons
-        lists = getConstrLists cons
-        listSorts = getConstrListSorts cons
-        hTypes = getConstrHTypes cons
+        folds = getCtorFolds cons
+        lists = getCtorLists cons
+        listSorts = getCtorSorts cons
+        hTypes = getCtorHTypes cons
 
     getMapExpr :: SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> Expression
     getMapExpr sname (MkVarConstructor consName _) table _ =
@@ -48,7 +48,7 @@ getMappings (_, sd, _, _) =
       ConstrInst (capitalize consName) (applyRulesIdentifiers
         sname
         rules
-        (collectRulesAllField rules (foldToNormalList folds ++ lists ++ listSorts))
+        (groupRulesByIden rules (foldToNormalList folds ++ lists ++ listSorts))
         (foldToNormalList folds)
         lists
         listSorts
@@ -57,11 +57,11 @@ getMappings (_, sd, _, _) =
         [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])
       where
         consName = getName cons
-        folds = getConstrFolds cons
-        lists = getConstrLists cons
-        listSorts = getConstrListSorts cons
-        hTypes = getConstrHTypes cons
-        rules = getConstrRules cons
+        folds = getCtorFolds cons
+        lists = getCtorLists cons
+        listSorts = getCtorSorts cons
+        hTypes = getCtorHTypes cons
+        rules = getCtorRules cons
 
     sortMapName :: SortName -> String
     sortMapName sname = toLowerCaseFirst sname ++ "map"
@@ -72,7 +72,7 @@ getMappings (_, sd, _, _) =
     nsiExprs :: [NamespaceInstance] -> [Expression]
     nsiExprs inst = [VarExpr ("on" ++ namespace) | INH _ namespace <- inst]
 
-    applyRulesIdentifiers :: SortName -> [NameSpaceRule] -> [(IdName, [NameSpaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
+    applyRulesIdentifiers :: SortName -> [NamespaceRule] -> [(IdName, [NamespaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
     applyRulesIdentifiers sname rules idRules folds lists listSorts table accessVarTable = map process idRules where
       process (iden, idr)
         | fromJust (lookup (capitalize sortnameInUse) accessVarTable) && elem iden (map fst folds) =

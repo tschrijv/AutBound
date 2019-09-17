@@ -17,11 +17,11 @@ wellFormed (namespaces, sorts, imps, _) = do
 --then looks up if all sortnames,namespacenames and contructornames are unique, if all sorts in the constructors exist,
 --and whether sorts and constructors and namespaces have distinct names. Also namespacenames used in sorts should exist and constructors can only use variablebindings of namespaces they can access in the sort
 helpWellFormed ::
-     ([NameSpaceDef], [SortDef], [(String, [String])])
+     ([NamespaceDef], [SortDef], [(String, [String])])
   -> [SortName]
   -> [ConstructorName]
   -> [SortName]
-  -> [NameSpaceName]
+  -> [NamespaceName]
   -> [SortName]
   -> [(SortName, [NamespaceInstance])]
   -> [SortDef]
@@ -38,7 +38,7 @@ helpWellFormed (namespacedef:lanrest, sorts, imp) sortnames consnames sortconsna
     sortdefs
     where
       --get the sort of the namespace
-      getSort :: NameSpaceDef -> SortName
+      getSort :: NamespaceDef -> SortName
       getSort (MkNameSpace _ name _) = name
 helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
   a <- isEmptySort s
@@ -48,11 +48,11 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
       namespacenames
   c <-
     wellFormedConstructors
-      (getConstrDefs s)
-      (map getName (getNSI s))
+      (getSortCtors s)
+      (map getName (getSortInstances s))
   d <- helpWellFormedInstances (getInstanceSortsNameSpaceNames s) namespacenames
-  e <- helpWellFormedVariables (getConstrDefs s) (getNSI s)
-  f <- helpWellFormedInstanceNames (map getName (getNSI s))
+  e <- helpWellFormedVariables (getSortCtors s) (getSortInstances s)
+  f <- helpWellFormedInstanceNames (map getName (getSortInstances s))
   helpWellFormed
     ([], lanrest, imp)
     ((getName s) : sortnames)
@@ -60,28 +60,28 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
     ((getSortsUsedByConstructors s) ++ sortconsnames)
     namespacenames
     sortnamespaces
-    (getNameAndNSI s : instTable)
+    (getSortNameAndInstances s : instTable)
     (s : sortdefs)
     where
       --get the namespaces used by the constructors
-      getNamespaceNamesUsedInSort :: SortDef -> [NameSpaceName]
+      getNamespaceNamesUsedInSort :: SortDef -> [NamespaceName]
       getNamespaceNamesUsedInSort s =
         map
           fromJust
           (filter
             isJust
-            (map (getNamespaceNameConstructor) (getConstrDefs s)))
+            (map (getNamespaceNameConstructor) (getSortCtors s)))
         where
           --getNamespaceName of a ConstructorDef
-          getNamespaceNameConstructor :: ConstructorDef -> Maybe NameSpaceName
+          getNamespaceNameConstructor :: ConstructorDef -> Maybe NamespaceName
           getNamespaceNameConstructor (MkBindConstructor _ _ _ _ name _ _) =
             Just (snd name)
           getNamespaceNameConstructor _ = Nothing
 
       --get the instances used by sorts
-      getInstanceSortsNameSpaceNames :: SortDef -> [NameSpaceName]
+      getInstanceSortsNameSpaceNames :: SortDef -> [NamespaceName]
       getInstanceSortsNameSpaceNames (MkDefSort _ instances _ _) =
-        map getNamespaceNameInstance instances
+        map getInstanceNameSpace instances
 
       --get the constructornames of a sortDef
       getConstructorNames :: SortDef -> [ConstructorName]
@@ -90,7 +90,7 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
       --get the sorts used in all constructors of the sort
       getSortsUsedByConstructors :: SortDef -> [SortName]
       getSortsUsedByConstructors s =
-        (getSortsOfConstructors (getConstrDefs s))
+        (getSortsOfConstructors (getSortCtors s))
         where
           -- get the sorts used by constructors in a list of constructors
           getSortsOfConstructors :: [ConstructorDef] -> [SortName]
@@ -187,7 +187,7 @@ wellFormedConstructor cons inst = do
     getAllIds _ = []
 
     --get identifiers of the rule, left expression+the rightexpr
-    getRuleIdentifiers :: NameSpaceRule -> [IdName]
+    getRuleIdentifiers :: NamespaceRule -> [IdName]
     getRuleIdentifiers (l, r) =
       getLeftExprId l ++ getRightExprIdBinding r ++ getRightExprId r
 
@@ -229,7 +229,7 @@ helpWellFormedVariables ((MkVarConstructor _ contextName):rest) instances = do
 helpWellFormedVariables (_:rest) instances =
   helpWellFormedVariables rest instances
 
--- --function to detect if all getNSI used in rules exist
+-- --function to detect if all getSortInstances used in rules exist
 -- helpWellFormedInstanceNamesExist ::
 --      [InstanceName] -> [InstanceName] -> Either String Bool
 -- helpWellFormedInstanceNamesExist l l2 =
@@ -237,7 +237,7 @@ helpWellFormedVariables (_:rest) instances =
 
 --function to detect if all namespaces used in instances in sorts exist
 helpWellFormedInstances ::
-     [NameSpaceName] -> [NameSpaceName] -> Either String Bool
+     [NamespaceName] -> [NamespaceName] -> Either String Bool
 helpWellFormedInstances l l2 =
   shouldBeInSecondList l l2 "Instance does not reference an existing namespace"
 
@@ -248,7 +248,7 @@ helpWellFormedInstanceNames l =
 
 --variables should only refer to namespace they are part of
 helpWellFormedVariablesNamespace ::
-     [SortDef] -> [NameSpaceDef] -> Either String Bool
+     [SortDef] -> [NamespaceDef] -> Either String Bool
 helpWellFormedVariablesNamespace [] _ = return True
 helpWellFormedVariablesNamespace ((MkDefSort sname inst cons _):rest) namespaces = do
   helpWellFormedVariablesCons sname cons inst namespaces
@@ -258,7 +258,7 @@ helpWellFormedVariablesCons ::
      SortName
   -> [ConstructorDef]
   -> [NamespaceInstance]
-  -> [NameSpaceDef]
+  -> [NamespaceDef]
   -> Either String Bool
 helpWellFormedVariablesCons sname [] _ _ = Right True
 helpWellFormedVariablesCons sname (MkVarConstructor name instanceName:rest) inst namespaces = do
@@ -271,16 +271,16 @@ helpWellFormedVarInst ::
      SortName
   -> InstanceName
   -> [NamespaceInstance]
-  -> [NameSpaceDef]
+  -> [NamespaceDef]
   -> Either String Bool
 helpWellFormedVarInst sname name [] namespaces =
   Left ("No instance found with that name in " ++ name)
 helpWellFormedVarInst sname name (inst:rest) namespaces =
   if getName inst == name
-    then helpVarnamespace sname (getNamespaceNameInstance inst) namespaces
+    then helpVarnamespace sname (getInstanceNameSpace inst) namespaces
     else helpWellFormedVarInst sname name rest namespaces
 
-helpVarnamespace :: SortName -> String -> [NameSpaceDef] -> Either String Bool
+helpVarnamespace :: SortName -> String -> [NamespaceDef] -> Either String Bool
 helpVarnamespace sname name [] =
   Left "Instance and namespace in variable do not coincide"
 helpVarnamespace sname name (MkNameSpace namespacename sortname _:rest) =
@@ -308,7 +308,7 @@ helpWellFormedConstructorName :: [ConstructorName] -> Either String Bool
 helpWellFormedConstructorName l = isUniqueInList l "not unique constructor"
 
 --function to detect if all NameSpaceNames are unique
-helpWellFormedNameSpaceName :: [NameSpaceName] -> Either String Bool
+helpWellFormedNameSpaceName :: [NamespaceName] -> Either String Bool
 helpWellFormedNameSpaceName l = isUniqueInList l "not unique namespace"
 
 --function to detect if all ConstructorName and Sortnames are unique
@@ -319,13 +319,13 @@ helpWellFormedConstructorAndSort l l2 =
 
 --function to detect if all NameSpaceNames and Sortnames are unique
 helpWellFormedNameSpaceAndSort ::
-     [NameSpaceName] -> [SortName] -> Either String Bool
+     [NamespaceName] -> [SortName] -> Either String Bool
 helpWellFormedNameSpaceAndSort l l2 =
   shouldNotBeInSecondList l l2 "namespace and sort have same name"
 
 --function to detect if all constructornames and namespacenames are unique
 helpWellFormedNameSpaceAndConstructor ::
-     [NameSpaceName] -> [ConstructorName] -> Either String Bool
+     [NamespaceName] -> [ConstructorName] -> Either String Bool
 helpWellFormedNameSpaceAndConstructor l l2 =
   shouldNotBeInSecondList l l2 "constructor and namespace have same name"
 
@@ -343,7 +343,7 @@ helpWellFormedSortNameInNamespaces l l2 =
 
 --function to detect if all namespacenames in constructors are valid (or in other words: are declared )
 helpWellFormedNameSpaceNameInConstructors ::
-     [NameSpaceName] -> [NameSpaceName] -> Either String Bool
+     [NamespaceName] -> [NamespaceName] -> Either String Bool
 helpWellFormedNameSpaceNameInConstructors l l2 =
   shouldBeInSecondList
     l
@@ -394,7 +394,7 @@ helpWellFormedRulesLHSExpressionsSort ::
 helpWellFormedRulesLHSExpressionsSort table s =
   concatMap
     (helpWellFormedRulesLHSExpressionsConstructor (getName s) table)
-    (getConstrDefs s)
+    (getSortCtors s)
 
 helpWellFormedRulesLHSExpressionsConstructor ::
      SortName
@@ -412,7 +412,7 @@ helpWellFormedRulesInstancesRuleLHSLeft ::
      SortName
   -> [(IdName, SortName)]
   -> [(SortName, [NamespaceInstance])]
-  -> NameSpaceRule
+  -> NamespaceRule
   -> Either String Bool
 helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LeftLHS contextName, RightLHS contextName2)
   | length (findContextToNamespaceInstanceSyn contextName sname tableInstances) >
@@ -506,23 +506,23 @@ findContextToNamespaceInstanceInh ctxName sname table =
   -- checking if the binding to a constructorrule is ok by looking if the right expression is of the right type
 isWellFormedBindToContextConstructorRule ::
     SortName
- -> NameSpaceName
+ -> NamespaceName
  -> [(IdName, SortName)]
  -> [(SortName, [NamespaceInstance])]
- -> NameSpaceRule
+ -> NamespaceRule
  -> Either String Bool
 isWellFormedBindToContextConstructorRule sname namespacebind tableIdentifiers tableInstances (_, RightAdd expr id)
  | getRightExprId expr == [] &&
      any
        (\x ->
           getInstanceNamesOfRuleRight expr == getName x &&
-          getNamespaceNameInstance x == namespacebind)
+          getInstanceNameSpace x == namespacebind)
        (fromJust (lookup sname tableInstances)) = return True
  | getRightExprId expr /= [] &&
      any
        (\x ->
           getInstanceNamesOfRuleRight expr == getName x &&
-          getNamespaceNameInstance x == namespacebind)
+          getInstanceNameSpace x == namespacebind)
        (fromJust
           (lookup
              (fromJust (lookup (head (getRightExprId expr)) tableIdentifiers))
@@ -548,7 +548,7 @@ isWellFormedBindToContextSort ::
 isWellFormedBindToContextSort table s =
  concatMap
    (isWellFormedBindToContextConstructor (getName s) table)
-   (getConstrDefs s)
+   (getSortCtors s)
 
 --binders should only be added to contexts that correspond to the same namespace (not necessarily the same context)
 isWellFormedBindToContext ::
@@ -567,7 +567,7 @@ helpWellFormedRulesInstancesRule ::
  -> [(IdName, SortName)]
  -> [(IdName, SortName, FoldName)]
  -> [(SortName, [NamespaceInstance])]
- -> NameSpaceRule
+ -> NamespaceRule
  -> Either String Bool
 helpWellFormedRulesInstancesRule sname lists tableIdentifiers folds tableInstances (leftexpr, rightexpr)
  | getRightExprId rightexpr /= [] &&
@@ -582,26 +582,26 @@ helpWellFormedRulesInstancesRule sname lists tableIdentifiers folds tableInstanc
      length rightInstanceLHS > 0 &&
      getLeftExprId leftexpr == [] &&
      length leftInstanceLHS > 0 &&
-     getNamespaceNameInstance (head rightInstanceLHS) ==
-     getNamespaceNameInstance (head leftInstanceLHS) = return True
+     getInstanceNameSpace (head rightInstanceLHS) ==
+     getInstanceNameSpace (head leftInstanceLHS) = return True
  | getRightExprId rightexpr /= [] &&
      length rightInstanceNoLHS > 0 &&
      getLeftExprId leftexpr == [] &&
      length leftInstanceLHS > 0 &&
-     getNamespaceNameInstance (head rightInstanceNoLHS) ==
-     getNamespaceNameInstance (head leftInstanceLHS) = return True
+     getInstanceNameSpace (head rightInstanceNoLHS) ==
+     getInstanceNameSpace (head leftInstanceLHS) = return True
  | getRightExprId rightexpr /= [] &&
      length rightInstanceNoLHS > 0 &&
      getLeftExprId leftexpr /= [] &&
      length leftInstanceNoLHS > 0 &&
-     getNamespaceNameInstance (head rightInstanceNoLHS) ==
-     getNamespaceNameInstance (head leftInstanceNoLHS) = return True
+     getInstanceNameSpace (head rightInstanceNoLHS) ==
+     getInstanceNameSpace (head leftInstanceNoLHS) = return True
  | getRightExprId rightexpr == [] &&
      length rightInstanceLHS > 0 &&
      getLeftExprId leftexpr /= [] &&
      length leftInstanceNoLHS > 0 &&
-     getNamespaceNameInstance (head rightInstanceLHS) ==
-     getNamespaceNameInstance (head leftInstanceNoLHS) = return True
+     getInstanceNameSpace (head rightInstanceLHS) ==
+     getInstanceNameSpace (head leftInstanceNoLHS) = return True
  | otherwise = Left ("incorrect context for this sort " ++ sname)
  where
    rightInstanceLHS =
@@ -618,11 +618,11 @@ helpWellFormedRulesInstancesRule sname lists tableIdentifiers folds tableInstanc
               tableInstances)))
    leftInstanceLHS =
      (filter
-        (\x -> getInstanceNamesOfRuleLeft leftexpr == getName x)
+        (\x -> getLeftSubInstanceName leftexpr == getName x)
         (fromJust (lookup sname tableInstances)))
    leftInstanceNoLHS =
      (filter
-        (\x -> getInstanceNamesOfRuleLeft leftexpr == getName x)
+        (\x -> getLeftSubInstanceName leftexpr == getName x)
         (fromJust
            (lookup
               (fromJust
@@ -647,7 +647,7 @@ helpWellFormedRulesInstancesSort ::
 helpWellFormedRulesInstancesSort table s =
  concatMap
    (helpWellFormedRulesInstancesConstructor (getName s) table)
-   (getConstrDefs s)
+   (getSortCtors s)
 
 -- identifiers in Rules can only use contexts they are allowed to use
 helpWellFormedRulesInstances ::

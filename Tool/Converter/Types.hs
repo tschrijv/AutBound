@@ -18,7 +18,7 @@ getTypes (_, sd, _, _) = map (
     getConstr (MkVarConstructor n _) =
       Constr n ["Variable"]
 
-getEnvType :: [NameSpaceDef] -> (Type, [Constructor])
+getEnvType :: [NamespaceDef] -> (Type, [Constructor])
 getEnvType nsd = ("Env", Constr "Nil" [] : map (
     \(MkNameSpace ns _ inEnv) -> Constr ('E' : ns) (inEnv ++ ["Env"])
   ) nsd)

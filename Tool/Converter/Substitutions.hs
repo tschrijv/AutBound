@@ -30,7 +30,7 @@ getSubstHelpers sd varAccessTable =
     | MkVarConstructor consName _ <- cdefs]
   ) filtered
 
-getSubstFunctions :: [SortDef] -> [NameSpaceDef] -> [(SortName, Bool)] -> [Function]
+getSubstFunctions :: [SortDef] -> [NamespaceDef] -> [(SortName, Bool)] -> [Function]
 getSubstFunctions sd nsd varAccessTable =
   let filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (capitalize sname) varAccessTable)) sd
   in concatMap (\(MkDefSort sname namespaceDecl _ bool) ->
@@ -38,7 +38,7 @@ getSubstFunctions sd nsd varAccessTable =
     in map (\inst -> namespaceInstanceSubstFunction sname inst namespaceDecl nsd bool) filteredNs
   ) filtered
   where
-    namespaceInstanceSubstFunction :: SortName -> NamespaceInstance -> [NamespaceInstance] -> [NameSpaceDef] -> Bool -> Function
+    namespaceInstanceSubstFunction :: SortName -> NamespaceInstance -> [NamespaceInstance] -> [NamespaceDef] -> Bool -> Function
     namespaceInstanceSubstFunction sname (INH instname namespaceName) namespaceDecl defs bool =
       Fn
         (toLowerCaseFirst sname ++ secondSort ++ "Substitute")
@@ -52,7 +52,7 @@ getSubstFunctions sd nsd varAccessTable =
         secondSort = lookForSortName namespaceName defs
         mapCall = FnCall (toLowerCaseFirst sname ++ "map") (declarationsToFunctionsSubst (INH instname namespaceName) namespaceDecl defs ++ [VarExpr "orig", VarExpr "t"])
 
-    declarationsToFunctionsSubst :: NamespaceInstance -> [NamespaceInstance] -> [NameSpaceDef] -> [Expression]
+    declarationsToFunctionsSubst :: NamespaceInstance -> [NamespaceInstance] -> [NamespaceDef] -> [Expression]
     declarationsToFunctionsSubst (INH instname1 namespaceName) nsi nsd =
       [
         if instname1 == instname2

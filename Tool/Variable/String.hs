@@ -3,7 +3,7 @@ module Variable.String where
 import GeneralTerms
 import Program
 
-getVariableType :: [NameSpaceDef] -> (Type, [Constructor])
+getVariableType :: [NamespaceDef] -> (Type, [Constructor])
 getVariableType nsd = ("Variable", map (\ns -> Constr ('S' : getName ns) ["String"]) nsd)
 
 getVariableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])]

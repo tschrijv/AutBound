@@ -11,7 +11,7 @@ import Converter.Utility
 
 getFreeVar :: Language -> [Function]
 getFreeVar (_, sd, _, _) =
-  let table = map getNameAndNSI sd
+  let table = map getSortNameAndInstances sd
       accessVarTable = getVarAccessTable sd
       filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (capitalize sname) accessVarTable)) sd
   in map (\(MkDefSort sname _ cons _) ->
@@ -32,7 +32,7 @@ generateFreeVariableFunction sname cons table accessVarTable =
           applyRulesIdentifiersFreeVariables
             sname
             rules
-            (collectRulesAllField rules (foldToNormalList folds ++ lists ++ listSorts))
+            (groupRulesByIden rules (foldToNormalList folds ++ lists ++ listSorts))
             (foldToNormalList folds)
             lists
             listSorts
@@ -42,10 +42,10 @@ generateFreeVariableFunction sname cons table accessVarTable =
     ]
   )]
   where
-    folds = getConstrFolds cons
-    lists = getConstrLists cons
-    listSorts = getConstrListSorts cons
-    rules = getConstrRules cons
+    folds = getCtorFolds cons
+    lists = getCtorLists cons
+    listSorts = getCtorSorts cons
+    rules = getCtorRules cons
 
 generateFreeVariableConstructor :: ConstructorDef -> Parameter
 generateFreeVariableConstructor (MkVarConstructor consName _) =
@@ -54,12 +54,12 @@ generateFreeVariableConstructor cons =
   ConstrParam (capitalize consName) (listToSpaceslower (foldToNormalList folds ++ lists ++ listSorts) ++ [VarParam "_" | _ <- hTypes])
   where
     consName = getName cons
-    folds = getConstrFolds cons
-    lists = getConstrLists cons
-    listSorts = getConstrListSorts cons
-    hTypes = getConstrHTypes cons
+    folds = getCtorFolds cons
+    lists = getCtorLists cons
+    listSorts = getCtorSorts cons
+    hTypes = getCtorHTypes cons
 
-applyRulesIdentifiersFreeVariables :: SortName -> [NameSpaceRule] -> [(IdName, [NameSpaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
+applyRulesIdentifiersFreeVariables :: SortName -> [NamespaceRule] -> [(IdName, [NamespaceRule])] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [Expression]
 applyRulesIdentifiersFreeVariables _ _ [] _ _ _ _ _ = [ListExpr []]
 applyRulesIdentifiersFreeVariables sname rules [(iden, idRules)] folds lists listSorts table accessVarTable
   | fromJust (lookup sortnameInUse accessVarTable) = [FnCall ("freeVariables" ++ sortnameInUse) (addedBinders : [VarExpr (toLowerCaseFirst iden)])]
