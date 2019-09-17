@@ -94,6 +94,14 @@ getCtorSorts (MkDefConstructor _ _ listSorts _ _ _) = listSorts
 getCtorSorts (MkBindConstructor _ _ listSorts _ _ _ _) = listSorts
 getCtorSorts MkVarConstructor{} = error "invalid method for var constructor"
 
+getCtorBindVarName :: ConstructorDef -> Maybe String
+getCtorBindVarName (MkBindConstructor _ _ _ _ (s, _) _ _) = Just s
+getCtorBindVarName _ = Nothing
+
+getCtorBindVarNamespace :: ConstructorDef -> Maybe String
+getCtorBindVarNamespace (MkBindConstructor _ _ _ _ (s, _) _ _) = Just s
+getCtorBindVarNamespace _ = Nothing
+
 getCtorFolds :: ConstructorDef -> [(IdName, SortName, FoldName)]
 getCtorFolds (MkDefConstructor _ _ _ folds _ _) = folds
 getCtorFolds (MkBindConstructor _ _ _ folds _ _ _) = folds

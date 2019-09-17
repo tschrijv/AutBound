@@ -64,6 +64,7 @@ applyRuleInheritedNamespaces sname rules (iden, rulesOfId) folds lists listSorts
     applyOneRuleLogic _ _ _ (_, RightLHS _) _ _ _ _ _ = Nothing
     applyOneRuleLogic sname inst rules (l, RightAdd expr _) folds lists listSorts table params =
       return (ConstrInst ("S" ++ getInstanceNameSpace inst) (emptyOrToList (applyOneRuleLogic sname inst rules (l, expr) folds lists listSorts table []) ++ params))
+      -- return (FnCall "insert" (VarExpr "b" : (emptyOrToList (applyOneRuleLogic sname inst rules (l, expr) folds lists listSorts table []) ++ params)))
     applyOneRuleLogic sname inst rules (_, RightSub iden context) folds lists listSorts table params
       | (elem iden (map fst lists) || elem iden (map fst folds)) && isJust newrule =
         return (FnCall ("generateHnat" ++ getInstanceNameSpace inst) (FnCall "length" (VarExpr iden : nextStep) : params))
@@ -76,6 +77,3 @@ applyRuleInheritedNamespaces sname rules (iden, rulesOfId) folds lists listSorts
       where
         newrule = find (\(l, _) -> getLeftSubIden l == iden) rules
         nextStep = emptyOrToList (applyOneRuleLogic sname inst rules (fromJust newrule) folds lists listSorts table [])
-
-    emptyOrToList :: Maybe Expression -> [Expression]
-    emptyOrToList ex = maybe [] (\a -> [a]) ex

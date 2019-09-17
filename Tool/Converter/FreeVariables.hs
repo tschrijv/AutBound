@@ -24,6 +24,7 @@ getFreeVar (_, sd, _, _) =
 generateFreeVariableFunction :: SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> [([Parameter], Expression)]
 generateFreeVariableFunction _ cons@(MkVarConstructor _ _) _ _ =
   [([VarParam "c", generateFreeVariableConstructor cons], IfExpr (GTEExpr (VarExpr "var") (VarExpr "c")) (ListExpr [FnCall "minus" [VarExpr "var", VarExpr "c"]]) (ListExpr []))]
+  -- [([VarParam "c", generateFreeVariableConstructor cons], IfExpr (FnCall "elem" [VarExpr "var", VarExpr "c"]) (ListExpr []) (ListExpr [ConstrInst (getName cons) [VarExpr "var"]]))]
 generateFreeVariableFunction sname cons table accessVarTable =
   [([VarParam "c", generateFreeVariableConstructor cons],
     FnCall "nub" [
@@ -52,6 +53,7 @@ generateFreeVariableConstructor (MkVarConstructor consName _) =
   ConstrParam (capitalize consName) [VarParam "var"]
 generateFreeVariableConstructor cons =
   ConstrParam (capitalize consName) (firstToVarParams (dropFold folds ++ lists ++ listSorts) ++ [VarParam "_" | _ <- hTypes])
+  -- ConstrParam (capitalize consName) ((map (\_ -> VarParam "b") (emptyOrToList (getCtorBindVarName cons))) ++ firstToVarParams (dropFold folds ++ lists ++ listSorts) ++ [VarParam "_" | _ <- hTypes])
   where
     consName = getName cons
     folds = getCtorFolds cons

@@ -10,6 +10,9 @@ toLowerCaseFirst (first:rest) = ((toLower first) : rest)
 capitalize :: String -> String
 capitalize (first:rest) = ((toUpper first) : rest)
 
+emptyOrToList :: Maybe a -> [a]
+emptyOrToList ex = maybe [] (\a -> [a]) ex
+
 lookForSortName :: NamespaceName -> [NamespaceDef] -> SortName
 lookForSortName name ((MkNameSpace name2 sortname _):rest)
   | name2 == name = toLowerCaseFirst sortname
