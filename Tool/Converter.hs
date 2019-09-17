@@ -8,12 +8,15 @@ import Converter.Mappings
 import Converter.Substitutions
 import Converter.Types
 
+-- | Data type for storing the functions that depend on the
+-- variable representation
 data VariableFunctions = VF {
   variableType :: [NamespaceDef] -> (Type, [Constructor]),
   variableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])],
   variableFunctions :: Language -> (Type, [Constructor]) -> [Function]
 }
 
+-- | Convert a language into a program using the specified variable functions
 convert :: Language -> VariableFunctions -> Program
 convert lan@(nsd, sd, imp, cd) vf =
   let var = (variableType vf) nsd
