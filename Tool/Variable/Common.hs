@@ -39,7 +39,7 @@ generateSortSynSystemOneConstructor :: SortName -> [NamespaceDef] -> [(SortName,
 generateSortSynSystemOneConstructor sname _ _ (MkVarConstructor consName _) _ =
   Fn ("addToEnvironment" ++ sname) [([ConstrParam (capitalize consName) [VarParam "var"], VarParam "c"], VarExpr "c")]
 generateSortSynSystemOneConstructor sname namespaces table cons ctx =
-  Fn ("addToEnvironment" ++ sname ++ cinst ctx) [([ConstrParam (capitalize consName) (firstToVarParams listSorts ++ [VarParam "_" | _ <- hTypes]), VarParam "c"], getEnvFunctionGenerate sname ctx namespaces newtable listSorts rules)]
+  Fn ("addToEnvironment" ++ sname ++ xinst ctx) [([ConstrParam (capitalize consName) (firstToVarParams listSorts ++ [VarParam "_" | _ <- hTypes]), VarParam "c"], getEnvFunctionGenerate sname ctx namespaces newtable listSorts rules)]
   where
     newtable = filterContextsForSameNamespace ctx table
     consName = getName cons
@@ -55,7 +55,7 @@ getEnvFunctionGenerate sname ctx namespaces table listSorts rules
     allrules = collectRulesSyn rules listSorts
     start = fromJust (
       find
-        (\x -> linst (fst x) == cinst ctx)
+        (\x -> linst (fst x) == xinst ctx)
         (fromJust (lookup "lhs" allrules))
       )
 
@@ -71,7 +71,7 @@ getEnvFunctionGenerate sname ctx namespaces table listSorts rules
 
 navigateRules :: SortName -> Context -> [NamespaceDef] -> [(SortName, [Context])] -> [(IdenName, SortName)] -> [AttributeDef] -> AttributeDef -> Expression
 navigateRules sname ctx namespaces table listSorts rules (l, RightAdd expr _) =
-  FnCall ("S" ++ cnamespace ctx) [navigateRules sname ctx namespaces table listSorts rules (l, expr)]
+  FnCall ("S" ++ xnamespace ctx) [navigateRules sname ctx namespaces table listSorts rules (l, expr)]
 navigateRules _ _ _ _ _ _ (LeftLHS _, RightLHS _) =
   VarExpr "c"
 navigateRules sname ctx namespaces table listSorts rules (LeftLHS _, RightSub iden _)
@@ -80,7 +80,7 @@ navigateRules sname ctx namespaces table listSorts rules (LeftLHS _, RightSub id
   | otherwise = FnCall functionName [VarExpr iden, VarExpr "c"]
   where
     newrule = find (\(l, _) -> liden l == iden) rules
-    functionName = "addToEnvironment" ++ fromJust (lookup iden listSorts) ++ cinst ctx -- TODO: iden was included in function name with a space?? included here both, below once + twice!!
+    functionName = "addToEnvironment" ++ fromJust (lookup iden listSorts) ++ xinst ctx -- TODO: iden was included in function name with a space?? included here both, below once + twice!!
 navigateRules _ _ _ _ _ _ (LeftSub _ _, RightLHS _) =
   VarExpr "c"
 navigateRules sname ctx namespaces table listSorts rules (LeftSub _ _, RightSub iden _)
@@ -89,7 +89,7 @@ navigateRules sname ctx namespaces table listSorts rules (LeftSub _ _, RightSub 
   | otherwise = FnCall functionName [VarExpr iden, VarExpr "c"]
   where
     newrule = find (\(l, _) -> liden l == iden) rules
-    functionName = "addToEnvironment" ++ fromJust (lookup iden listSorts) ++ cinst ctx
+    functionName = "addToEnvironment" ++ fromJust (lookup iden listSorts) ++ xinst ctx
 
 -- * Free variables
 -- ----------------------------------------------------------------------------
@@ -184,7 +184,7 @@ getMappings (_, sd, _, _) ef =
 
     getExpr :: SortName -> ConstructorDef -> [(SortName, [Context])] -> [(SortName, Bool)] -> Expression
     getExpr sname (MkVarConstructor consName _) table _ =
-      FnCall ("on" ++ cnamespace (head (fromJust (lookup sname table)))) [
+      FnCall ("on" ++ xnamespace (head (fromJust (lookup sname table)))) [
         VarExpr "c",
         ConstrInst (capitalize consName) [VarExpr "var"]
       ]
@@ -319,24 +319,24 @@ applyRuleInheritedNamespaces ef sname rules (iden, rulesOfId) folds lists listSo
       | isJust foundrule = applyOneRuleLogic ef sname currentCtx newrules (fromJust foundrule) folds lists listSorts newtable [param]
       | otherwise = Nothing
       where
-        foundrule = find (\x -> linst (fst x) == cinst currentCtx) rulesOfId
+        foundrule = find (\x -> linst (fst x) == xinst currentCtx) rulesOfId
         newtable = filterContextsForSameNamespace currentCtx table
         newrules = filter (\(l, r) ->
             let sortnameId = liden l
                 snameLookup = fromJust (lookup (capitalize sname) table)
                 sortnameIdlookup = fromJust (lookup (getSortForId sortnameId (folds ++ lists ++ listSorts)) table)
-            in (sortnameId == "" && any (\ctx -> linst l == cinst ctx) snameLookup) || any (\ctx -> linst l == cinst ctx) sortnameIdlookup
+            in (sortnameId == "" && any (\ctx -> linst l == xinst ctx) snameLookup) || any (\ctx -> linst l == xinst ctx) sortnameIdlookup
           ) rules
 
     applyOneRuleLogic :: ExternalFunctions -> SortName -> Context -> [AttributeDef] -> AttributeDef -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Expression] -> Maybe Expression
     applyOneRuleLogic _ _ _ _ (_, RightLHS _) _ _ _ _ _ = Nothing
     applyOneRuleLogic ef sname ctx rules (l, RightAdd expr _) folds lists listSorts table params =
-      return (oneDeeper ef (cnamespace ctx) (emptyOrToList (applyOneRuleLogic ef sname ctx rules (l, expr) folds lists listSorts table []) ++ params))
+      return (oneDeeper ef (xnamespace ctx) (emptyOrToList (applyOneRuleLogic ef sname ctx rules (l, expr) folds lists listSorts table []) ++ params))
     applyOneRuleLogic ef sname ctx rules (_, RightSub iden context) folds lists listSorts table params
       | (elem iden (map fst lists) || elem iden (map fst folds)) && isJust newrule =
-        return (FnCall ("generateHnat" ++ cnamespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params))
+        return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params))
       | elem iden (map fst lists) || elem iden (map fst folds) =
-        return (FnCall ("generateHnat" ++ cnamespace ctx) (FnCall "length" [VarExpr iden] : params))
+        return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" [VarExpr iden] : params))
       | isJust newrule =
         return (FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) ((VarExpr iden : nextStep) ++ params))
       | otherwise =

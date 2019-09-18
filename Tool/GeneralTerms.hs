@@ -12,8 +12,8 @@ type InstanceName     = String
 
 --the inherited or synthesised contexts
 data Context
-  = INH { cinst :: InstanceName, cnamespace :: NamespaceName }
-  | SYN { cinst :: InstanceName, cnamespace :: NamespaceName }
+  = INH { xinst :: InstanceName, xnamespace :: NamespaceName }
+  | SYN { xinst :: InstanceName, xnamespace :: NamespaceName }
   deriving (Show, Eq)
 
 --the left part of an expression like t1.ctx=lhs.ctx
@@ -48,24 +48,27 @@ data SortDef
 
 --definition of a constructor
 data ConstructorDef
-  = MkDefConstructor
-      ConstructorName
-      [(IdenName, SortName)] -- lists
-      [(IdenName, SortName)] -- sorts
-      [(IdenName, SortName, FoldName)] -- folds
-      [AttributeDef] -- rules
-      [HaskellTypeName]
-  | MkBindConstructor
-      ConstructorName
-      [(IdenName, SortName)] -- lists
-      [(IdenName, SortName)] -- sorts
-      [(IdenName, SortName, FoldName)] -- folds
-      (String, NamespaceName) -- namespace
-      [AttributeDef]
-      [HaskellTypeName]
-  | MkVarConstructor
-      ConstructorName
-      InstanceName
+  = MkDefConstructor {
+    cname :: ConstructorName,
+    clists :: [(IdenName, SortName)],
+    csorts :: [(IdenName, SortName)],
+    cfolds :: [(IdenName, SortName, FoldName)],
+    cattrs :: [AttributeDef],
+    cnatives :: [HaskellTypeName]
+  }
+  | MkBindConstructor {
+    cname :: ConstructorName,
+    clists :: [(IdenName, SortName)],
+    csorts :: [(IdenName, SortName)],
+    cfolds :: [(IdenName, SortName, FoldName)],
+    cbinder :: (IdenName, NamespaceName),
+    cattrs :: [AttributeDef],
+    cnatives :: [HaskellTypeName]
+  }
+  | MkVarConstructor {
+    cname :: ConstructorName,
+    cinst :: InstanceName
+  }
   deriving (Show, Eq)
 
 type Language         = ([NamespaceDef], [SortDef], [(String, [String])], [String])
