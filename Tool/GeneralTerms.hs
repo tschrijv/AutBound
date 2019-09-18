@@ -19,8 +19,12 @@ data Context
 --the left part of an expression like t1.ctx=lhs.ctx
 data LeftExpr
   = LeftLHS { linst :: InstanceName }
-  | LeftSub { liden :: IdenName, linst :: InstanceName }
+  | LeftSub { _liden :: IdenName, linst :: InstanceName }
   deriving (Show, Eq)
+
+liden :: LeftExpr -> IdenName
+liden left@(LeftSub{}) = _liden left
+liden _                = ""
 
 --the right part of an expression like t1.ctx=lhs.ctx
 data RightExpr
@@ -126,17 +130,8 @@ getSortInstances (MkDefSort _ instances _ _) = instances
 getSortNameAndInstances :: SortDef -> (SortName, [Context])
 getSortNameAndInstances s = (getName s, getSortInstances s)
 
-getLeftSubIden :: LeftExpr -> IdenName
-getLeftSubIden (LeftLHS _)    = ""
-getLeftSubIden (LeftSub iden _) = iden
-
---get the name of the context of a left expr
-getLeftSubInstanceName :: LeftExpr -> InstanceName
-getLeftSubInstanceName (LeftLHS name)   = name
-getLeftSubInstanceName (LeftSub _ name) = name
-
 --collects all the rules of the identifiers used in the constructor and groups them in a list with each identifier getting a list of rules
 groupRulesByIden :: [NamespaceRule] -> [(IdenName, SortName)] -> [(IdenName, [NamespaceRule])]
 groupRulesByIden rules sorts = [
-    (iden, filter (\(l, r) -> getLeftSubIden l == iden) rules)
+    (iden, filter (\(l, r) -> liden l == iden) rules)
   | (iden, _) <- sorts]

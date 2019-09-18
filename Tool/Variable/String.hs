@@ -153,14 +153,14 @@ getCustSubst (nsd, sd, _, _) =
                   | isJust foundrule = applyOneRuleLogic ef sname currentCtx newrules (fromJust foundrule) folds lists listSorts newtable params
                   | otherwise = Nothing
                   where
-                    foundrule = find (\x -> getLeftSubInstanceName (fst x) == cinst currentCtx) rulesOfId
+                    foundrule = find (\x -> linst (fst x) == cinst currentCtx) rulesOfId
                     newtable = filterContextsForSameNamespace currentCtx table
                     newrules = filter (\(l, r) ->
-                        let sortnameId = getLeftSubIden l
+                        let sortnameId = liden l
                             snameLookup = fromJust (lookup (capitalize sname) table)
                             sortnameIdlookup = fromJust (lookup (getSortForId sortnameId (folds ++ lists ++ listSorts)) table)
-                        in (sortnameId == "" && any (\ctx -> getLeftSubInstanceName l == cinst ctx) snameLookup)
-                        || any (\ctx -> getLeftSubInstanceName l == cinst ctx) sortnameIdlookup
+                        in (sortnameId == "" && any (\ctx -> linst l == cinst ctx) snameLookup)
+                        || any (\ctx -> linst l == cinst ctx) sortnameIdlookup
                       ) rules
 
                 applyOneRuleLogic :: ExternalFunctions -> SortName -> Context -> [NamespaceRule] -> NamespaceRule -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Expression] -> Maybe [Expression]
@@ -177,5 +177,5 @@ getCustSubst (nsd, sd, _, _) =
                   | otherwise =
                     return [FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) (VarExpr iden : params)]
                   where
-                    newrule = find (\(l, _) -> getLeftSubIden l == iden) rules
+                    newrule = find (\(l, _) -> liden l == iden) rules
                     nextStep = fromMaybe [] (applyOneRuleLogic ef sname ctx rules (fromJust newrule) folds lists listSorts table [])

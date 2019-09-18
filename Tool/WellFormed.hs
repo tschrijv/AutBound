@@ -618,11 +618,11 @@ helpWellFormedRulesInstancesRule sname lists tableIdentifiers folds tableInstanc
               tableInstances)))
    leftInstanceLHS =
      (filter
-        (\ctx -> getLeftSubInstanceName leftexpr == cinst ctx)
+        (\ctx -> linst leftexpr == cinst ctx)
         (fromJust (lookup sname tableInstances)))
    leftInstanceNoLHS =
      (filter
-        (\ctx -> getLeftSubInstanceName leftexpr == cinst ctx)
+        (\ctx -> linst leftexpr == cinst ctx)
         (fromJust
            (lookup
               (fromJust
