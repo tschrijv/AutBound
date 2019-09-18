@@ -8,7 +8,6 @@ type SortName         = String
 type NamespaceName    = String
 type IdName           = String
 type HaskellTypeName  = String
-type Language         = ([NamespaceDef], [SortDef], [(String, [String])], [String])
 type InstanceName     = String
 
 --the inherited or synthesised contexts
@@ -64,6 +63,8 @@ data ConstructorDef
       ConstructorName
       InstanceName
   deriving (Show, Eq)
+
+type Language         = ([NamespaceDef], [SortDef], [(String, [String])], [String])
 
 class Named a where
   getName :: a -> String

@@ -1,5 +1,9 @@
 {-# OPTIONS_GHC -Wall #-}
 
+module Main where
+
+import System.Environment
+
 import GeneralTerms
 import WellFormed
 import Parser
@@ -11,8 +15,13 @@ import Printer.OCaml as POC
 import Variable.DeBruijn as VDB
 import Variable.String as VS
 
-import System.Environment
-
+-- | Read the following arguments from the command line:
+-- * path of the input file
+-- * name of the output language (Haskell or OCaml)
+-- * variable representation type (DeBruijn or String)
+-- * output module name
+-- Outputs either an error message, or creates a module in the respective
+-- language with the implementation of the input
 main :: IO ()
 main = do
   [inputName, outputLanguage, varType, outputName] <- getArgs
@@ -25,6 +34,7 @@ main = do
         Left err    -> print err
         Right program -> writeToLanguage program outputLanguage outputName
 
+-- | Check well-formedness of the input syntax and convert it if successful
 checkAndConvert :: Language -> String -> IO (Either String Program)
 checkAndConvert lang varType =
   case wellFormed lang of
@@ -34,6 +44,8 @@ checkAndConvert lang varType =
       "String" -> return (Right (convert lang VS.getFunctions))
     Right False -> error "Language is not well formed!"
 
+-- | Convert the abstract syntax of the implementation to a specific language
+-- and output it as a file
 writeToLanguage :: Program -> String -> String -> IO ()
 writeToLanguage program lang name = case lang of
   "Haskell" -> writeFile (name ++ ".hs") (show (PHS.printProgram name program))
