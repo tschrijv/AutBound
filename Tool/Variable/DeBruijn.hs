@@ -111,7 +111,7 @@ getShiftHelpers sd opName varAccessTable = let filtered = filter (\(MkDefSort sn
       ] | MkVarConstructor consName _ <- cdefs]
 
 getShiftFunctions :: [SortDef] -> [NamespaceDef] -> String -> [(SortName, Bool)] -> [Function]
-getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> isJust (lookup (getName s) varAccessTable)) sd
+getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> isJust (lookup (sname s) varAccessTable)) sd
   in map (\(MkDefSort sname namespaceDecl _ _) ->
     Fn
       (toLowerCaseFirst sname ++ "shift" ++ opName)

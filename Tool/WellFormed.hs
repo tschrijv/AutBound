@@ -44,14 +44,14 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
       namespacenames
   c <-
     wellFormedConstructors
-      (getSortCtors s)
-      (map cinst (getSortInstances s))
+      (sctors s)
+      (map cinst (sctxs s))
   d <- helpWellFormedInstances (getInstanceSortsNameSpaceNames s) namespacenames
-  e <- helpWellFormedVariables (getSortCtors s) (getSortInstances s)
-  f <- helpWellFormedInstanceNames (map cinst (getSortInstances s))
+  e <- helpWellFormedVariables (sctors s) (sctxs s)
+  f <- helpWellFormedInstanceNames (map cinst (sctxs s))
   helpWellFormed
     ([], lanrest, imp)
-    ((getName s) : sortnames)
+    ((sname s) : sortnames)
     ((getConstructorNames s) ++ consnames)
     ((getSortsUsedByConstructors s) ++ sortconsnames)
     namespacenames
@@ -66,7 +66,7 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
           fromJust
           (filter
             isJust
-            (map (getNamespaceNameConstructor) (getSortCtors s)))
+            (map (getNamespaceNameConstructor) (sctors s)))
         where
           --getNamespaceName of a ConstructorDef
           getNamespaceNameConstructor :: ConstructorDef -> Maybe NamespaceName
@@ -86,7 +86,7 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
       --get the sorts used in all constructors of the sort
       getSortsUsedByConstructors :: SortDef -> [SortName]
       getSortsUsedByConstructors s =
-        (getSortsOfConstructors (getSortCtors s))
+        (getSortsOfConstructors (sctors s))
         where
           -- get the sorts used by constructors in a list of constructors
           getSortsOfConstructors :: [ConstructorDef] -> [SortName]
@@ -389,8 +389,8 @@ helpWellFormedRulesLHSExpressionsSort ::
      [(SortName, [Context])] -> SortDef -> [Either String Bool]
 helpWellFormedRulesLHSExpressionsSort table s =
   concatMap
-    (helpWellFormedRulesLHSExpressionsConstructor (getName s) table)
-    (getSortCtors s)
+    (helpWellFormedRulesLHSExpressionsConstructor (sname s) table)
+    (sctors s)
 
 helpWellFormedRulesLHSExpressionsConstructor ::
      SortName
@@ -543,8 +543,8 @@ isWellFormedBindToContextSort ::
     [(SortName, [Context])] -> SortDef -> [Either String Bool]
 isWellFormedBindToContextSort table s =
  concatMap
-   (isWellFormedBindToContextConstructor (getName s) table)
-   (getSortCtors s)
+   (isWellFormedBindToContextConstructor (sname s) table)
+   (sctors s)
 
 --binders should only be added to contexts that correspond to the same namespace (not necessarily the same context)
 isWellFormedBindToContext ::
@@ -642,8 +642,8 @@ helpWellFormedRulesInstancesSort ::
     [(SortName, [Context])] -> SortDef -> [Either String Bool]
 helpWellFormedRulesInstancesSort table s =
  concatMap
-   (helpWellFormedRulesInstancesConstructor (getName s) table)
-   (getSortCtors s)
+   (helpWellFormedRulesInstancesConstructor (sname s) table)
+   (sctors s)
 
 -- identifiers in Rules can only use contexts they are allowed to use
 helpWellFormedRulesInstances ::

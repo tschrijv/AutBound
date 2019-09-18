@@ -23,24 +23,24 @@ getVarAccessTable sList = map (sortCanAccessVariables sList []) sList
   where
     sortCanAccessVariables :: [SortDef] -> [SortName] -> SortDef -> (SortName, Bool)
     sortCanAccessVariables allSorts listVisited s
-      | hasAccess = (sname, hasAccess)
-      | otherwise = (sname, findPathToVariable)
+      | hasAccess = (name, hasAccess)
+      | otherwise = (name, findPathToVariable)
       where
-        sname = getName s
-        hasAccess = fromJust (lookup sname (getTableOfHasVariable allSorts))
-        sortDefTable = map (\x -> (getName x, x)) allSorts
+        name = sname s
+        hasAccess = fromJust (lookup name (getTableOfHasVariable allSorts))
+        sortDefTable = map (\x -> (sname x, x)) allSorts
         findPathToVariable =
           or
             (map
               (constructorCanAccessVariables sortDefTable listVisited)
-              (getSortCtors s))
+              (sctors s))
 
         getTableOfHasVariable :: [SortDef] -> [(SortName, Bool)]
-        getTableOfHasVariable sd = [(getName s, hasVariables s) | s <- sd]
+        getTableOfHasVariable sd = [(sname s, hasVariables s) | s <- sd]
 
         -- function generating for each Sort, if it has access to some variable
         hasVariables :: SortDef -> Bool
-        hasVariables s = or [True | (MkVarConstructor _ _) <- getSortCtors s]
+        hasVariables s = or [True | (MkVarConstructor _ _) <- sctors s]
 
         constructorCanAccessVariables :: [(SortName, SortDef)] -> [SortName] -> ConstructorDef -> Bool
         constructorCanAccessVariables table visited (MkVarConstructor _ _) = True

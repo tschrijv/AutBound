@@ -43,7 +43,7 @@ data NamespaceDef
 
 --definition of a sort
 data SortDef
-  = MkDefSort SortName [Context] [ConstructorDef] Bool
+  = MkDefSort { sname :: SortName, sctxs :: [Context], sctors :: [ConstructorDef], srewrite :: Bool }
   deriving (Show, Eq)
 
 --definition of a constructor
@@ -72,9 +72,6 @@ type Language         = ([NamespaceDef], [SortDef], [(String, [String])], [Strin
 
 class Named a where
   getName :: a -> String
-
-instance Named SortDef where
-  getName (MkDefSort sname _ _ _) = sname
 
 -- get the name of definition of a constructor
 instance Named ConstructorDef where
@@ -115,17 +112,9 @@ getCtorHTypes (MkDefConstructor _ _ _ _ _ hTypes) = hTypes
 getCtorHTypes (MkBindConstructor _ _ _ _ _ _ hTypes) = hTypes
 getCtorHTypes MkVarConstructor{} = error "invalid method for var constructor"
 
---get the defs of constructors in the sort
-getSortCtors :: SortDef -> [ConstructorDef]
-getSortCtors (MkDefSort _ _ cdefs _) = cdefs
-
--- get the instances by the sorts in the
-getSortInstances :: SortDef -> [Context]
-getSortInstances (MkDefSort _ instances _ _) = instances
-
---get the names   contexts and the namespaces it refers to for a sorts in a tuple
+-- TODO
 getSortNameAndInstances :: SortDef -> (SortName, [Context])
-getSortNameAndInstances s = (getName s, getSortInstances s)
+getSortNameAndInstances s = (sname s, sctxs s)
 
 --collects all the rules of the identifiers used in the constructor and groups them in a list with each identifier getting a list of rules
 groupRulesByIden :: [AttributeDef] -> [(IdenName, SortName)] -> [(IdenName, [AttributeDef])]

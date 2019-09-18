@@ -28,11 +28,11 @@ getEnvType (nsd, _, _, _) = ("Env", Constr "Nil" [] : map (
 getEnvFunctions :: Language -> [Function]
 getEnvFunctions (nsd, sd, _, _) = let table = map getSortNameAndInstances sd
   in concatMap (\s ->
-    let nsi = [SYN x y | SYN x y <- getSortInstances s]
+    let nsi = [SYN x y | SYN x y <- sctxs s]
     in if null nsi then [] else
     map (\c ->
-      generateSortSynSystemOneConstructor (getName s) nsd table c (head nsi)
-    ) (getSortCtors s)
+      generateSortSynSystemOneConstructor (sname s) nsd table c (head nsi)
+    ) (sctors s)
   ) sd
 
 generateSortSynSystemOneConstructor :: SortName -> [NamespaceDef] -> [(SortName, [Context])] -> ConstructorDef -> Context -> Function
