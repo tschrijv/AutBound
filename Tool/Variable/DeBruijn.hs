@@ -23,6 +23,18 @@ getFunctions
 getVariableType :: Language -> (Type, [Constructor])
 getVariableType (nsd, _, _, _) = ("Variable", Constr "Z" [] : map (\ns -> Constr ('S' : getName ns) ["Variable"]) nsd)
 
+getTypes :: Language -> [(Type, [Constructor])]
+getTypes (_, sd, _, _) = map (
+    \(MkDefSort name _ cds _) -> (name, map getConstr cds)
+  ) sd where
+    getConstr :: ConstructorDef -> Constructor
+    getConstr (MkDefConstructor n lists listSorts folds _ hTypes) =
+      Constr n (map (\(_, s, f) -> "(" ++ f ++ " " ++ s ++ ")") folds ++ map (\(_, t) -> "[" ++ t ++ "]") lists ++ map snd listSorts ++ hTypes)
+    getConstr (MkBindConstructor n lists listSorts folds (var, ns) _ hTypes) =
+      Constr n (map (\(_, s, f) -> "(" ++ f ++ " " ++ s ++ ")") folds ++ map (\(_, t) -> "[" ++ t ++ "]") lists ++ map snd listSorts ++ hTypes)
+    getConstr (MkVarConstructor n _) =
+      Constr n ["Variable"]
+
 getVariableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])]
 getVariableInstances (_, hnatc) =
   let cs = delete (Constr "Z" []) hnatc
@@ -39,7 +51,7 @@ getVariableInstances (_, hnatc) =
       | otherwise = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "error" [StringExpr "differing namespace found in compare"])
 
 getVariableFunctions :: Language -> (Type, [Constructor]) -> [Function]
-getVariableFunctions lan@(nsd, _, _, _) varT = getHNatModifiers varT ++ getGenerators nsd ++ getShift lan ++ getMappings lan ++ getSubst lan ++ getFreeVar lan
+getVariableFunctions lan@(nsd, _, _, _) varT = getHNatModifiers varT ++ getGenerators nsd ++ getShift lan ++ getMappings lan ef ++ getSubst lan ++ getFreeVar lan ef
 
 getHNatModifiers :: (Type, [Constructor]) -> [Function]
 getHNatModifiers (_, hnatc) =
@@ -117,3 +129,25 @@ getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> i
       in map (\(INH _ namespaceName) ->
         FnCall (lookForSortName namespaceName nsd ++ "shiftHelp" ++ op) [VarExpr "d"]
       ) filtered
+
+_getCtorParams :: ConstructorDef -> [Parameter]
+_getCtorParams (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "var"]]
+_getCtorParams cons = [ConstrParam (capitalize consName) (firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
+-- getCtorParams cons = [ConstrParam (capitalize consName) ((map (\_ -> VarParam "b") (emptyOrToList (getCtorBindVarName cons))) ++ firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
+  where
+    consName = getName cons
+    folds = getCtorFolds cons
+    lists = getCtorLists cons
+    sorts = getCtorSorts cons
+    hTypes = getCtorHTypes cons
+
+_varCtorFreeVar :: String -> Expression
+_varCtorFreeVar name = IfExpr (GTEExpr (VarExpr "var") (VarExpr "c")) (ListExpr [FnCall "minus" [VarExpr "var", VarExpr "c"]]) (ListExpr [])
+
+_oneDeeper namespace expr = ConstrInst ("S" ++ namespace) expr
+
+ef = EF {
+  getCtorParams = _getCtorParams,
+  varCtorFreeVar = _varCtorFreeVar,
+  oneDeeper = _oneDeeper
+}
