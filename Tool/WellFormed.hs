@@ -157,7 +157,7 @@ wellFormedConstructor cons inst = do
     getIdentifiersConstructor _ = []
 
     --get the ids of the RightExpr that bind, including the binder added
-    getRightExprIdsConstructorBinding :: ConstructorDef -> [IdName]
+    getRightExprIdsConstructorBinding :: ConstructorDef -> [IdenName]
     getRightExprIdsConstructorBinding (MkDefConstructor _ _ sorts _ rules _) =
       concatMap getRightExprIdBinding (map snd rules)
     getRightExprIdsConstructorBinding (MkBindConstructor _ _ sorts _ namespace rules _) =
@@ -165,7 +165,7 @@ wellFormedConstructor cons inst = do
     getRightExprIdsConstructorBinding _ = []
 
     -- get the name on the right expression
-    getRightExprIdBinding :: RightExpr -> [IdName]
+    getRightExprIdBinding :: RightExpr -> [IdenName]
     getRightExprIdBinding (RightLHS _)       = []
     getRightExprIdBinding (RightSub _ _)     = []
     getRightExprIdBinding (RightAdd expr id) = (id : (getRightExprIdBinding expr))
@@ -179,7 +179,7 @@ wellFormedConstructor cons inst = do
     getIdentifiersWithoutBinding _ = []
 
     --get the identifiers used in the rules defined in the constructor
-    getAllIds :: ConstructorDef -> [IdName]
+    getAllIds :: ConstructorDef -> [IdenName]
     getAllIds (MkDefConstructor _ _ sorts _ rules _) =
       concatMap getRuleIdentifiers rules
     getAllIds (MkBindConstructor _ _ sorts _ namespace rules _) =
@@ -187,17 +187,17 @@ wellFormedConstructor cons inst = do
     getAllIds _ = []
 
     --get identifiers of the rule, left expression+the rightexpr
-    getRuleIdentifiers :: NamespaceRule -> [IdName]
+    getRuleIdentifiers :: NamespaceRule -> [IdenName]
     getRuleIdentifiers (l, r) =
       getLeftExprId l ++ getRightExprIdBinding r ++ getRightExprId r
 
     --get the binding of a constructor
-    getBinding :: ConstructorDef -> [IdName]
+    getBinding :: ConstructorDef -> [IdenName]
     getBinding (MkBindConstructor _ _ _ _ name _ _) = [fst name]
     getBinding _                                    = []
 
     -- get the ids of the RightExpr without any binders included
-    getRightExprIdsConstructor :: ConstructorDef -> [IdName]
+    getRightExprIdsConstructor :: ConstructorDef -> [IdenName]
     getRightExprIdsConstructor (MkDefConstructor _ _ sorts _ rules _) =
       concatMap getRightExprId (map snd rules)
     getRightExprIdsConstructor (MkBindConstructor _ _ sorts _ namespace rules _) =
@@ -205,7 +205,7 @@ wellFormedConstructor cons inst = do
     getRightExprIdsConstructor _ = []
 
     --get the ids of the LeftExpr
-    getLeftExprIdsConstructor :: ConstructorDef -> [IdName]
+    getLeftExprIdsConstructor :: ConstructorDef -> [IdenName]
     getLeftExprIdsConstructor (MkDefConstructor _ _ sorts _ rules _) =
       concatMap getLeftExprId (map fst rules)
     getLeftExprIdsConstructor (MkBindConstructor _ _ sorts _ namespace rules _) =
@@ -291,12 +291,12 @@ helpVarnamespace sname name (MkNameSpace namespacename sortname _:rest) =
     else helpVarnamespace sname name rest
 
 --function to detect if all identifiers used in the rules exist as fields
-helpWellFormedRulesIdentifiers :: [IdName] -> [IdName] -> Either String Bool
+helpWellFormedRulesIdentifiers :: [IdenName] -> [IdenName] -> Either String Bool
 helpWellFormedRulesIdentifiers l l2 =
   shouldBeInSecondList l l2 "identifier not used in constructor"
 
 --function to detect if all identifiers are unique in the fields of a constructor
-helpWellFormedIdentifiers :: [IdName] -> Either String Bool
+helpWellFormedIdentifiers :: [IdenName] -> Either String Bool
 helpWellFormedIdentifiers l = isUniqueInList l "not unique identifier"
 
 --function to detect if all sortnames are unique
@@ -352,7 +352,7 @@ helpWellFormedNameSpaceNameInConstructors l l2 =
 
 --detects if an identifier in the right expression does not appear as a binder
 helpWellFormedIdentifierBindingInRightExpr ::
-     [IdName] -> [IdName] -> Either String Bool
+     [IdenName] -> [IdenName] -> Either String Bool
 helpWellFormedIdentifierBindingInRightExpr l l2 =
   shouldBeInSecondList
     l
@@ -360,7 +360,7 @@ helpWellFormedIdentifierBindingInRightExpr l l2 =
     "Identifier in right expression does not appear as binder"
 
 --detects if an identifier in the right expression does not appear as constructorfield
-helpWellFormedIdentifierInLeftExpr :: [IdName] -> [IdName] -> Either String Bool
+helpWellFormedIdentifierInLeftExpr :: [IdenName] -> [IdenName] -> Either String Bool
 helpWellFormedIdentifierInLeftExpr l l2 =
   shouldBeInSecondList
     l
@@ -369,7 +369,7 @@ helpWellFormedIdentifierInLeftExpr l l2 =
 
 --detects if an identifier in the right expression does not appear as constructorfield
 helpWellFormedIdentifierInRightExpr ::
-     [IdName] -> [IdName] -> Either String Bool
+     [IdenName] -> [IdenName] -> Either String Bool
 helpWellFormedIdentifierInRightExpr l l2 =
   shouldBeInSecondList
     l
@@ -410,7 +410,7 @@ helpWellFormedRulesLHSExpressionsConstructor _ _ _ = [Right True]
 --checks if the left hand side and right hand side are wellformed in the sense that inherited contexts and synthesised contexts cannot be used in every position
 helpWellFormedRulesInstancesRuleLHSLeft ::
      SortName
-  -> [(IdName, SortName)]
+  -> [(IdenName, SortName)]
   -> [(SortName, [Context])]
   -> NamespaceRule
   -> Either String Bool
@@ -507,7 +507,7 @@ findContextToNamespaceInstanceInh instName sname table =
 isWellFormedBindToContextConstructorRule ::
     SortName
  -> NamespaceName
- -> [(IdName, SortName)]
+ -> [(IdenName, SortName)]
  -> [(SortName, [Context])]
  -> NamespaceRule
  -> Either String Bool
@@ -563,9 +563,9 @@ isWellFormedBindToContext sdefs table
 --checks whether both the lefthandside and the right hand side abide by the check of whether they refer to the same namespace
 helpWellFormedRulesInstancesRule ::
     SortName
- -> [(IdName, SortName)]
- -> [(IdName, SortName)]
- -> [(IdName, SortName, FoldName)]
+ -> [(IdenName, SortName)]
+ -> [(IdenName, SortName)]
+ -> [(IdenName, SortName, FoldName)]
  -> [(SortName, [Context])]
  -> NamespaceRule
  -> Either String Bool
@@ -662,12 +662,12 @@ helpWellFormedRulesInstances sdefs table
      ]
 
 -- get the name on the left expression
-getLeftExprId :: LeftExpr -> [IdName]
+getLeftExprId :: LeftExpr -> [IdenName]
 getLeftExprId (LeftLHS _)    = []
 getLeftExprId (LeftSub iden _) = [iden]
 
 --gets the idName of the rightexpr
-getRightExprId :: RightExpr -> [IdName]
+getRightExprId :: RightExpr -> [IdenName]
 getRightExprId (RightLHS _)      = []
 getRightExprId (RightSub name _) = [name]
 getRightExprId (RightAdd expr _) = getRightExprId expr

@@ -6,7 +6,7 @@ type FoldName         = String
 type ConstructorName  = String
 type SortName         = String
 type NamespaceName    = String
-type IdName           = String
+type IdenName           = String
 type HaskellTypeName  = String
 type InstanceName     = String
 
@@ -19,14 +19,14 @@ data Context
 --the left part of an expression like t1.ctx=lhs.ctx
 data LeftExpr
   = LeftLHS InstanceName
-  | LeftSub IdName InstanceName
+  | LeftSub IdenName InstanceName
   deriving (Show, Eq)
 
 --the right part of an expression like t1.ctx=lhs.ctx
 data RightExpr
   = RightLHS InstanceName
-  | RightSub IdName InstanceName
-  | RightAdd RightExpr IdName
+  | RightSub IdenName InstanceName
+  | RightAdd RightExpr IdenName
   deriving (Show, Eq)
 
 --the complete expression of like t1.ctx=lhs.ctx
@@ -46,16 +46,16 @@ data SortDef
 data ConstructorDef
   = MkDefConstructor
       ConstructorName
-      [(IdName, SortName)] -- lists
-      [(IdName, SortName)] -- sorts
-      [(IdName, SortName, FoldName)] -- folds
+      [(IdenName, SortName)] -- lists
+      [(IdenName, SortName)] -- sorts
+      [(IdenName, SortName, FoldName)] -- folds
       [NamespaceRule] -- rules
       [HaskellTypeName]
   | MkBindConstructor
       ConstructorName
-      [(IdName, SortName)] -- lists
-      [(IdName, SortName)] -- sorts
-      [(IdName, SortName, FoldName)] -- folds
+      [(IdenName, SortName)] -- lists
+      [(IdenName, SortName)] -- sorts
+      [(IdenName, SortName, FoldName)] -- folds
       (String, NamespaceName) -- namespace
       [NamespaceRule]
       [HaskellTypeName]
@@ -81,12 +81,12 @@ instance Named ConstructorDef where
   getName (MkVarConstructor cname _)            = cname
   getName (MkBindConstructor cname _ _ _ _ _ _) = cname
 
-getCtorLists :: ConstructorDef -> [(IdName, SortName)]
+getCtorLists :: ConstructorDef -> [(IdenName, SortName)]
 getCtorLists (MkDefConstructor _ lists _ _ _ _) = lists
 getCtorLists (MkBindConstructor _ lists _ _ _ _ _) = lists
 getCtorLists MkVarConstructor{} = error "invalid method for var constructor"
 
-getCtorSorts :: ConstructorDef -> [(IdName, SortName)]
+getCtorSorts :: ConstructorDef -> [(IdenName, SortName)]
 getCtorSorts (MkDefConstructor _ _ listSorts _ _ _) = listSorts
 getCtorSorts (MkBindConstructor _ _ listSorts _ _ _ _) = listSorts
 getCtorSorts MkVarConstructor{} = error "invalid method for var constructor"
@@ -99,7 +99,7 @@ getCtorBindVarNamespace :: ConstructorDef -> Maybe String
 getCtorBindVarNamespace (MkBindConstructor _ _ _ _ (s, _) _ _) = Just s
 getCtorBindVarNamespace _ = Nothing
 
-getCtorFolds :: ConstructorDef -> [(IdName, SortName, FoldName)]
+getCtorFolds :: ConstructorDef -> [(IdenName, SortName, FoldName)]
 getCtorFolds (MkDefConstructor _ _ _ folds _ _) = folds
 getCtorFolds (MkBindConstructor _ _ _ folds _ _ _) = folds
 getCtorFolds MkVarConstructor{} = error "invalid method for var constructor"
@@ -126,7 +126,7 @@ getSortInstances (MkDefSort _ instances _ _) = instances
 getSortNameAndInstances :: SortDef -> (SortName, [Context])
 getSortNameAndInstances s = (getName s, getSortInstances s)
 
-getLeftSubIden :: LeftExpr -> IdName
+getLeftSubIden :: LeftExpr -> IdenName
 getLeftSubIden (LeftLHS _)    = ""
 getLeftSubIden (LeftSub iden _) = iden
 
@@ -136,7 +136,7 @@ getLeftSubInstanceName (LeftLHS name)   = name
 getLeftSubInstanceName (LeftSub _ name) = name
 
 --collects all the rules of the identifiers used in the constructor and groups them in a list with each identifier getting a list of rules
-groupRulesByIden :: [NamespaceRule] -> [(IdName, SortName)] -> [(IdName, [NamespaceRule])]
+groupRulesByIden :: [NamespaceRule] -> [(IdenName, SortName)] -> [(IdenName, [NamespaceRule])]
 groupRulesByIden rules sorts = [
     (iden, filter (\(l, r) -> getLeftSubIden l == iden) rules)
   | (iden, _) <- sorts]
