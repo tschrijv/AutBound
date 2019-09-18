@@ -6,6 +6,9 @@ import Converter
 import Variable.Common
 import Utility
 
+import Data.Maybe
+import Data.List
+
 getFunctions :: ConvertFunctions
 getFunctions
   = VF {
@@ -36,7 +39,7 @@ getVariableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])]
 getVariableInstances _ = []
 
 getVariableFunctions :: Language -> (Type, [Constructor]) -> [Function]
-getVariableFunctions lan _ = getMappings lan ef ++ getSubst lan ef ++ getFreeVar lan ef
+getVariableFunctions lan _ = getMappings lan ef ++ getCustSubst lan ++ getFreeVar lan ef
 
 _getCtorParams :: ConstructorDef -> [Parameter]
 _getCtorParams (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "var"]]
@@ -51,7 +54,7 @@ _getCtorParams cons = [ConstrParam (capitalize consName) ((map (\_ -> VarParam "
 _varCtorFreeVar :: String -> Expression
 _varCtorFreeVar name = IfExpr (FnCall "elem" [VarExpr "var", VarExpr "c"]) (ListExpr []) (ListExpr [VarExpr "var"])
 
-_oneDeeper namespace expr = head expr -- FnCall "concat" [ListExpr (ListExpr [VarExpr "b"] : expr)]
+_oneDeeper namespace expr = expr -- FnCall "concat" [ListExpr (ListExpr [VarExpr "b"] : expr)]
 
 _substExpr sname consName =
   IfExpr (EQExpr (VarExpr "var") (VarExpr "c"))
@@ -61,7 +64,118 @@ _substExpr sname consName =
 ef = EF {
   getCtorParams = _getCtorParams,
   varCtorFreeVar = _varCtorFreeVar,
-  oneDeeper = _oneDeeper,
+  oneDeeper = (\n e -> head e),
   substExpr = _substExpr,
   includeBinders = True
 }
+
+-- Custom subst
+getCustSubst :: Language -> [Function]
+getCustSubst (nsd, sd, _, _) =
+  let filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (capitalize sname) (getVarAccessTable sd))) sd
+  in concatMap (\(MkDefSort sname namespaceDecl constr rewrite) ->
+    let filteredNs = [INH x y | INH x y <- namespaceDecl]
+    in map (\inst ->
+      let secondSort = lookForSortName (getInstanceNameSpace inst) nsd
+      in Fn
+        (toLowerCaseFirst sname ++ secondSort ++ "Substitute")
+        (map (\c ->
+          (
+            [VarParam "orig", VarParam "sub"] ++ getCtorParams ef c
+          ,
+            getExpr sname secondSort c (map getSortNameAndInstances sd) (getVarAccessTable sd)
+          )
+        ) constr)
+    ) filteredNs
+  ) filtered
+  where
+    getExpr :: SortName -> SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> Expression
+    getExpr sname secondSort (MkVarConstructor consName _) table _ =
+      IfExpr (EQExpr (VarExpr "var") (VarExpr "orig"))
+        (VarExpr "sub")
+        (ConstrInst (capitalize consName) [VarExpr "var"])
+    getExpr sname secondSort cons table accessVarTable =
+      let binder = if isBind cons then [VarExpr "b"] else []
+      in ConstrInst (capitalize (getName cons)) (binder ++ map process idRules ++ [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip (getCtorHTypes cons) [1 :: Int ..]])
+      where
+        rules = getCtorRules cons
+        idRules = groupRulesByIden rules (folds ++ lists ++ sorts)
+        folds = dropFold (getCtorFolds cons)
+        lists = getCtorLists cons
+        sorts = getCtorSorts cons
+
+        isBind MkBindConstructor{} = True
+        isBind _                   = False
+
+        process (iden, idenRules)
+          | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst folds) =
+            FnCall "fmap" [FnCall (toLowerCaseFirst sname ++ secondSort ++ "Substitute") (addedBinders), VarExpr (toLowerCaseFirst iden)]
+          | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst lists) =
+            FnCall "map" [FnCall (toLowerCaseFirst sname ++ secondSort ++ "Substitute") (addedBinders), VarExpr (toLowerCaseFirst iden)]
+          | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst sorts) =
+            FnCall (toLowerCaseFirst sname ++ secondSort ++ "Substitute") (addedBinders ++ [VarExpr (toLowerCaseFirst iden)])
+          | otherwise = VarExpr (toLowerCaseFirst iden)
+          where
+            addedBinders =
+              applyRuleInheritedNamespaces
+                ef
+                sname
+                rules
+                (iden, idenRules)
+                folds
+                lists
+                sorts
+                table
+                (getSortInheritedInstances sortnameInUse table)
+            sortnameInUse = getSortForId iden (folds ++ lists ++ sorts)
+
+            applyRuleInheritedNamespaces :: ExternalFunctions -> SortName -> [NamespaceRule] -> (IdName, [NamespaceRule]) -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [NamespaceInstance] -> [Expression]
+            applyRuleInheritedNamespaces ef sname rules (iden, rulesOfId) folds lists listSorts table = recurse
+              where
+                newString =
+                  applyTheRuleOneInheritedNamespace
+                    ef
+                    sname
+                    rules
+                    (iden, rulesOfId)
+                    folds
+                    lists
+                    listSorts
+                    table
+                recurse :: [NamespaceInstance] -> [Expression]
+                recurse [] = [VarExpr "orig", VarExpr "sub"]
+                recurse (x:xs) = case newString x (recurse xs) of
+                  Just ex -> ex
+                  Nothing -> recurse xs
+
+                applyTheRuleOneInheritedNamespace :: ExternalFunctions -> SortName -> [NamespaceRule] -> (IdName, [NamespaceRule]) -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> NamespaceInstance -> [Expression] -> Maybe [Expression]
+                applyTheRuleOneInheritedNamespace ef sname rules (_, rulesOfId) folds lists listSorts table currentinst params
+                  | isJust foundrule = applyOneRuleLogic ef sname currentinst newrules (fromJust foundrule) folds lists listSorts newtable params
+                  | otherwise = Nothing
+                  where
+                    foundrule = find (\x -> getLeftSubInstanceName (fst x) == getName currentinst) rulesOfId
+                    newtable = filterTableBySameNamespace currentinst table
+                    newrules = filter (\(l, r) ->
+                        let sortnameId = getLeftSubIden l
+                            snameLookup = fromJust (lookup (capitalize sname) table)
+                            sortnameIdlookup = fromJust (lookup (getSortForId sortnameId (folds ++ lists ++ listSorts)) table)
+                        in (sortnameId == "" && any (\x -> getLeftSubInstanceName l == getName x) snameLookup)
+                        || any (\x -> getLeftSubInstanceName l == getName x) sortnameIdlookup
+                      ) rules
+
+                applyOneRuleLogic :: ExternalFunctions -> SortName -> NamespaceInstance -> [NamespaceRule] -> NamespaceRule -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [Expression] -> Maybe [Expression]
+                applyOneRuleLogic _ _ _ _ (_, RightLHS _) _ _ _ _ _ = Nothing
+                applyOneRuleLogic ef sname inst rules (l, RightAdd expr _) folds lists listSorts table params =
+                  return (fromMaybe [] (applyOneRuleLogic ef sname inst rules (l, expr) folds lists listSorts table []) ++ params)
+                applyOneRuleLogic ef sname inst rules (_, RightSub iden context) folds lists listSorts table params
+                  | (elem iden (map fst lists) || elem iden (map fst folds)) && isJust newrule =
+                    return [FnCall ("generateHnat" ++ getInstanceNameSpace inst) (FnCall "length" (VarExpr iden : nextStep) : params)]
+                  | elem iden (map fst lists) || elem iden (map fst folds) =
+                    return [FnCall ("generateHnat" ++ getInstanceNameSpace inst) (FnCall "length" [VarExpr iden] : params)]
+                  | isJust newrule =
+                    return [FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) ((VarExpr iden : nextStep) ++ params)]
+                  | otherwise =
+                    return [FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) (VarExpr iden : params)]
+                  where
+                    newrule = find (\(l, _) -> getLeftSubIden l == iden) rules
+                    nextStep = fromMaybe [] (applyOneRuleLogic ef sname inst rules (fromJust newrule) folds lists listSorts table [])

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Variable.Common (getEnvType, getEnvFunctions, getFreeVar, getMappings, getSubst, getSortForId, firstToVarParams, dropFold, applyRuleInheritedNamespaces, ExternalFunctions(..)) where
+module Variable.Common (getEnvType, getEnvFunctions, getFreeVar, getMappings, getSubst, getSortForId, firstToVarParams, dropFold, ExternalFunctions(..), getSortInheritedInstances) where
 
 import Data.List
 import Data.Maybe
