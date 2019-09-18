@@ -263,7 +263,7 @@ pConstructorNameSpaceName =
     return (a, b)
 
 -- | Parse namespace rules for a constructor
-pRule :: Parser NamespaceRule
+pRule :: Parser AttributeDef
 pRule = do
   a <- pLeftExpr
   pReservedOp "="

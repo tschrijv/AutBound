@@ -187,7 +187,7 @@ wellFormedConstructor cons cinst = do
     getAllIds _ = []
 
     --get identifiers of the rule, left expression+the rightexpr
-    getRuleIdentifiers :: NamespaceRule -> [IdenName]
+    getRuleIdentifiers :: AttributeDef -> [IdenName]
     getRuleIdentifiers (l, r) =
       getLeftExprId l ++ getRightExprIdBinding r ++ getRightExprId r
 
@@ -412,7 +412,7 @@ helpWellFormedRulesInstancesRuleLHSLeft ::
      SortName
   -> [(IdenName, SortName)]
   -> [(SortName, [Context])]
-  -> NamespaceRule
+  -> AttributeDef
   -> Either String Bool
 helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LeftLHS contextName, RightLHS contextName2)
   | length (findContextToNamespaceInstanceSyn contextName sname tableInstances) >
@@ -509,7 +509,7 @@ isWellFormedBindToContextConstructorRule ::
  -> NamespaceName
  -> [(IdenName, SortName)]
  -> [(SortName, [Context])]
- -> NamespaceRule
+ -> AttributeDef
  -> Either String Bool
 isWellFormedBindToContextConstructorRule sname namespacebind tableIdentifiers tableInstances (_, RightAdd expr id)
  | getRightExprId expr == [] &&
@@ -567,7 +567,7 @@ helpWellFormedRulesInstancesRule ::
  -> [(IdenName, SortName)]
  -> [(IdenName, SortName, FoldName)]
  -> [(SortName, [Context])]
- -> NamespaceRule
+ -> AttributeDef
  -> Either String Bool
 helpWellFormedRulesInstancesRule sname lists tableIdentifiers folds tableInstances (leftexpr, rightexpr)
  | getRightExprId rightexpr /= [] &&

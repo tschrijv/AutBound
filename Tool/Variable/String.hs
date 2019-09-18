@@ -129,7 +129,7 @@ getCustSubst (nsd, sd, _, _) =
                 (getSortInheritedInstances sortnameInUse table)
             sortnameInUse = getSortForId iden (folds ++ lists ++ sorts)
 
-            applyRuleInheritedNamespaces :: ExternalFunctions -> SortName -> [NamespaceRule] -> (IdenName, [NamespaceRule]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Context] -> [Expression]
+            applyRuleInheritedNamespaces :: ExternalFunctions -> SortName -> [AttributeDef] -> (IdenName, [AttributeDef]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Context] -> [Expression]
             applyRuleInheritedNamespaces ef sname rules (iden, rulesOfId) folds lists listSorts table = recurse
               where
                 newString =
@@ -148,7 +148,7 @@ getCustSubst (nsd, sd, _, _) =
                   Just ex -> ex
                   Nothing -> recurse xs
 
-                applyTheRuleOneInheritedNamespace :: ExternalFunctions -> SortName -> [NamespaceRule] -> (IdenName, [NamespaceRule]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> Context -> [Expression] -> Maybe [Expression]
+                applyTheRuleOneInheritedNamespace :: ExternalFunctions -> SortName -> [AttributeDef] -> (IdenName, [AttributeDef]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> Context -> [Expression] -> Maybe [Expression]
                 applyTheRuleOneInheritedNamespace ef sname rules (_, rulesOfId) folds lists listSorts table currentCtx params
                   | isJust foundrule = applyOneRuleLogic ef sname currentCtx newrules (fromJust foundrule) folds lists listSorts newtable params
                   | otherwise = Nothing
@@ -163,7 +163,7 @@ getCustSubst (nsd, sd, _, _) =
                         || any (\ctx -> linst l == cinst ctx) sortnameIdlookup
                       ) rules
 
-                applyOneRuleLogic :: ExternalFunctions -> SortName -> Context -> [NamespaceRule] -> NamespaceRule -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Expression] -> Maybe [Expression]
+                applyOneRuleLogic :: ExternalFunctions -> SortName -> Context -> [AttributeDef] -> AttributeDef -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Expression] -> Maybe [Expression]
                 applyOneRuleLogic _ _ _ _ (_, RightLHS _) _ _ _ _ _ = Nothing
                 applyOneRuleLogic ef sname ctx rules (l, RightAdd expr _) folds lists listSorts table params =
                   return (fromMaybe [] (applyOneRuleLogic ef sname ctx rules (l, expr) folds lists listSorts table []) ++ params)

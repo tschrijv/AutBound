@@ -23,18 +23,18 @@ data LeftExpr
   deriving (Show, Eq)
 
 liden :: LeftExpr -> IdenName
-liden left@(LeftSub{}) = _liden left
+liden left@LeftSub{} = _liden left
 liden _                = ""
 
 --the right part of an expression like t1.ctx=lhs.ctx
 data RightExpr
-  = RightLHS InstanceName
-  | RightSub IdenName InstanceName
-  | RightAdd RightExpr IdenName
+  = RightLHS { rinst :: InstanceName }
+  | RightSub { riden :: IdenName, rinst :: InstanceName }
+  | RightAdd { rexp :: RightExpr, riden :: IdenName }
   deriving (Show, Eq)
 
 --the complete expression of like t1.ctx=lhs.ctx
-type NamespaceRule = (LeftExpr, RightExpr)
+type AttributeDef = (LeftExpr, RightExpr)
 
 --the definition of a namespace declaration
 data NamespaceDef
@@ -53,7 +53,7 @@ data ConstructorDef
       [(IdenName, SortName)] -- lists
       [(IdenName, SortName)] -- sorts
       [(IdenName, SortName, FoldName)] -- folds
-      [NamespaceRule] -- rules
+      [AttributeDef] -- rules
       [HaskellTypeName]
   | MkBindConstructor
       ConstructorName
@@ -61,7 +61,7 @@ data ConstructorDef
       [(IdenName, SortName)] -- sorts
       [(IdenName, SortName, FoldName)] -- folds
       (String, NamespaceName) -- namespace
-      [NamespaceRule]
+      [AttributeDef]
       [HaskellTypeName]
   | MkVarConstructor
       ConstructorName
@@ -108,7 +108,7 @@ getCtorFolds (MkDefConstructor _ _ _ folds _ _) = folds
 getCtorFolds (MkBindConstructor _ _ _ folds _ _ _) = folds
 getCtorFolds MkVarConstructor{} = error "invalid method for var constructor"
 
-getCtorRules :: ConstructorDef -> [NamespaceRule]
+getCtorRules :: ConstructorDef -> [AttributeDef]
 getCtorRules (MkDefConstructor _ _ _ _ rules _) = rules
 getCtorRules (MkBindConstructor _ _ _ _ _ rules _) = rules
 getCtorRules MkVarConstructor{} = error "invalid method for var constructor"
@@ -131,7 +131,7 @@ getSortNameAndInstances :: SortDef -> (SortName, [Context])
 getSortNameAndInstances s = (getName s, getSortInstances s)
 
 --collects all the rules of the identifiers used in the constructor and groups them in a list with each identifier getting a list of rules
-groupRulesByIden :: [NamespaceRule] -> [(IdenName, SortName)] -> [(IdenName, [NamespaceRule])]
+groupRulesByIden :: [AttributeDef] -> [(IdenName, SortName)] -> [(IdenName, [AttributeDef])]
 groupRulesByIden rules sorts = [
     (iden, filter (\(l, r) -> liden l == iden) rules)
   | (iden, _) <- sorts]
