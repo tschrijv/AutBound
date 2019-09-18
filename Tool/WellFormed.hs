@@ -32,14 +32,10 @@ helpWellFormed (namespacedef:lanrest, sorts, imp) sortnames consnames sortconsna
     sortnames
     consnames
     sortconsnames
-    ((getName namespacedef) : namespacenames)
-    ((getSort namespacedef) : sortnamespaces)
+    ((nname namespacedef) : namespacenames)
+    ((nsort namespacedef) : sortnamespaces)
     instTable
     sortdefs
-    where
-      --get the sort of the namespace
-      getSort :: NamespaceDef -> SortName
-      getSort (MkNameSpace _ name _) = name
 helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
   a <- isEmptySort s
   b <-

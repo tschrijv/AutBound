@@ -21,7 +21,7 @@ getFunctions
   }
 
 getVariableType :: Language -> (Type, [Constructor])
-getVariableType (nsd, _, _, _) = ("Variable", Constr "Z" [] : map (\ns -> Constr ('S' : getName ns) ["Variable"]) nsd)
+getVariableType (nsd, _, _, _) = ("Variable", Constr "Z" [] : map (\ns -> Constr ('S' : nname ns) ["Variable"]) nsd)
 
 getTypes :: Language -> [(Type, [Constructor])]
 getTypes (_, sd, _, _) = map (
@@ -80,7 +80,7 @@ getHNatModifiers (_, hnatc) =
 getGenerators :: [NamespaceDef] -> [Function]
 getGenerators = map (
     \ns ->
-      let name = getName ns
+      let name = nname ns
           fnName = "generateHnat" ++ name
           constr = 'S' : name
       in

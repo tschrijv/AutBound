@@ -21,7 +21,7 @@ getFunctions
   }
 
 getVariableType :: Language -> (Type, [Constructor])
-getVariableType (nsd, _, _, _) = ("Variable", map (\ns -> Constr ('S' : getName ns) ["String"]) nsd)
+getVariableType (nsd, _, _, _) = ("Variable", map (\ns -> Constr ('S' : nname ns) ["String"]) nsd)
 
 getTypes :: Language -> [(Type, [Constructor])]
 getTypes (_, sd, _, _) = map (

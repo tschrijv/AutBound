@@ -38,7 +38,7 @@ type AttributeDef = (LeftExpr, RightExpr)
 
 --the definition of a namespace declaration
 data NamespaceDef
-  = MkNameSpace NamespaceName SortName [String]
+  = MkNameSpace { nname :: NamespaceName,  nsort :: SortName, nenv :: [String] } -- TODO: what are the envs for?
   deriving (Show, Eq)
 
 --definition of a sort
@@ -75,9 +75,6 @@ class Named a where
 
 instance Named SortDef where
   getName (MkDefSort sname _ _ _) = sname
-
-instance Named NamespaceDef where
-  getName (MkNameSpace name _ _) = name
 
 -- get the name of definition of a constructor
 instance Named ConstructorDef where
