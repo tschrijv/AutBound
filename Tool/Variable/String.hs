@@ -36,7 +36,7 @@ getVariableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])]
 getVariableInstances _ = []
 
 getVariableFunctions :: Language -> (Type, [Constructor]) -> [Function]
-getVariableFunctions lan _ = getMappings lan ef ++ getFreeVar lan ef
+getVariableFunctions lan _ = getMappings lan ef ++ getSubst lan ef ++ getFreeVar lan ef
 
 _getCtorParams :: ConstructorDef -> [Parameter]
 _getCtorParams (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "var"]]
@@ -51,11 +51,17 @@ _getCtorParams cons = [ConstrParam (capitalize consName) ((map (\_ -> VarParam "
 _varCtorFreeVar :: String -> Expression
 _varCtorFreeVar name = IfExpr (FnCall "elem" [VarExpr "var", VarExpr "c"]) (ListExpr []) (ListExpr [VarExpr "var"])
 
-_oneDeeper namespace expr = FnCall "concat" [ListExpr (ListExpr [VarExpr "b"] : expr)]
+_oneDeeper namespace expr = head expr -- FnCall "concat" [ListExpr (ListExpr [VarExpr "b"] : expr)]
+
+_substExpr sname consName =
+  IfExpr (EQExpr (VarExpr "var") (VarExpr "c"))
+    (VarExpr "sub")
+    (ConstrInst (capitalize consName) [VarExpr "var"])
 
 ef = EF {
   getCtorParams = _getCtorParams,
   varCtorFreeVar = _varCtorFreeVar,
   oneDeeper = _oneDeeper,
+  substExpr = _substExpr,
   includeBinders = True
 }

@@ -13,6 +13,7 @@ data ExternalFunctions = EF {
   getCtorParams :: ConstructorDef -> [Parameter],
   varCtorFreeVar :: String -> Expression,
   oneDeeper :: String -> [Expression] -> Expression,
+  substExpr :: String -> String -> Expression,
   includeBinders :: Bool
 }
 
@@ -228,12 +229,12 @@ getMappings (_, sd, _, _) ef =
 -- * Substitution functions
 -- ----------------------------------------------------------------------------
 
-getSubst :: Language -> [Function]
-getSubst (nsd, sd, _, _) = let accessVarTable = getVarAccessTable sd
-  in getSubstHelpers sd accessVarTable ++ getSubstFunctions sd nsd accessVarTable
+getSubst :: Language -> ExternalFunctions -> [Function]
+getSubst (nsd, sd, _, _) ef = let accessVarTable = getVarAccessTable sd
+  in getSubstHelpers ef sd accessVarTable ++ getSubstFunctions sd nsd accessVarTable
 
-getSubstHelpers :: [SortDef] -> [(SortName, Bool)] -> [Function]
-getSubstHelpers sd varAccessTable =
+getSubstHelpers :: ExternalFunctions -> [SortDef] -> [(SortName, Bool)] -> [Function]
+getSubstHelpers ef sd varAccessTable =
   let filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (capitalize sname) varAccessTable)) sd
   in concatMap (\(MkDefSort sname _ cdefs _) ->
     [
@@ -241,10 +242,7 @@ getSubstHelpers sd varAccessTable =
       [
         (
           [VarParam "sub", VarParam "c", ConstrParam (capitalize consName) [VarParam "var"]],
-          IfExpr
-            (EQExpr (VarExpr "var") (VarExpr "c"))
-            (FnCall (toLowerCaseFirst sname ++ "shiftplus") [VarExpr "c", VarExpr "sub"])
-            (ConstrInst (capitalize consName) [VarExpr "var"])
+          substExpr ef sname consName
         )
       ]
     | MkVarConstructor consName _ <- cdefs]
