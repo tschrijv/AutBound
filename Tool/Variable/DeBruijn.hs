@@ -133,7 +133,6 @@ getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> i
 _getCtorParams :: ConstructorDef -> [Parameter]
 _getCtorParams (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "var"]]
 _getCtorParams cons = [ConstrParam (capitalize consName) (firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
--- getCtorParams cons = [ConstrParam (capitalize consName) ((map (\_ -> VarParam "b") (emptyOrToList (getCtorBindVarName cons))) ++ firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
   where
     consName = getName cons
     folds = getCtorFolds cons
@@ -149,5 +148,6 @@ _oneDeeper namespace expr = ConstrInst ("S" ++ namespace) expr
 ef = EF {
   getCtorParams = _getCtorParams,
   varCtorFreeVar = _varCtorFreeVar,
-  oneDeeper = _oneDeeper
+  oneDeeper = _oneDeeper,
+  includeBinders = False
 }

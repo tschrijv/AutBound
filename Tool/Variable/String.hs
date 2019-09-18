@@ -49,12 +49,13 @@ _getCtorParams cons = [ConstrParam (capitalize consName) ((map (\_ -> VarParam "
     hTypes = getCtorHTypes cons
 
 _varCtorFreeVar :: String -> Expression
-_varCtorFreeVar name = IfExpr (FnCall "elem" [VarExpr "var", VarExpr "c"]) (ListExpr []) (ListExpr [ConstrInst name [VarExpr "var"]])
+_varCtorFreeVar name = IfExpr (FnCall "elem" [VarExpr "var", VarExpr "c"]) (ListExpr []) (ListExpr [VarExpr "var"])
 
-_oneDeeper namespace expr = FnCall "insert" (VarExpr "b" : expr)
+_oneDeeper namespace expr = FnCall "concat" [ListExpr (ListExpr [VarExpr "b"] : expr)]
 
 ef = EF {
   getCtorParams = _getCtorParams,
   varCtorFreeVar = _varCtorFreeVar,
-  oneDeeper = _oneDeeper
+  oneDeeper = _oneDeeper,
+  includeBinders = True
 }

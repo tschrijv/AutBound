@@ -12,7 +12,8 @@ import Utility
 data ExternalFunctions = EF {
   getCtorParams :: ConstructorDef -> [Parameter],
   varCtorFreeVar :: String -> Expression,
-  oneDeeper :: String -> [Expression] -> Expression
+  oneDeeper :: String -> [Expression] -> Expression,
+  includeBinders :: Bool
 }
 
 -- * Types
@@ -187,13 +188,17 @@ getMappings (_, sd, _, _) ef =
         ConstrInst (capitalize consName) [VarExpr "var"]
       ]
     getExpr sname cons table accessVarTable =
-      ConstrInst (capitalize (getName cons)) (map process idRules ++ [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip (getCtorHTypes cons) [1 :: Int ..]])
+      let binder = if includeBinders ef && isBind cons then [VarExpr "b"] else []
+      in ConstrInst (capitalize (getName cons)) (binder ++ map process idRules ++ [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip (getCtorHTypes cons) [1 :: Int ..]])
       where
         rules = getCtorRules cons
         idRules = groupRulesByIden rules (folds ++ lists ++ sorts)
         folds = dropFold (getCtorFolds cons)
         lists = getCtorLists cons
         sorts = getCtorSorts cons
+
+        isBind MkBindConstructor{} = True
+        isBind _                   = False
 
         process (iden, idenRules)
           | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst folds) =
