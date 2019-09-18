@@ -67,5 +67,5 @@ getVarAccessTable sList = map (sortCanAccessVariables sList []) sList
 
 filterContextsForSameNamespace :: Context -> [(SortName, [Context])] -> [(SortName, [Context])]
 filterContextsForSameNamespace ctx table = [
-  (sortName, [ctx' | ctx' <- ctxs, namespace ctx' == namespace ctx])
+  (sortName, [ctx' | ctx' <- ctxs, cnamespace ctx' == cnamespace ctx])
   | (sortName, ctxs) <- table]

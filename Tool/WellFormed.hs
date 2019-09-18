@@ -49,10 +49,10 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
   c <-
     wellFormedConstructors
       (getSortCtors s)
-      (map inst (getSortInstances s))
+      (map cinst (getSortInstances s))
   d <- helpWellFormedInstances (getInstanceSortsNameSpaceNames s) namespacenames
   e <- helpWellFormedVariables (getSortCtors s) (getSortInstances s)
-  f <- helpWellFormedInstanceNames (map inst (getSortInstances s))
+  f <- helpWellFormedInstanceNames (map cinst (getSortInstances s))
   helpWellFormed
     ([], lanrest, imp)
     ((getName s) : sortnames)
@@ -81,7 +81,7 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
       --get the instances used by sorts
       getInstanceSortsNameSpaceNames :: SortDef -> [NamespaceName]
       getInstanceSortsNameSpaceNames (MkDefSort _ ctxs _ _) =
-        map namespace ctxs
+        map cnamespace ctxs
 
       --get the constructornames of a sortDef
       getConstructorNames :: SortDef -> [ConstructorName]
@@ -119,12 +119,12 @@ helpWellFormed ([], [], imp) sortnames consnames sortconsnames namespacenames so
 wellFormedConstructors ::
      [ConstructorDef] -> [InstanceName] -> Either String Bool
 wellFormedConstructors [] _ = return True
-wellFormedConstructors (c:crest) inst = do
-  a <- wellFormedConstructor c inst
-  wellFormedConstructors crest inst
+wellFormedConstructors (c:crest) cinst = do
+  a <- wellFormedConstructor c cinst
+  wellFormedConstructors crest cinst
 
 wellFormedConstructor :: ConstructorDef -> [InstanceName] -> Either String Bool
-wellFormedConstructor cons inst = do
+wellFormedConstructor cons cinst = do
   a <- helpWellFormedIdentifiers (getIdentifiersConstructor cons)
   b <-
     helpWellFormedRulesIdentifiers
@@ -276,8 +276,8 @@ helpWellFormedVarInst ::
 helpWellFormedVarInst sname name [] namespaces =
   Left ("No instance found with that name in " ++ name)
 helpWellFormedVarInst sname name (ctx:rest) namespaces =
-  if inst ctx == name
-    then helpVarnamespace sname (namespace ctx) namespaces
+  if cinst ctx == name
+    then helpVarnamespace sname (cnamespace ctx) namespaces
     else helpWellFormedVarInst sname name rest namespaces
 
 helpVarnamespace :: SortName -> String -> [NamespaceDef] -> Either String Bool
@@ -485,7 +485,7 @@ findContextToNamespaceInstanceSyn ::
   -> [Context]
 findContextToNamespaceInstanceSyn instName sname table =
   filter
-    (\ctx -> inst ctx == instName)
+    (\ctx -> cinst ctx == instName)
     [ SYN ctxNamesyn namespacename
     | SYN ctxNamesyn namespacename <- fromJust (lookup sname table)
     ]
@@ -498,7 +498,7 @@ findContextToNamespaceInstanceInh ::
   -> [Context]
 findContextToNamespaceInstanceInh instName sname table =
   filter
-    (\ctx -> inst ctx == instName)
+    (\ctx -> cinst ctx == instName)
     [ INH ctxNameinh namespacename
     | INH ctxNameinh namespacename <- fromJust (lookup sname table)
     ]
@@ -515,14 +515,14 @@ isWellFormedBindToContextConstructorRule sname namespacebind tableIdentifiers ta
  | getRightExprId expr == [] &&
      any
        (\ctx ->
-          getInstanceNamesOfRuleRight expr == inst ctx &&
-          namespace ctx == namespacebind)
+          getInstanceNamesOfRuleRight expr == cinst ctx &&
+          cnamespace ctx == namespacebind)
        (fromJust (lookup sname tableInstances)) = return True
  | getRightExprId expr /= [] &&
      any
        (\ctx ->
-          getInstanceNamesOfRuleRight expr == inst ctx &&
-          namespace ctx == namespacebind)
+          getInstanceNamesOfRuleRight expr == cinst ctx &&
+          cnamespace ctx == namespacebind)
        (fromJust
           (lookup
              (fromJust (lookup (head (getRightExprId expr)) tableIdentifiers))
@@ -582,35 +582,35 @@ helpWellFormedRulesInstancesRule sname lists tableIdentifiers folds tableInstanc
      length rightInstanceLHS > 0 &&
      getLeftExprId leftexpr == [] &&
      length leftInstanceLHS > 0 &&
-     namespace (head rightInstanceLHS) ==
-      namespace (head leftInstanceLHS) = return True
+     cnamespace (head rightInstanceLHS) ==
+      cnamespace (head leftInstanceLHS) = return True
  | getRightExprId rightexpr /= [] &&
      length rightInstanceNoLHS > 0 &&
      getLeftExprId leftexpr == [] &&
      length leftInstanceLHS > 0 &&
-     namespace (head rightInstanceNoLHS) ==
-      namespace (head leftInstanceLHS) = return True
+     cnamespace (head rightInstanceNoLHS) ==
+      cnamespace (head leftInstanceLHS) = return True
  | getRightExprId rightexpr /= [] &&
      length rightInstanceNoLHS > 0 &&
      getLeftExprId leftexpr /= [] &&
      length leftInstanceNoLHS > 0 &&
-     namespace (head rightInstanceNoLHS) ==
-      namespace (head leftInstanceNoLHS) = return True
+     cnamespace (head rightInstanceNoLHS) ==
+      cnamespace (head leftInstanceNoLHS) = return True
  | getRightExprId rightexpr == [] &&
      length rightInstanceLHS > 0 &&
      getLeftExprId leftexpr /= [] &&
      length leftInstanceNoLHS > 0 &&
-     namespace (head rightInstanceLHS) ==
-      namespace (head leftInstanceNoLHS) = return True
+     cnamespace (head rightInstanceLHS) ==
+      cnamespace (head leftInstanceNoLHS) = return True
  | otherwise = Left ("incorrect context for this sort " ++ sname)
  where
    rightInstanceLHS =
      (filter
-        (\ctx -> getInstanceNamesOfRuleRight rightexpr == inst ctx)
+        (\ctx -> getInstanceNamesOfRuleRight rightexpr == cinst ctx)
         (fromJust (lookup sname tableInstances)))
    rightInstanceNoLHS =
      (filter
-        (\ctx -> getInstanceNamesOfRuleRight rightexpr == inst ctx)
+        (\ctx -> getInstanceNamesOfRuleRight rightexpr == cinst ctx)
         (fromJust
            (lookup
               (fromJust
@@ -618,11 +618,11 @@ helpWellFormedRulesInstancesRule sname lists tableIdentifiers folds tableInstanc
               tableInstances)))
    leftInstanceLHS =
      (filter
-        (\ctx -> getLeftSubInstanceName leftexpr == inst ctx)
+        (\ctx -> getLeftSubInstanceName leftexpr == cinst ctx)
         (fromJust (lookup sname tableInstances)))
    leftInstanceNoLHS =
      (filter
-        (\ctx -> getLeftSubInstanceName leftexpr == inst ctx)
+        (\ctx -> getLeftSubInstanceName leftexpr == cinst ctx)
         (fromJust
            (lookup
               (fromJust

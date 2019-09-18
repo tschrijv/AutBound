@@ -12,14 +12,14 @@ type InstanceName     = String
 
 --the inherited or synthesised contexts
 data Context
-  = INH { inst :: InstanceName, namespace :: NamespaceName }
-  | SYN { inst :: InstanceName, namespace :: NamespaceName }
+  = INH { cinst :: InstanceName, cnamespace :: NamespaceName }
+  | SYN { cinst :: InstanceName, cnamespace :: NamespaceName }
   deriving (Show, Eq)
 
 --the left part of an expression like t1.ctx=lhs.ctx
 data LeftExpr
-  = LeftLHS InstanceName
-  | LeftSub IdenName InstanceName
+  = LeftLHS { linst :: InstanceName }
+  | LeftSub { liden :: IdenName, linst :: InstanceName }
   deriving (Show, Eq)
 
 --the right part of an expression like t1.ctx=lhs.ctx
