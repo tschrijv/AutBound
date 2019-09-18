@@ -81,7 +81,7 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
 
       --get the constructornames of a sortDef
       getConstructorNames :: SortDef -> [ConstructorName]
-      getConstructorNames (MkDefSort _ _ cnames _) = map (getName) cnames
+      getConstructorNames (MkDefSort _ _ cnames _) = map cname cnames
 
       --get the sorts used in all constructors of the sort
       getSortsUsedByConstructors :: SortDef -> [SortName]

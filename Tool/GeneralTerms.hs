@@ -38,12 +38,21 @@ type AttributeDef = (LeftExpr, RightExpr)
 
 --the definition of a namespace declaration
 data NamespaceDef
-  = MkNameSpace { nname :: NamespaceName,  nsort :: SortName, nenv :: [String] } -- TODO: what are the envs for?
+  = MkNameSpace {
+    nname :: NamespaceName,
+    nsort :: SortName,
+    nenv :: [String]  -- TODO: what are the envs for?
+  }
   deriving (Show, Eq)
 
 --definition of a sort
 data SortDef
-  = MkDefSort { sname :: SortName, sctxs :: [Context], sctors :: [ConstructorDef], srewrite :: Bool }
+  = MkDefSort {
+    sname :: SortName,
+    sctxs :: [Context],
+    sctors :: [ConstructorDef],
+    srewrite :: Bool
+  }
   deriving (Show, Eq)
 
 --definition of a constructor
@@ -61,7 +70,7 @@ data ConstructorDef
     clists :: [(IdenName, SortName)],
     csorts :: [(IdenName, SortName)],
     cfolds :: [(IdenName, SortName, FoldName)],
-    cbinder :: (IdenName, NamespaceName),
+    _cbinder :: (IdenName, NamespaceName),
     cattrs :: [AttributeDef],
     cnatives :: [HaskellTypeName]
   }
@@ -71,56 +80,19 @@ data ConstructorDef
   }
   deriving (Show, Eq)
 
-type Language         = ([NamespaceDef], [SortDef], [(String, [String])], [String])
+cbinder :: ConstructorDef -> Maybe (IdenName, NamespaceName)
+cbinder ctor@MkBindConstructor{} = Just (_cbinder ctor)
+cbinder _                        = Nothing
 
-class Named a where
-  getName :: a -> String
-
--- get the name of definition of a constructor
-instance Named ConstructorDef where
-  getName (MkDefConstructor cname _ _ _ _ _)    = cname
-  getName (MkVarConstructor cname _)            = cname
-  getName (MkBindConstructor cname _ _ _ _ _ _) = cname
-
-getCtorLists :: ConstructorDef -> [(IdenName, SortName)]
-getCtorLists (MkDefConstructor _ lists _ _ _ _) = lists
-getCtorLists (MkBindConstructor _ lists _ _ _ _ _) = lists
-getCtorLists MkVarConstructor{} = error "invalid method for var constructor"
-
-getCtorSorts :: ConstructorDef -> [(IdenName, SortName)]
-getCtorSorts (MkDefConstructor _ _ listSorts _ _ _) = listSorts
-getCtorSorts (MkBindConstructor _ _ listSorts _ _ _ _) = listSorts
-getCtorSorts MkVarConstructor{} = error "invalid method for var constructor"
-
-getCtorBindVarName :: ConstructorDef -> Maybe String
-getCtorBindVarName (MkBindConstructor _ _ _ _ (s, _) _ _) = Just s
-getCtorBindVarName _ = Nothing
-
-getCtorBindVarNamespace :: ConstructorDef -> Maybe String
-getCtorBindVarNamespace (MkBindConstructor _ _ _ _ (s, _) _ _) = Just s
-getCtorBindVarNamespace _ = Nothing
-
-getCtorFolds :: ConstructorDef -> [(IdenName, SortName, FoldName)]
-getCtorFolds (MkDefConstructor _ _ _ folds _ _) = folds
-getCtorFolds (MkBindConstructor _ _ _ folds _ _ _) = folds
-getCtorFolds MkVarConstructor{} = error "invalid method for var constructor"
-
-getCtorRules :: ConstructorDef -> [AttributeDef]
-getCtorRules (MkDefConstructor _ _ _ _ rules _) = rules
-getCtorRules (MkBindConstructor _ _ _ _ _ rules _) = rules
-getCtorRules MkVarConstructor{} = error "invalid method for var constructor"
-
-getCtorHTypes :: ConstructorDef -> [HaskellTypeName]
-getCtorHTypes (MkDefConstructor _ _ _ _ _ hTypes) = hTypes
-getCtorHTypes (MkBindConstructor _ _ _ _ _ _ hTypes) = hTypes
-getCtorHTypes MkVarConstructor{} = error "invalid method for var constructor"
+type Language = ([NamespaceDef], [SortDef], [(String, [String])], [String])
 
 -- TODO
 getSortNameAndInstances :: SortDef -> (SortName, [Context])
 getSortNameAndInstances s = (sname s, sctxs s)
 
---collects all the rules of the identifiers used in the constructor and groups them in a list with each identifier getting a list of rules
-groupRulesByIden :: [AttributeDef] -> [(IdenName, SortName)] -> [(IdenName, [AttributeDef])]
-groupRulesByIden rules sorts = [
-    (iden, filter (\(l, r) -> liden l == iden) rules)
+-- | Produce a list of pairs with the first element being an identifier, the
+-- second the list of attribute definitions that assign to this identifier
+attrByIden :: [AttributeDef] -> [(IdenName, SortName)] -> [(IdenName, [AttributeDef])]
+attrByIden attrs sorts = [
+  (iden, filter (\(l, _) -> liden l == iden) attrs)
   | (iden, _) <- sorts]

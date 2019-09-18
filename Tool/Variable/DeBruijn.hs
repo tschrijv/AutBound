@@ -134,11 +134,11 @@ _getCtorParams :: ConstructorDef -> [Parameter]
 _getCtorParams (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "var"]]
 _getCtorParams cons = [ConstrParam (capitalize consName) (firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
   where
-    consName = getName cons
-    folds = getCtorFolds cons
-    lists = getCtorLists cons
-    sorts = getCtorSorts cons
-    hTypes = getCtorHTypes cons
+    consName = cname cons
+    folds = cfolds cons
+    lists = clists cons
+    sorts = csorts cons
+    hTypes = cnatives cons
 
 _varCtorFreeVar :: String -> Expression
 _varCtorFreeVar name = IfExpr (GTEExpr (VarExpr "var") (VarExpr "c")) (ListExpr [FnCall "minus" [VarExpr "var", VarExpr "c"]]) (ListExpr [])

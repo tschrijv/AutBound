@@ -42,10 +42,10 @@ generateSortSynSystemOneConstructor sname namespaces table cons ctx =
   Fn ("addToEnvironment" ++ sname ++ xinst ctx) [([ConstrParam (capitalize consName) (firstToVarParams listSorts ++ [VarParam "_" | _ <- hTypes]), VarParam "c"], getEnvFunctionGenerate sname ctx namespaces newtable listSorts rules)]
   where
     newtable = filterContextsForSameNamespace ctx table
-    consName = getName cons
-    listSorts = getCtorSorts cons
-    hTypes = getCtorHTypes cons
-    rules = getCtorRules cons
+    consName = cname cons
+    listSorts = csorts cons
+    hTypes = cnatives cons
+    rules = cattrs cons
 
 getEnvFunctionGenerate :: SortName -> Context -> [NamespaceDef] -> [(SortName, [Context])] -> [(IdenName, SortName)]  -> [AttributeDef] -> Expression
 getEnvFunctionGenerate sname ctx namespaces table listSorts rules
@@ -105,12 +105,12 @@ getFreeVar (_, sd, _, _) ef =
       (VarParam "c" : getCtorParams ef c,
       case c of
         (MkVarConstructor consName _) -> varCtorFreeVar ef consName
-        _ -> let consName = getName c
-                 folds = getCtorFolds c
-                 lists = getCtorLists c
-                 sorts = getCtorSorts c
-                 rules = getCtorRules c
-                 hTypes = getCtorHTypes c
+        _ -> let consName = cname c
+                 folds = cfolds c
+                 lists = clists c
+                 sorts = csorts c
+                 rules = cattrs c
+                 hTypes = cnatives c
           in FnCall "nub" [
             FnCall "concat"
               [ListExpr (
@@ -118,7 +118,7 @@ getFreeVar (_, sd, _, _) ef =
                   ef
                   sname
                   rules
-                  (groupRulesByIden rules (dropFold folds ++ lists ++ sorts))
+                  (attrByIden rules (dropFold folds ++ lists ++ sorts))
                   (dropFold folds)
                   lists
                   sorts
@@ -190,13 +190,13 @@ getMappings (_, sd, _, _) ef =
       ]
     getExpr sname cons table accessVarTable =
       let binder = if includeBinders ef && isBind cons then [VarExpr "b"] else []
-      in ConstrInst (capitalize (getName cons)) (binder ++ map process idRules ++ [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip (getCtorHTypes cons) [1 :: Int ..]])
+      in ConstrInst (capitalize (cname cons)) (binder ++ map process idRules ++ [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip (cnatives cons) [1 :: Int ..]])
       where
-        rules = getCtorRules cons
-        idRules = groupRulesByIden rules (folds ++ lists ++ sorts)
-        folds = dropFold (getCtorFolds cons)
-        lists = getCtorLists cons
-        sorts = getCtorSorts cons
+        rules = cattrs cons
+        idRules = attrByIden rules (folds ++ lists ++ sorts)
+        folds = dropFold (cfolds cons)
+        lists = clists cons
+        sorts = csorts cons
 
         isBind MkBindConstructor{} = True
         isBind _                   = False

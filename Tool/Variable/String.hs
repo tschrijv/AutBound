@@ -43,13 +43,13 @@ getVariableFunctions lan _ = getMappings lan ef ++ getCustSubst lan ++ getFreeVa
 
 _getCtorParams :: ConstructorDef -> [Parameter]
 _getCtorParams (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "var"]]
-_getCtorParams cons = [ConstrParam (capitalize consName) ((map (\_ -> VarParam "b") (emptyOrToList (getCtorBindVarName cons))) ++ firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
+_getCtorParams cons = [ConstrParam (capitalize consName) ((map (\_ -> VarParam "b") (emptyOrToList (cbinder cons))) ++ firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
   where
-    consName = getName cons
-    folds = getCtorFolds cons
-    lists = getCtorLists cons
-    sorts = getCtorSorts cons
-    hTypes = getCtorHTypes cons
+    consName = cname cons
+    folds = cfolds cons
+    lists = clists cons
+    sorts = csorts cons
+    hTypes = cnatives cons
 
 _varCtorFreeVar :: String -> Expression
 _varCtorFreeVar name = IfExpr (FnCall "elem" [VarExpr "var", VarExpr "c"]) (ListExpr []) (ListExpr [VarExpr "var"])
@@ -96,13 +96,13 @@ getCustSubst (nsd, sd, _, _) =
         (ConstrInst (capitalize consName) [VarExpr "var"])
     getExpr sname secondSort cons table accessVarTable =
       let binder = if isBind cons then [VarExpr "b"] else []
-      in ConstrInst (capitalize (getName cons)) (binder ++ map process idRules ++ [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip (getCtorHTypes cons) [1 :: Int ..]])
+      in ConstrInst (capitalize (cname cons)) (binder ++ map process idRules ++ [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip (cnatives cons) [1 :: Int ..]])
       where
-        rules = getCtorRules cons
-        idRules = groupRulesByIden rules (folds ++ lists ++ sorts)
-        folds = dropFold (getCtorFolds cons)
-        lists = getCtorLists cons
-        sorts = getCtorSorts cons
+        rules = cattrs cons
+        idRules = attrByIden rules (folds ++ lists ++ sorts)
+        folds = dropFold (cfolds cons)
+        lists = clists cons
+        sorts = csorts cons
 
         isBind MkBindConstructor{} = True
         isBind _                   = False
