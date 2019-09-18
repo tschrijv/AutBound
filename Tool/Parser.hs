@@ -145,11 +145,11 @@ pSortDeclNoRewrite = do
   return (MkDefSort b c d False)
 
 -- | Parse a namespace instance
-pInstance :: Parser NamespaceInstance
+pInstance :: Parser Context
 pInstance = pInh <|> pSyn
 
 -- | Parse an inherited namespace instance
-pInh :: Parser NamespaceInstance
+pInh :: Parser Context
 pInh = do
   pReserved "inh"
   a <- pInstanceName
@@ -157,7 +157,7 @@ pInh = do
   return (INH a b)
 
 -- | Parse a synthesized namespace instance
-pSyn :: Parser NamespaceInstance
+pSyn :: Parser Context
 pSyn = do
   pReserved "syn"
   a <- pInstanceName

@@ -124,7 +124,7 @@ getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> i
       ]
   ) filtered
   where
-    declarationsToFunctions :: [NamespaceInstance] -> [NamespaceDef] -> String -> [Expression]
+    declarationsToFunctions :: [Context] -> [NamespaceDef] -> String -> [Expression]
     declarationsToFunctions nsi nsd op = let filtered = [INH x y | INH x y <- nsi]
       in map (\(INH _ namespaceName) ->
         FnCall (lookForSortName namespaceName nsd ++ "shiftHelp" ++ op) [VarExpr "d"]

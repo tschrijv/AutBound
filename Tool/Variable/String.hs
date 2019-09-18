@@ -75,8 +75,8 @@ getCustSubst (nsd, sd, _, _) =
   let filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (capitalize sname) (getVarAccessTable sd))) sd
   in concatMap (\(MkDefSort sname namespaceDecl constr rewrite) ->
     let filteredNs = [INH x y | INH x y <- namespaceDecl]
-    in map (\inst ->
-      let secondSort = lookForSortName (getInstanceNameSpace inst) nsd
+    in map (\ctx ->
+      let secondSort = lookForSortName (namespace ctx) nsd
       in Fn
         (toLowerCaseFirst sname ++ secondSort ++ "Substitute")
         (map (\c ->
@@ -89,7 +89,7 @@ getCustSubst (nsd, sd, _, _) =
     ) filteredNs
   ) filtered
   where
-    getExpr :: SortName -> SortName -> ConstructorDef -> [(SortName, [NamespaceInstance])] -> [(SortName, Bool)] -> Expression
+    getExpr :: SortName -> SortName -> ConstructorDef -> [(SortName, [Context])] -> [(SortName, Bool)] -> Expression
     getExpr sname secondSort (MkVarConstructor consName _) table _ =
       IfExpr (EQExpr (VarExpr "var") (VarExpr "orig"))
         (VarExpr "sub")
@@ -129,7 +129,7 @@ getCustSubst (nsd, sd, _, _) =
                 (getSortInheritedInstances sortnameInUse table)
             sortnameInUse = getSortForId iden (folds ++ lists ++ sorts)
 
-            applyRuleInheritedNamespaces :: ExternalFunctions -> SortName -> [NamespaceRule] -> (IdName, [NamespaceRule]) -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [NamespaceInstance] -> [Expression]
+            applyRuleInheritedNamespaces :: ExternalFunctions -> SortName -> [NamespaceRule] -> (IdName, [NamespaceRule]) -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [Context])] -> [Context] -> [Expression]
             applyRuleInheritedNamespaces ef sname rules (iden, rulesOfId) folds lists listSorts table = recurse
               where
                 newString =
@@ -142,40 +142,40 @@ getCustSubst (nsd, sd, _, _) =
                     lists
                     listSorts
                     table
-                recurse :: [NamespaceInstance] -> [Expression]
+                recurse :: [Context] -> [Expression]
                 recurse [] = [VarExpr "orig", VarExpr "sub"]
                 recurse (x:xs) = case newString x (recurse xs) of
                   Just ex -> ex
                   Nothing -> recurse xs
 
-                applyTheRuleOneInheritedNamespace :: ExternalFunctions -> SortName -> [NamespaceRule] -> (IdName, [NamespaceRule]) -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> NamespaceInstance -> [Expression] -> Maybe [Expression]
-                applyTheRuleOneInheritedNamespace ef sname rules (_, rulesOfId) folds lists listSorts table currentinst params
-                  | isJust foundrule = applyOneRuleLogic ef sname currentinst newrules (fromJust foundrule) folds lists listSorts newtable params
+                applyTheRuleOneInheritedNamespace :: ExternalFunctions -> SortName -> [NamespaceRule] -> (IdName, [NamespaceRule]) -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [Context])] -> Context -> [Expression] -> Maybe [Expression]
+                applyTheRuleOneInheritedNamespace ef sname rules (_, rulesOfId) folds lists listSorts table currentCtx params
+                  | isJust foundrule = applyOneRuleLogic ef sname currentCtx newrules (fromJust foundrule) folds lists listSorts newtable params
                   | otherwise = Nothing
                   where
-                    foundrule = find (\x -> getLeftSubInstanceName (fst x) == getName currentinst) rulesOfId
-                    newtable = filterTableBySameNamespace currentinst table
+                    foundrule = find (\x -> getLeftSubInstanceName (fst x) == inst currentCtx) rulesOfId
+                    newtable = filterContextsForSameNamespace currentCtx table
                     newrules = filter (\(l, r) ->
                         let sortnameId = getLeftSubIden l
                             snameLookup = fromJust (lookup (capitalize sname) table)
                             sortnameIdlookup = fromJust (lookup (getSortForId sortnameId (folds ++ lists ++ listSorts)) table)
-                        in (sortnameId == "" && any (\x -> getLeftSubInstanceName l == getName x) snameLookup)
-                        || any (\x -> getLeftSubInstanceName l == getName x) sortnameIdlookup
+                        in (sortnameId == "" && any (\ctx -> getLeftSubInstanceName l == inst ctx) snameLookup)
+                        || any (\ctx -> getLeftSubInstanceName l == inst ctx) sortnameIdlookup
                       ) rules
 
-                applyOneRuleLogic :: ExternalFunctions -> SortName -> NamespaceInstance -> [NamespaceRule] -> NamespaceRule -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [NamespaceInstance])] -> [Expression] -> Maybe [Expression]
+                applyOneRuleLogic :: ExternalFunctions -> SortName -> Context -> [NamespaceRule] -> NamespaceRule -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(IdName, SortName)] -> [(SortName, [Context])] -> [Expression] -> Maybe [Expression]
                 applyOneRuleLogic _ _ _ _ (_, RightLHS _) _ _ _ _ _ = Nothing
-                applyOneRuleLogic ef sname inst rules (l, RightAdd expr _) folds lists listSorts table params =
-                  return (fromMaybe [] (applyOneRuleLogic ef sname inst rules (l, expr) folds lists listSorts table []) ++ params)
-                applyOneRuleLogic ef sname inst rules (_, RightSub iden context) folds lists listSorts table params
+                applyOneRuleLogic ef sname ctx rules (l, RightAdd expr _) folds lists listSorts table params =
+                  return (fromMaybe [] (applyOneRuleLogic ef sname ctx rules (l, expr) folds lists listSorts table []) ++ params)
+                applyOneRuleLogic ef sname ctx rules (_, RightSub iden context) folds lists listSorts table params
                   | (elem iden (map fst lists) || elem iden (map fst folds)) && isJust newrule =
-                    return [FnCall ("generateHnat" ++ getInstanceNameSpace inst) (FnCall "length" (VarExpr iden : nextStep) : params)]
+                    return [FnCall ("generateHnat" ++ namespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params)]
                   | elem iden (map fst lists) || elem iden (map fst folds) =
-                    return [FnCall ("generateHnat" ++ getInstanceNameSpace inst) (FnCall "length" [VarExpr iden] : params)]
+                    return [FnCall ("generateHnat" ++ namespace ctx) (FnCall "length" [VarExpr iden] : params)]
                   | isJust newrule =
                     return [FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) ((VarExpr iden : nextStep) ++ params)]
                   | otherwise =
                     return [FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) (VarExpr iden : params)]
                   where
                     newrule = find (\(l, _) -> getLeftSubIden l == iden) rules
-                    nextStep = fromMaybe [] (applyOneRuleLogic ef sname inst rules (fromJust newrule) folds lists listSorts table [])
+                    nextStep = fromMaybe [] (applyOneRuleLogic ef sname ctx rules (fromJust newrule) folds lists listSorts table [])

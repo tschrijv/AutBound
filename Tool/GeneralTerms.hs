@@ -11,9 +11,9 @@ type HaskellTypeName  = String
 type InstanceName     = String
 
 --the inherited or synthesised contexts
-data NamespaceInstance
-  = INH InstanceName NamespaceName
-  | SYN InstanceName NamespaceName
+data Context
+  = INH { inst :: InstanceName, namespace :: NamespaceName }
+  | SYN { inst :: InstanceName, namespace :: NamespaceName }
   deriving (Show, Eq)
 
 --the left part of an expression like t1.ctx=lhs.ctx
@@ -39,7 +39,7 @@ data NamespaceDef
 
 --definition of a sort
 data SortDef
-  = MkDefSort SortName [NamespaceInstance] [ConstructorDef] Bool
+  = MkDefSort SortName [Context] [ConstructorDef] Bool
   deriving (Show, Eq)
 
 --definition of a constructor
@@ -81,10 +81,6 @@ instance Named ConstructorDef where
   getName (MkVarConstructor cname _)            = cname
   getName (MkBindConstructor cname _ _ _ _ _ _) = cname
 
-instance Named NamespaceInstance where
-  getName (INH name _) = name
-  getName (SYN name _) = name
-
 getCtorLists :: ConstructorDef -> [(IdName, SortName)]
 getCtorLists (MkDefConstructor _ lists _ _ _ _) = lists
 getCtorLists (MkBindConstructor _ lists _ _ _ _ _) = lists
@@ -123,21 +119,16 @@ getSortCtors :: SortDef -> [ConstructorDef]
 getSortCtors (MkDefSort _ _ cdefs _) = cdefs
 
 -- get the instances by the sorts in the
-getSortInstances :: SortDef -> [NamespaceInstance]
+getSortInstances :: SortDef -> [Context]
 getSortInstances (MkDefSort _ instances _ _) = instances
 
 --get the names   contexts and the namespaces it refers to for a sorts in a tuple
-getSortNameAndInstances :: SortDef -> (SortName, [NamespaceInstance])
+getSortNameAndInstances :: SortDef -> (SortName, [Context])
 getSortNameAndInstances s = (getName s, getSortInstances s)
 
 getLeftSubIden :: LeftExpr -> IdName
 getLeftSubIden (LeftLHS _)    = ""
 getLeftSubIden (LeftSub iden _) = iden
-
--- get the namespaceName where the instance is referring to
-getInstanceNameSpace :: NamespaceInstance -> NamespaceName
-getInstanceNameSpace (INH _ name) = name
-getInstanceNameSpace (SYN _ name) = name
 
 --get the name of the context of a left expr
 getLeftSubInstanceName :: LeftExpr -> InstanceName
