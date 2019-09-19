@@ -99,7 +99,7 @@ getCustSubst (nsd, sd, _, _) =
       in ConstrInst (upperFirst (cname cons)) (binder ++ map process idRules ++ [VarExpr (lowerFirst x ++ show n) | (x, n) <- zip (cnatives cons) [1 :: Int ..]])
       where
         rules = cattrs cons
-        idRules = attrByIden rules (folds ++ lists ++ sorts)
+        idRules = attrsByIden rules (folds ++ lists ++ sorts)
         folds = dropFold (cfolds cons)
         lists = clists cons
         sorts = csorts cons
@@ -127,7 +127,7 @@ getCustSubst (nsd, sd, _, _) =
                 sorts
                 table
                 (inhCtxsForSortName sortnameInUse table)
-            sortnameInUse = getSortForId iden (folds ++ lists ++ sorts)
+            sortnameInUse = sortNameForIden iden (folds ++ lists ++ sorts)
 
             applyRuleInheritedNamespaces :: ExternalFunctions -> SortName -> [AttributeDef] -> (IdenName, [AttributeDef]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Context] -> [Expression]
             applyRuleInheritedNamespaces ef sname rules (iden, rulesOfId) folds lists listSorts table = recurse
@@ -158,7 +158,7 @@ getCustSubst (nsd, sd, _, _) =
                     newrules = filter (\(l, r) ->
                         let sortnameId = liden l
                             snameLookup = fromJust (lookup (upperFirst sname) table)
-                            sortnameIdlookup = fromJust (lookup (getSortForId sortnameId (folds ++ lists ++ listSorts)) table)
+                            sortnameIdlookup = fromJust (lookup (sortNameForIden sortnameId (folds ++ lists ++ listSorts)) table)
                         in (sortnameId == "" && any (\ctx -> linst l == xinst ctx) snameLookup)
                         || any (\ctx -> linst l == xinst ctx) sortnameIdlookup
                       ) rules
