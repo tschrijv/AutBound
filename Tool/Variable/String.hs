@@ -39,7 +39,7 @@ getVariableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])]
 getVariableInstances _ = []
 
 getVariableFunctions :: Language -> (Type, [Constructor]) -> [Function]
-getVariableFunctions lan _ = getMappings lan ef ++ getCustSubst lan ++ getFreeVar lan ef
+getVariableFunctions lan _ = mappingFunctions lan ef ++ getCustSubst lan ++ freeVarFunctions lan ef
 
 _getCtorParams :: ConstructorDef -> [Parameter]
 _getCtorParams (MkVarConstructor consName _) = [ConstrParam (upperFirst consName) [VarParam "var"]]
@@ -62,10 +62,10 @@ _substExpr sname consName =
     (ConstrInst (upperFirst consName) [VarExpr "var"])
 
 ef = EF {
-  getCtorParams = _getCtorParams,
-  varCtorFreeVar = _varCtorFreeVar,
+  paramForCtor = _getCtorParams,
+  freeVarExprForVarCtor = _varCtorFreeVar,
   oneDeeper = (\n e -> head e),
-  substExpr = _substExpr,
+  substHelperExprForVarCtor = _substExpr,
   includeBinders = True
 }
 
@@ -81,9 +81,9 @@ getCustSubst (nsd, sd, _, _) =
         (lowerFirst sname ++ secondSort ++ "Substitute")
         (map (\c ->
           (
-            [VarParam "orig", VarParam "sub"] ++ getCtorParams ef c
+            [VarParam "orig", VarParam "sub"] ++ paramForCtor ef c
           ,
-            getExpr sname secondSort c (map getSortNameAndInstances sd) (varAccessBySortName sd)
+            getExpr sname secondSort c (map nameAndCtxs sd) (varAccessBySortName sd)
           )
         ) constr)
     ) filteredNs
@@ -126,7 +126,7 @@ getCustSubst (nsd, sd, _, _) =
                 lists
                 sorts
                 table
-                (getSortInheritedInstances sortnameInUse table)
+                (inhCtxsForSortName sortnameInUse table)
             sortnameInUse = getSortForId iden (folds ++ lists ++ sorts)
 
             applyRuleInheritedNamespaces :: ExternalFunctions -> SortName -> [AttributeDef] -> (IdenName, [AttributeDef]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Context] -> [Expression]

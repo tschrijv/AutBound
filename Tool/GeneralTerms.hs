@@ -85,14 +85,3 @@ cbinder ctor@MkBindConstructor{} = Just (_cbinder ctor)
 cbinder _                        = Nothing
 
 type Language = ([NamespaceDef], [SortDef], [(String, [String])], [String])
-
--- TODO
-getSortNameAndInstances :: SortDef -> (SortName, [Context])
-getSortNameAndInstances s = (sname s, sctxs s)
-
--- | Produce a list of pairs with the first element being an identifier, the
--- second the list of attribute definitions that assign to this identifier
-attrByIden :: [AttributeDef] -> [(IdenName, SortName)] -> [(IdenName, [AttributeDef])]
-attrByIden attrs sorts = [
-  (iden, filter (\(l, _) -> liden l == iden) attrs)
-  | (iden, _) <- sorts]

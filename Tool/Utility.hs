@@ -64,3 +64,15 @@ filterCtxsByNamespace :: NamespaceName -> [(SortName, [Context])] -> [(SortName,
 filterCtxsByNamespace namespace contextsBySortName = [
   (sortName, [ctx' | ctx' <- ctxs, xnamespace ctx' == namespace])
   | (sortName, ctxs) <- contextsBySortName]
+
+-- TODO
+nameAndCtxs :: SortDef -> (SortName, [Context])
+nameAndCtxs s = (sname s, sctxs s)
+
+-- Possibly TODO
+-- | Produce a list of pairs with the first element being an identifier, the
+-- second the list of attribute definitions that assign to this identifier
+attrByIden :: [AttributeDef] -> [(IdenName, SortName)] -> [(IdenName, [AttributeDef])]
+attrByIden attrs sorts = [
+  (iden, filter (\(l, _) -> liden l == iden) attrs)
+  | (iden, _) <- sorts]

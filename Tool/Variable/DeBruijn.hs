@@ -51,7 +51,7 @@ getVariableInstances (_, hnatc) =
       | otherwise = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "error" [StringExpr "differing namespace found in compare"])
 
 getVariableFunctions :: Language -> (Type, [Constructor]) -> [Function]
-getVariableFunctions lan@(nsd, _, _, _) varT = getHNatModifiers varT ++ getGenerators nsd ++ getShift lan ++ getMappings lan ef ++ getSubst lan ef ++ getFreeVar lan ef
+getVariableFunctions lan@(nsd, _, _, _) varT = getHNatModifiers varT ++ getGenerators nsd ++ getShift lan ++ mappingFunctions lan ef ++ substFunctions lan ef ++ freeVarFunctions lan ef
 
 getHNatModifiers :: (Type, [Constructor]) -> [Function]
 getHNatModifiers (_, hnatc) =
@@ -151,9 +151,9 @@ _substExpr sname consName =
     (ConstrInst (upperFirst consName) [VarExpr "var"])
 
 ef = EF {
-  getCtorParams = _getCtorParams,
-  varCtorFreeVar = _varCtorFreeVar,
+  paramForCtor = _getCtorParams,
+  freeVarExprForVarCtor = _varCtorFreeVar,
   oneDeeper = _oneDeeper,
-  substExpr = _substExpr,
+  substHelperExprForVarCtor = _substExpr,
   includeBinders = False
 }
