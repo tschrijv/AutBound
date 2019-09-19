@@ -140,7 +140,7 @@ wellFormedConstructor cons xinst = do
       (getIdentifiersWithoutBinding cons)
   g <-
     helpWellFormedIdentifiers
-      (map toLowerCaseFirst (getIdentifiersWithoutBinding cons))
+      (map lowerFirst (getIdentifiersWithoutBinding cons))
   return True
   where
     --get the Identifiers of the arguments of a constructor (including the binder)

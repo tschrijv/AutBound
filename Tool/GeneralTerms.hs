@@ -6,7 +6,7 @@ type FoldName         = String
 type ConstructorName  = String
 type SortName         = String
 type NamespaceName    = String
-type IdenName           = String
+type IdenName         = String
 type HaskellTypeName  = String
 type InstanceName     = String
 

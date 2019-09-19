@@ -42,8 +42,8 @@ getVariableFunctions :: Language -> (Type, [Constructor]) -> [Function]
 getVariableFunctions lan _ = getMappings lan ef ++ getCustSubst lan ++ getFreeVar lan ef
 
 _getCtorParams :: ConstructorDef -> [Parameter]
-_getCtorParams (MkVarConstructor consName _) = [ConstrParam (capitalize consName) [VarParam "var"]]
-_getCtorParams cons = [ConstrParam (capitalize consName) ((map (\_ -> VarParam "b") (emptyOrToList (cbinder cons))) ++ firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (toLowerCaseFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
+_getCtorParams (MkVarConstructor consName _) = [ConstrParam (upperFirst consName) [VarParam "var"]]
+_getCtorParams cons = [ConstrParam (upperFirst consName) ((map (\_ -> VarParam "b") (maybeToList (cbinder cons))) ++ firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (lowerFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
   where
     consName = cname cons
     folds = cfolds cons
@@ -59,7 +59,7 @@ _oneDeeper namespace expr = expr -- FnCall "concat" [ListExpr (ListExpr [VarExpr
 _substExpr sname consName =
   IfExpr (EQExpr (VarExpr "var") (VarExpr "c"))
     (VarExpr "sub")
-    (ConstrInst (capitalize consName) [VarExpr "var"])
+    (ConstrInst (upperFirst consName) [VarExpr "var"])
 
 ef = EF {
   getCtorParams = _getCtorParams,
@@ -72,18 +72,18 @@ ef = EF {
 -- Custom subst
 getCustSubst :: Language -> [Function]
 getCustSubst (nsd, sd, _, _) =
-  let filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (capitalize sname) (getVarAccessTable sd))) sd
+  let filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (upperFirst sname) (varAccessBySortName sd))) sd
   in concatMap (\(MkDefSort sname namespaceDecl constr rewrite) ->
     let filteredNs = [INH x y | INH x y <- namespaceDecl]
     in map (\ctx ->
-      let secondSort = lookForSortName (xnamespace ctx) nsd
+      let secondSort = sortNameForNamespaceName (xnamespace ctx) nsd
       in Fn
-        (toLowerCaseFirst sname ++ secondSort ++ "Substitute")
+        (lowerFirst sname ++ secondSort ++ "Substitute")
         (map (\c ->
           (
             [VarParam "orig", VarParam "sub"] ++ getCtorParams ef c
           ,
-            getExpr sname secondSort c (map getSortNameAndInstances sd) (getVarAccessTable sd)
+            getExpr sname secondSort c (map getSortNameAndInstances sd) (varAccessBySortName sd)
           )
         ) constr)
     ) filteredNs
@@ -93,10 +93,10 @@ getCustSubst (nsd, sd, _, _) =
     getExpr sname secondSort (MkVarConstructor consName _) table _ =
       IfExpr (EQExpr (VarExpr "var") (VarExpr "orig"))
         (VarExpr "sub")
-        (ConstrInst (capitalize consName) [VarExpr "var"])
+        (ConstrInst (upperFirst consName) [VarExpr "var"])
     getExpr sname secondSort cons table accessVarTable =
       let binder = if isBind cons then [VarExpr "b"] else []
-      in ConstrInst (capitalize (cname cons)) (binder ++ map process idRules ++ [VarExpr (toLowerCaseFirst x ++ show n) | (x, n) <- zip (cnatives cons) [1 :: Int ..]])
+      in ConstrInst (upperFirst (cname cons)) (binder ++ map process idRules ++ [VarExpr (lowerFirst x ++ show n) | (x, n) <- zip (cnatives cons) [1 :: Int ..]])
       where
         rules = cattrs cons
         idRules = attrByIden rules (folds ++ lists ++ sorts)
@@ -109,12 +109,12 @@ getCustSubst (nsd, sd, _, _) =
 
         process (iden, idenRules)
           | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst folds) =
-            FnCall "fmap" [FnCall (toLowerCaseFirst sname ++ secondSort ++ "Substitute") (addedBinders), VarExpr (toLowerCaseFirst iden)]
+            FnCall "fmap" [FnCall (lowerFirst sname ++ secondSort ++ "Substitute") (addedBinders), VarExpr (lowerFirst iden)]
           | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst lists) =
-            FnCall "map" [FnCall (toLowerCaseFirst sname ++ secondSort ++ "Substitute") (addedBinders), VarExpr (toLowerCaseFirst iden)]
+            FnCall "map" [FnCall (lowerFirst sname ++ secondSort ++ "Substitute") (addedBinders), VarExpr (lowerFirst iden)]
           | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst sorts) =
-            FnCall (toLowerCaseFirst sname ++ secondSort ++ "Substitute") (addedBinders ++ [VarExpr (toLowerCaseFirst iden)])
-          | otherwise = VarExpr (toLowerCaseFirst iden)
+            FnCall (lowerFirst sname ++ secondSort ++ "Substitute") (addedBinders ++ [VarExpr (lowerFirst iden)])
+          | otherwise = VarExpr (lowerFirst iden)
           where
             addedBinders =
               applyRuleInheritedNamespaces
@@ -154,10 +154,10 @@ getCustSubst (nsd, sd, _, _) =
                   | otherwise = Nothing
                   where
                     foundrule = find (\x -> linst (fst x) == xinst currentCtx) rulesOfId
-                    newtable = filterContextsForSameNamespace currentCtx table
+                    newtable = filterCtxsByNamespace (xnamespace currentCtx) table
                     newrules = filter (\(l, r) ->
                         let sortnameId = liden l
-                            snameLookup = fromJust (lookup (capitalize sname) table)
+                            snameLookup = fromJust (lookup (upperFirst sname) table)
                             sortnameIdlookup = fromJust (lookup (getSortForId sortnameId (folds ++ lists ++ listSorts)) table)
                         in (sortnameId == "" && any (\ctx -> linst l == xinst ctx) snameLookup)
                         || any (\ctx -> linst l == xinst ctx) sortnameIdlookup

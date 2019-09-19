@@ -1,71 +1,66 @@
+{-# OPTIONS_GHC -Wall #-}
+
 module Utility where
 
 import Data.Char
 import GeneralTerms
 import Data.Maybe
 
-toLowerCaseFirst :: String -> String
-toLowerCaseFirst (first:rest) = ((toLower first) : rest)
+-- | Transform the first character of a string to lowercase
+lowerFirst :: String -> String
+lowerFirst [] = []
+lowerFirst (first:rest) = toLower first : rest
 
-capitalize :: String -> String
-capitalize (first:rest) = ((toUpper first) : rest)
+-- | Transform the first character of a string to uppercase
+upperFirst :: String -> String
+upperFirst [] = []
+upperFirst (first:rest) = toUpper first : rest
 
-emptyOrToList :: Maybe a -> [a]
-emptyOrToList ex = maybe [] (\a -> [a]) ex
+-- | Return the sort name for a given namespace name in a list of namespace
+-- definitions
+sortNameForNamespaceName :: NamespaceName -> [NamespaceDef] -> SortName
+sortNameForNamespaceName name nsd = head [lowerFirst $ nsort ns | ns <- nsd, nname ns == name]
 
-lookForSortName :: NamespaceName -> [NamespaceDef] -> SortName
-lookForSortName name ((MkNameSpace name2 sortname _):rest)
-  | name2 == name = toLowerCaseFirst sortname
-  | otherwise = lookForSortName name rest
-
-getVarAccessTable :: [SortDef] -> [(SortName, Bool)]
-getVarAccessTable sList = map (sortCanAccessVariables sList []) sList
+-- | Return a list of tuples with sort names and a boolean value indicating
+-- whether they access variables
+varAccessBySortName :: [SortDef] -> [(SortName, Bool)]
+varAccessBySortName sd = map (\s -> (sname s, sortCanAccessVariables [] s)) sd
   where
-    sortCanAccessVariables :: [SortDef] -> [SortName] -> SortDef -> (SortName, Bool)
-    sortCanAccessVariables allSorts listVisited s
-      | hasAccess = (name, hasAccess)
-      | otherwise = (name, findPathToVariable)
+    -- | Returns whether a given sort can access variables
+    sortCanAccessVariables :: [SortName] -> SortDef -> Bool
+    sortCanAccessVariables visited sort
+      | hasVarCtor = True
+      | name `elem` visited = False
+      | otherwise = hasPathToVar
       where
-        name = sname s
-        hasAccess = fromJust (lookup name (getTableOfHasVariable allSorts))
-        sortDefTable = map (\x -> (sname x, x)) allSorts
-        findPathToVariable =
-          or
-            (map
-              (constructorCanAccessVariables sortDefTable listVisited)
-              (sctors s))
+        name = sname sort
+        hasVarCtor = fromJust (lookup name sortsWithVarCtor)
+        hasPathToVar = any (ctorHasVarAccess (name : visited)) (sctors sort)
 
-        getTableOfHasVariable :: [SortDef] -> [(SortName, Bool)]
-        getTableOfHasVariable sd = [(sname s, hasVariables s) | s <- sd]
+        -- | Retuns a list of tuples containing a sort name and whether they
+        -- contain any variable constructors
+        sortsWithVarCtor :: [(SortName, Bool)]
+        sortsWithVarCtor = [(sname s, hasVariables s) | s <- sd]
+          where
+            -- | Returns whether a sort definition contains any variable constructors
+            hasVariables :: SortDef -> Bool
+            hasVariables s = or [True | (MkVarConstructor _ _) <- sctors s]
 
-        -- function generating for each Sort, if it has access to some variable
-        hasVariables :: SortDef -> Bool
-        hasVariables s = or [True | (MkVarConstructor _ _) <- sctors s]
+        -- | Returns whether a given constructor accesses variables
+        -- (either by being a variable constructor or by having an instance
+        -- of a sort that accesses a variable)
+        ctorHasVarAccess :: [SortName] -> ConstructorDef -> Bool
+        ctorHasVarAccess _ (MkVarConstructor _ _) = True
+        ctorHasVarAccess visited' ctor =
+          any
+            (\sortName ->
+              sortCanAccessVariables visited' (head (filter (\s -> sname s == sortName) sd))
+            )
+            (map snd (csorts ctor ++ clists ctor) ++ map (\(_, b, _) -> b) (cfolds ctor))
 
-        constructorCanAccessVariables :: [(SortName, SortDef)] -> [SortName] -> ConstructorDef -> Bool
-        constructorCanAccessVariables table visited (MkVarConstructor _ _) = True
-        constructorCanAccessVariables table visited (MkBindConstructor _ listSorts sorts folds _ _ _) =
-          or
-            (map
-              (hasAccessSortName table visited)
-              ((map snd sorts) ++ (map snd listSorts) ++ map (\(a, b, c) -> b) folds))
-        constructorCanAccessVariables table visited (MkDefConstructor _ listSorts sorts folds _ _) =
-          or
-            (map
-              (hasAccessSortName table visited)
-              ((map snd sorts) ++ (map snd listSorts) ++ map (\(a, b, c) -> b) folds))
-
-        hasAccessSortName :: [(SortName, SortDef)] -> [SortName] -> SortName -> Bool
-        hasAccessSortName table visited nextSort
-          | any (\x -> x == nextSort) visited = False
-          | otherwise =
-            snd
-              (sortCanAccessVariables
-                (map snd table)
-                (nextSort : visited)
-                (fromJust (lookup nextSort table)))
-
-filterContextsForSameNamespace :: Context -> [(SortName, [Context])] -> [(SortName, [Context])]
-filterContextsForSameNamespace ctx table = [
-  (sortName, [ctx' | ctx' <- ctxs, xnamespace ctx' == xnamespace ctx])
-  | (sortName, ctxs) <- table]
+-- | Given a namespace name and a list of tuples containing a sort name
+-- and assigned contexts, remove the contexts that use different namespaces
+filterCtxsByNamespace :: NamespaceName -> [(SortName, [Context])] -> [(SortName, [Context])]
+filterCtxsByNamespace namespace contextsBySortName = [
+  (sortName, [ctx' | ctx' <- ctxs, xnamespace ctx' == namespace])
+  | (sortName, ctxs) <- contextsBySortName]
