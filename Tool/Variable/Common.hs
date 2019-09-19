@@ -177,12 +177,12 @@ mappingFunctions (_, sd, _, _) ef =
     mapFnForSortName sname = lowerFirst sname ++ "map"
 
     mappingExprForCtor :: SortName -> ConstructorDef -> [(SortName, [Context])] -> [(SortName, Bool)] -> Expression
-    mappingExprForCtor sortName (MkVarConstructor ctorName _) table _ =
-      FnCall ("on" ++ xnamespace (head (fromJust (lookup sortName table)))) [
+    mappingExprForCtor sortName (MkVarConstructor ctorName _) ctxsBySname _ =
+      FnCall ("on" ++ xnamespace (head (fromJust (lookup sortName ctxsBySname)))) [
         VarExpr "c",
         ConstrInst (upperFirst ctorName) [VarExpr "var"]
       ]
-    mappingExprForCtor sortName cons table varAccessBySname =
+    mappingExprForCtor sortName cons ctxsBySname varAccessBySname =
       let binder = if includeBinders ef && isBind cons then [VarExpr "b"] else []
       in ConstrInst (upperFirst (cname cons)) (binder ++ map process idRules ++ [VarExpr (lowerFirst x ++ show n) | (x, n) <- zip (cnatives cons) [1 :: Int ..]])
       where
@@ -192,16 +192,18 @@ mappingFunctions (_, sd, _, _) ef =
         lists = clists cons
         sorts = csorts cons
 
+        isBind :: ConstructorDef -> Bool
         isBind MkBindConstructor{} = True
         isBind _                   = False
 
+        process :: (IdenName, [AttributeDef]) -> Expression
         process (iden, idenRules)
           | fromJust (lookup sortNameOfIden varAccessBySname) && elem iden (map fst folds) =
-            FnCall "fmap" [FnCall (mapFnForSortName sortNameOfIden) (nsiExprs (fromJust (lookup sortNameOfIden table)) ++ addedBinders), VarExpr (lowerFirst iden)]
+            FnCall "fmap" [FnCall (mapFnForSortName sortNameOfIden) (nsiExprs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders), VarExpr (lowerFirst iden)]
           | fromJust (lookup sortNameOfIden varAccessBySname) && elem iden (map fst lists) =
-            FnCall "map" [FnCall (mapFnForSortName sortNameOfIden) (nsiExprs (fromJust (lookup sortNameOfIden table)) ++ addedBinders), VarExpr (lowerFirst iden)]
+            FnCall "map" [FnCall (mapFnForSortName sortNameOfIden) (nsiExprs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders), VarExpr (lowerFirst iden)]
           | fromJust (lookup sortNameOfIden varAccessBySname) && elem iden (map fst sorts) =
-            FnCall (mapFnForSortName sortNameOfIden) (nsiExprs (fromJust (lookup sortNameOfIden table)) ++ addedBinders ++ [VarExpr (lowerFirst iden)])
+            FnCall (mapFnForSortName sortNameOfIden) (nsiExprs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders ++ [VarExpr (lowerFirst iden)])
           | otherwise = VarExpr (lowerFirst iden)
           where
             addedBinders =
@@ -213,8 +215,8 @@ mappingFunctions (_, sd, _, _) ef =
                 folds
                 lists
                 sorts
-                table
-                (inhCtxsForSortName sortNameOfIden table)]
+                ctxsBySname
+                (inhCtxsForSortName sortNameOfIden ctxsBySname)]
             sortNameOfIden = sortNameForIden iden (folds ++ lists ++ sorts)
 
             nsiExprs :: [Context] -> [Expression]
@@ -244,30 +246,37 @@ substFunctions (nsd, sd, _, _) ef =
         ]
       | MkVarConstructor ctorName _ <- ctors]
       ++
-      map (\ctx -> namespaceInstanceSubstFunction sortName ctx ctxs nsd rewrite) inhCtxs
+      map (\ctx -> substFunctionForCtx sortName ctx ctxs nsd rewrite) inhCtxs
   ) sortsWithVarAccess
   where
-    namespaceInstanceSubstFunction :: SortName -> Context -> [Context] -> [NamespaceDef] -> Bool -> Function
-    namespaceInstanceSubstFunction sortName (INH instname namespaceName) ctxs nsd rewrite =
-      Fn
-        (lowerFirst sortName ++ secondSort ++ "Substitute")
-        [
-          (
-            [VarParam "sub", VarParam "orig", VarParam "t"],
-            if rewrite then FnCall ("rewrite" ++ sortName) [mapCall] else mapCall
-          )
-        ]
+    -- | Generate a substitution function for a given sort's given context instance
+    -- where parameters are
+    -- * `orig` for the variable we want to substitute
+    -- * `sub` for the term we want to replace `orig` with
+    -- * `t` for the term we want to run the substitution on
+    substFunctionForCtx :: SortName -> Context -> [Context] -> [NamespaceDef] -> Bool -> Function
+    substFunctionForCtx sortName ctx ctxs nsd rewrite
+      = let sortOfCtxNamespace = sortNameForNamespaceName (xnamespace ctx) nsd
+            mapCall = FnCall (lowerFirst sortName ++ "map") (paramFnCallsForCtxs ctx ctxs nsd ++ [VarExpr "orig", VarExpr "t"])
+        in Fn
+          (lowerFirst sortName ++ sortOfCtxNamespace ++ "Substitute")
+          [
+            (
+              [VarParam "sub", VarParam "orig", VarParam "t"],
+              if rewrite then FnCall ("rewrite" ++ sortName) [mapCall] else mapCall
+            )
+          ]
       where
-        secondSort = sortNameForNamespaceName namespaceName nsd
-        mapCall = FnCall (lowerFirst sortName ++ "map") (declarationsToFunctionsSubst (INH instname namespaceName) ctxs nsd ++ [VarExpr "orig", VarExpr "t"])
-
-    declarationsToFunctionsSubst :: Context -> [Context] -> [NamespaceDef] -> [Expression]
-    declarationsToFunctionsSubst (INH instname1 namespaceName) nsi nsd =
-      [
-        if instname1 == instname2
-          then FnCall (sortNameForNamespaceName namespaceName nsd ++ "SubstituteHelp") [VarExpr "sub"]
-          else LambdaExpr [VarParam "c", VarParam "x"] (VarExpr "x")
-      | INH instname2 _ <- nsi]
+        -- | For each inherited context instance in the list (a sort's contexts) generate
+        -- either a function call to the helper function if the instance is the one
+        -- being substituted, or a lambda function that just returns the variable's
+        -- value
+        paramFnCallsForCtxs :: Context -> [Context] -> [NamespaceDef] -> [Expression]
+        paramFnCallsForCtxs (INH inst namespaceName) ctxs nsd =
+          [if inst == inst'
+              then FnCall (sortNameForNamespaceName namespaceName nsd ++ "SubstituteHelp") [VarExpr "sub"]
+              else LambdaExpr [VarParam "c", VarParam "x"] (VarExpr "x")
+          | INH inst' _ <- ctxs]
 
 -- * Helper functions
 -- ----------------------------------------------------------------------------
