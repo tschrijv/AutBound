@@ -43,14 +43,14 @@ getEnvFunctions (nsd, sd, _, _) = let table = map nameAndCtxs sd
 generateSortSynSystemOneConstructor :: SortName -> [NamespaceDef] -> [(SortName, [Context])] -> ConstructorDef -> Context -> Function
 generateSortSynSystemOneConstructor sname _ _ (MkVarConstructor consName _) _ =
   Fn ("addToEnvironment" ++ sname) [([ConstrParam (upperFirst consName) [VarParam "var"], VarParam "c"], VarExpr "c")]
-generateSortSynSystemOneConstructor sname namespaces table cons ctx =
+generateSortSynSystemOneConstructor sname namespaces table ctor ctx =
   Fn ("addToEnvironment" ++ sname ++ xinst ctx) [([ConstrParam (upperFirst consName) (firstToVarParams listSorts ++ [VarParam "_" | _ <- hTypes]), VarParam "c"], getEnvFunctionGenerate sname ctx namespaces newtable listSorts rules)]
   where
     newtable = filterCtxsByNamespace (xnamespace ctx) table
-    consName = cname cons
-    listSorts = csorts cons
-    hTypes = cnatives cons
-    rules = cattrs cons
+    consName = cname ctor
+    listSorts = csorts ctor
+    hTypes = cnatives ctor
+    rules = cattrs ctor
 
 getEnvFunctionGenerate :: SortName -> Context -> [NamespaceDef] -> [(SortName, [Context])] -> [(IdenName, SortName)]  -> [AttributeDef] -> Expression
 getEnvFunctionGenerate sname ctx namespaces table listSorts rules
@@ -133,16 +133,16 @@ freeVarFunctions (_, sd, _, _) ef =
             folds = dropFold $ cfolds ctor
             lists = clists ctor
             sorts = csorts ctor
-            idensAndAttrs = (attrsByIden attrs (folds ++ lists ++ sorts))
+            idensAndAttrs = attrsByIden attrs (folds ++ lists ++ sorts)
             callList = concatMap (
               \(iden, iattrs) ->
                 let addedBinders = applyRuleInheritedNamespaces ef sname attrs (iden, iattrs) folds lists sorts ctxsBySname (inhCtxsForSortName sortNameOfIden ctxsBySname) -- TODO: clean up this line
                     sortNameOfIden = sortNameForIden iden (folds ++ lists ++ sorts)
                 in
                   if fromJust (lookup sortNameOfIden varAccessBySname)
-                  then if (iden `elem` map fst folds)
+                  then if iden `elem` map fst folds
                     then [FnCall "foldMap" [FnCall ("freeVariables" ++ sortNameOfIden) [addedBinders], VarExpr (lowerFirst iden)]]
-                    else if (iden `elem` map fst lists)
+                    else if iden `elem` map fst lists
                       then [FnCall "concatMap" [FnCall ("freeVariables" ++ sortNameOfIden) [addedBinders], VarExpr (lowerFirst iden)]]
                       else [FnCall ("freeVariables" ++ sortNameOfIden) (addedBinders : [VarExpr (lowerFirst iden)])]
                   else []
@@ -173,54 +173,59 @@ mappingFunctions (_, sd, _, _) ef =
         ) ctors)
   ) sortsWithVarAccess
   where
+    -- | Return the name of the mapping function for the given sort name
     mapFnForSortName :: SortName -> String
     mapFnForSortName sname = lowerFirst sname ++ "map"
 
+    -- | Generate the map function's body for a given contructor in the sort
+    -- (a function call to the namespace's processing function in case of a variable,
+    -- and a constructor call with its identifiers also mapped otherwise)
     mappingExprForCtor :: SortName -> ConstructorDef -> [(SortName, [Context])] -> [(SortName, Bool)] -> Expression
     mappingExprForCtor sortName (MkVarConstructor ctorName _) ctxsBySname _ =
-      FnCall ("on" ++ xnamespace (head (fromJust (lookup sortName ctxsBySname)))) [
+      FnCall ("on" ++ xnamespace (head (fromJust (lookup sortName ctxsBySname)))) [ -- TODO: this is a suspicious head call
         VarExpr "c",
         ConstrInst (upperFirst ctorName) [VarExpr "var"]
       ]
-    mappingExprForCtor sortName cons ctxsBySname varAccessBySname =
-      let binder = if includeBinders ef && isBind cons then [VarExpr "b"] else []
-      in ConstrInst (upperFirst (cname cons)) (binder ++ map process idRules ++ [VarExpr (lowerFirst x ++ show n) | (x, n) <- zip (cnatives cons) [1 :: Int ..]])
+    mappingExprForCtor sortName ctor ctxsBySname varAccessBySname =
+      let binder = if includeBinders ef && isBind ctor then [VarExpr "b"] else []
+      in
+        ConstrInst
+          (upperFirst (cname ctor))
+          (
+            binder
+            ++ map mapFnCallForIden idensAndAttrs
+            ++ [VarExpr (lowerFirst x ++ show n) | (x, n) <- zip (cnatives ctor) [1 :: Int ..]]
+          )
       where
-        rules = cattrs cons
-        idRules = attrsByIden rules (folds ++ lists ++ sorts)
-        folds = dropFold (cfolds cons)
-        lists = clists cons
-        sorts = csorts cons
+        attrs = cattrs ctor
+        idensAndAttrs = attrsByIden attrs (folds ++ lists ++ sorts)
+        folds = dropFold (cfolds ctor)
+        lists = clists ctor
+        sorts = csorts ctor
 
+        -- | Returns whether the given constructor has a binder
         isBind :: ConstructorDef -> Bool
         isBind MkBindConstructor{} = True
         isBind _                   = False
 
-        process :: (IdenName, [AttributeDef]) -> Expression
-        process (iden, idenRules)
-          | fromJust (lookup sortNameOfIden varAccessBySname) && elem iden (map fst folds) =
-            FnCall "fmap" [FnCall (mapFnForSortName sortNameOfIden) (nsiExprs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders), VarExpr (lowerFirst iden)]
-          | fromJust (lookup sortNameOfIden varAccessBySname) && elem iden (map fst lists) =
-            FnCall "map" [FnCall (mapFnForSortName sortNameOfIden) (nsiExprs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders), VarExpr (lowerFirst iden)]
-          | fromJust (lookup sortNameOfIden varAccessBySname) && elem iden (map fst sorts) =
-            FnCall (mapFnForSortName sortNameOfIden) (nsiExprs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders ++ [VarExpr (lowerFirst iden)])
-          | otherwise = VarExpr (lowerFirst iden)
+        -- | Construct a mapping function call for an identifier
+        mapFnCallForIden :: (IdenName, [AttributeDef]) -> Expression
+        mapFnCallForIden (iden, idenAttrs)
+          = if fromJust (lookup sortNameOfIden varAccessBySname)
+              then if iden `elem` map fst folds
+                then FnCall "fmap" [FnCall (mapFnForSortName sortNameOfIden) (fnCallsForCtxs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders), VarExpr (lowerFirst iden)]
+                else if iden `elem` map fst lists
+                  then FnCall "map" [FnCall (mapFnForSortName sortNameOfIden) (fnCallsForCtxs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders), VarExpr (lowerFirst iden)]
+                  else FnCall (mapFnForSortName sortNameOfIden) (fnCallsForCtxs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders ++ [VarExpr (lowerFirst iden)])
+              else VarExpr (lowerFirst iden)
           where
-            addedBinders =
-              [applyRuleInheritedNamespaces
-                ef
-                sortName
-                rules
-                (iden, idenRules)
-                folds
-                lists
-                sorts
-                ctxsBySname
-                (inhCtxsForSortName sortNameOfIden ctxsBySname)]
+            addedBinders = [applyRuleInheritedNamespaces ef sortName attrs (iden, idenAttrs) folds lists sorts ctxsBySname (inhCtxsForSortName sortNameOfIden ctxsBySname)]  -- TODO: clean up this line
             sortNameOfIden = sortNameForIden iden (folds ++ lists ++ sorts)
 
-            nsiExprs :: [Context] -> [Expression]
-            nsiExprs ctx = [VarExpr ("on" ++ namespace) | INH _ namespace <- ctx]
+            -- | Return a function reference for the processing functions
+            -- of the namespaces in the list of contexts
+            fnCallsForCtxs :: [Context] -> [Expression]
+            fnCallsForCtxs ctx = [VarExpr ("on" ++ namespace) | INH _ namespace <- ctx]
 
 -- * Substitution functions
 -- ----------------------------------------------------------------------------
