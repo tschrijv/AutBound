@@ -12,7 +12,7 @@ import Utility
 data ExternalFunctions = EF {
   paramForCtor :: ConstructorDef -> [Parameter],
   freeVarExprForVarCtor :: String -> Expression,
-  oneDeeper :: String -> [Expression] -> Expression,
+  transformForAddAttr :: String -> [Expression] -> Expression,
   substHelperExprForVarCtor :: String -> String -> Expression,
   includeBinders :: Bool
 }
@@ -325,7 +325,7 @@ applyInhCtxsToAttrs ef sname ctor (iden, idenAttrs) ctxsBySname (ctx:ctxs)
     applyOneRuleLogic :: AttributeDef -> [Expression] -> Maybe Expression
     applyOneRuleLogic (_, RightLHS _) _ = Nothing
     applyOneRuleLogic (l, RightAdd expr _) params
-      = return (oneDeeper ef (xnamespace ctx) (nextStep ++ params))
+      = return (transformForAddAttr ef (xnamespace ctx) (nextStep ++ params))
       where
         nextStep = maybeToList (applyOneRuleLogic (l, expr) [])
     applyOneRuleLogic (_, RightSub iden context) params

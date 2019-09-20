@@ -153,7 +153,7 @@ _substExpr sname consName =
 ef = EF {
   paramForCtor = _getCtorParams,
   freeVarExprForVarCtor = _varCtorFreeVar,
-  oneDeeper = _oneDeeper,
+  transformForAddAttr = _oneDeeper,
   substHelperExprForVarCtor = _substExpr,
   includeBinders = False
 }
