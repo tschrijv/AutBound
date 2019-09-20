@@ -66,8 +66,8 @@ filterCtxsByNamespace namespace contextsBySortName = [
   | (sortName, ctxs) <- contextsBySortName]
 
 -- TODO
-nameAndCtxs :: SortDef -> (SortName, [Context])
-nameAndCtxs s = (sname s, sctxs s)
+snameAndCtxs :: SortDef -> (SortName, [Context])
+snameAndCtxs s = (sname s, sctxs s)
 
 -- Possibly TODO
 -- | Produce a list of pairs with the first element being an identifier, the

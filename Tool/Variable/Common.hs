@@ -31,7 +31,7 @@ getEnvType (nsd, _, _, _) =
 
 -- | ??
 getEnvFunctions :: Language -> [Function]
-getEnvFunctions (nsd, sd, _, _) = let table = map nameAndCtxs sd
+getEnvFunctions (nsd, sd, _, _) = let table = map snameAndCtxs sd
   in concatMap (\s ->
     let nsi = [SYN x y | SYN x y <- sctxs s]
     in if null nsi then [] else
@@ -103,7 +103,7 @@ navigateRules sname ctx namespaces table listSorts rules (LeftSub _ _, RightSub 
 -- constructors
 freeVarFunctions :: Language -> ExternalFunctions -> [Function]
 freeVarFunctions (_, sd, _, _) ef =
-  let ctxsBySname = map nameAndCtxs sd
+  let ctxsBySname = map snameAndCtxs sd
       varAccessBySname = varAccessBySortName sd
       sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> isJust (lookup sname varAccessBySname)) sd
   in map (\sort ->
@@ -136,8 +136,8 @@ freeVarFunctions (_, sd, _, _) ef =
             idensAndAttrs = attrsByIden attrs (folds ++ lists ++ sorts)
             callList = concatMap (
               \(iden, iattrs) ->
-                let addedBinders = applyRuleInheritedNamespaces ef sname attrs (iden, iattrs) folds lists sorts ctxsBySname (inhCtxsForSortName sortNameOfIden ctxsBySname) -- TODO: clean up this line
-                    sortNameOfIden = sortNameForIden iden (folds ++ lists ++ sorts)
+                let addedBinders = applyInhCtxsToAttrs ef sname ctor (iden, iattrs) ctxsBySname (inhCtxsForSortName sortNameOfIden ctxsBySname)
+                    sortNameOfIden = sortNameForIden iden ctor
                 in
                   if fromJust (lookup sortNameOfIden varAccessBySname)
                   then if iden `elem` map fst folds
@@ -156,7 +156,7 @@ freeVarFunctions (_, sd, _, _) ef =
 -- constructors
 mappingFunctions :: Language -> ExternalFunctions -> [Function]
 mappingFunctions (_, sd, _, _) ef =
-  let ctxsBySname = map nameAndCtxs sd
+  let ctxsBySname = map snameAndCtxs sd
       varAccessBySname = varAccessBySortName sd
       sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> isJust (lookup sname varAccessBySname)) sd
   in map (
@@ -219,8 +219,8 @@ mappingFunctions (_, sd, _, _) ef =
                   else FnCall (mapFnForSortName sortNameOfIden) (fnCallsForCtxs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders ++ [VarExpr (lowerFirst iden)])
               else VarExpr (lowerFirst iden)
           where
-            addedBinders = [applyRuleInheritedNamespaces ef sortName attrs (iden, idenAttrs) folds lists sorts ctxsBySname (inhCtxsForSortName sortNameOfIden ctxsBySname)]  -- TODO: clean up this line
-            sortNameOfIden = sortNameForIden iden (folds ++ lists ++ sorts)
+            addedBinders = [applyInhCtxsToAttrs ef sortName ctor (iden, idenAttrs) ctxsBySname (inhCtxsForSortName sortNameOfIden ctxsBySname)]
+            sortNameOfIden = sortNameForIden iden ctor
 
             -- | Return a function reference for the processing functions
             -- of the namespaces in the list of contexts
@@ -286,64 +286,65 @@ substFunctions (nsd, sd, _, _) ef =
 -- * Helper functions
 -- ----------------------------------------------------------------------------
 
+-- | Returns the list of inherited contexts for a given sort name
 inhCtxsForSortName :: SortName -> [(SortName, [Context])] -> [Context]
-inhCtxsForSortName sname table = [INH x y | INH x y <- ctx]
+inhCtxsForSortName sname ctxsForSortName = [INH x y | INH x y <- ctxs]
   where
-    ctx = fromJust (lookup sname table)
+    ctxs = fromJust (lookup sname ctxsForSortName)
 
-sortNameForIden :: IdenName -> [(IdenName, SortName)] -> SortName
-sortNameForIden iden table = fromJust (lookup iden table)
+-- | Looks up the sort name for a given identifier in a constructor
+sortNameForIden :: IdenName -> ConstructorDef -> SortName
+sortNameForIden iden ctor = fromJust (lookup iden (dropFold (cfolds ctor) ++ clists ctor ++ csorts ctor))
 
+-- | In a list of tuples, converts the first elements to a list of variable parameters
 firstToVarParams :: [(String, String)] -> [Parameter]
 firstToVarParams = map (VarParam . lowerFirst . fst)
 
+-- | Drops the third element from each tuple in a list
 dropFold :: [(String, String, String)] -> [(String, String)]
 dropFold = map (\(a, b, _) -> (a, b))
 
-applyRuleInheritedNamespaces :: ExternalFunctions -> SortName -> [AttributeDef] -> (IdenName, [AttributeDef]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Context] -> Expression
-applyRuleInheritedNamespaces ef sname rules (iden, rulesOfId) folds lists listSorts table = recurse
+-- | For every (inherited) context (of a sort), apply nested modifiers to the
+-- returned "c" variable
+applyInhCtxsToAttrs :: ExternalFunctions -> SortName -> ConstructorDef -> (IdenName, [AttributeDef]) -> [(SortName, [Context])] -> [Context] -> Expression
+applyInhCtxsToAttrs _ _ _ (_, _) _ [] = VarExpr "c"
+applyInhCtxsToAttrs ef sname ctor (iden, idenAttrs) ctxsBySname (ctx:ctxs)
+ = let rest = applyInhCtxsToAttrs ef sname ctor (iden, idenAttrs) ctxsBySname ctxs
+  in fromMaybe rest (applyOneCtx ctx rest)
   where
-    newString =
-      applyTheRuleOneInheritedNamespace
-        ef
-        sname
-        rules
-        (iden, rulesOfId)
-        folds
-        lists
-        listSorts
-        table
-    recurse :: [Context] -> Expression
-    recurse [] = VarExpr "c"
-    recurse (x:xs) = fromMaybe (recurse xs) (newString x (recurse xs))
-
-    applyTheRuleOneInheritedNamespace :: ExternalFunctions -> SortName -> [AttributeDef] -> (IdenName, [AttributeDef]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> Context -> Expression -> Maybe Expression
-    applyTheRuleOneInheritedNamespace ef sname rules (_, rulesOfId) folds lists listSorts table currentCtx param
-      | isJust foundrule = applyOneRuleLogic ef sname currentCtx newrules (fromJust foundrule) folds lists listSorts newtable [param]
+    -- | Runs `applyOneRuleLogic` if the identifier's attribute definitions
+    -- contain an assignment to an instance of the given context
+    applyOneCtx :: Context -> Expression -> Maybe Expression
+    applyOneCtx ctx param
+      | isJust attrForCtx = applyOneRuleLogic (fromJust attrForCtx) [param]
       | otherwise = Nothing
       where
-        foundrule = find (\x -> linst (fst x) == xinst currentCtx) rulesOfId
-        newtable = filterCtxsByNamespace (xnamespace currentCtx) table
-        newrules = filter (\(l, r) ->
-            let sortnameId = liden l
-                snameLookup = fromJust (lookup (upperFirst sname) table)
-                sortnameIdlookup = fromJust (lookup (sortNameForIden sortnameId (folds ++ lists ++ listSorts)) table)
-            in (sortnameId == "" && any (\ctx -> linst l == xinst ctx) snameLookup) || any (\ctx -> linst l == xinst ctx) sortnameIdlookup
-          ) rules
+        attrForCtx = find (\(left, _) -> linst left == xinst ctx) idenAttrs
 
-    applyOneRuleLogic :: ExternalFunctions -> SortName -> Context -> [AttributeDef] -> AttributeDef -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Expression] -> Maybe Expression
-    applyOneRuleLogic _ _ _ _ (_, RightLHS _) _ _ _ _ _ = Nothing
-    applyOneRuleLogic ef sname ctx rules (l, RightAdd expr _) folds lists listSorts table params =
-      return (oneDeeper ef (xnamespace ctx) (maybeToList (applyOneRuleLogic ef sname ctx rules (l, expr) folds lists listSorts table []) ++ params))
-    applyOneRuleLogic ef sname ctx rules (_, RightSub iden context) folds lists listSorts table params
-      | (elem iden (map fst lists) || elem iden (map fst folds)) && isJust newrule =
-        return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params))
-      | elem iden (map fst lists) || elem iden (map fst folds) =
-        return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" [VarExpr iden] : params))
-      | isJust newrule =
-        return (FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) ((VarExpr iden : nextStep) ++ params))
-      | otherwise =
-        return (FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) (VarExpr iden : params))
+    -- | Apply the necessary wrap based on the attribute assignment type
+    applyOneRuleLogic :: AttributeDef -> [Expression] -> Maybe Expression
+    applyOneRuleLogic (_, RightLHS _) _ = Nothing
+    applyOneRuleLogic (l, RightAdd expr _) params
+      = return (oneDeeper ef (xnamespace ctx) (nextStep ++ params))
       where
-        newrule = find (\(l, _) -> liden l == iden) rules
-        nextStep = maybeToList (applyOneRuleLogic ef sname ctx rules (fromJust newrule) folds lists listSorts table [])
+        nextStep = maybeToList (applyOneRuleLogic (l, expr) [])
+    applyOneRuleLogic (_, RightSub iden context) params
+      = if elem iden (map fst lists) || elem iden (map fst folds)
+          then if isJust attrsForIden
+            then return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params))
+            else return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" [VarExpr iden] : params))
+          else if isJust attrsForIden
+            then return (FnCall ("addToEnvironment" ++ fromJust (lookup iden sorts) ++ context) ((VarExpr iden : nextStep) ++ params))
+            else return (FnCall ("addToEnvironment" ++ fromJust (lookup iden sorts) ++ context) (VarExpr iden : params))
+      where
+        newAttrs = filter (\(left, _) ->
+            let iden = liden left
+                ctxsForSort = fromJust (lookup sname ctxsBySname)
+                ctxsForIdenSort = fromJust (lookup (sortNameForIden iden ctor) ctxsBySname)
+            in (iden == "" && any (\ctx -> linst left == xinst ctx) ctxsForSort) || any (\ctx -> linst left == xinst ctx) ctxsForIdenSort
+          ) (cattrs ctor)
+        attrsForIden = find (\(left, _) -> liden left == iden) newAttrs
+        nextStep = maybeToList (applyOneRuleLogic (fromJust attrsForIden) [])
+        lists = clists ctor
+        folds = dropFold $ cfolds ctor
+        sorts = csorts ctor

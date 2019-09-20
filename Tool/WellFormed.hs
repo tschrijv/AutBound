@@ -56,7 +56,7 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
     ((getSortsUsedByConstructors s) ++ sortconsnames)
     namespacenames
     sortnamespaces
-    (nameAndCtxs s : instTable)
+    (snameAndCtxs s : instTable)
     (s : sortdefs)
     where
       --get the namespaces used by the constructors

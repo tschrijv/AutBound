@@ -39,7 +39,7 @@ getVariableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])]
 getVariableInstances _ = []
 
 getVariableFunctions :: Language -> (Type, [Constructor]) -> [Function]
-getVariableFunctions lan _ = mappingFunctions lan ef ++ getCustSubst lan ++ freeVarFunctions lan ef
+getVariableFunctions lan _ = mappingFunctions lan ef ++ freeVarFunctions lan ef -- ++ getCustSubst lan
 
 _getCtorParams :: ConstructorDef -> [Parameter]
 _getCtorParams (MkVarConstructor consName _) = [ConstrParam (upperFirst consName) [VarParam "var"]]
@@ -70,112 +70,112 @@ ef = EF {
 }
 
 -- Custom subst
-getCustSubst :: Language -> [Function]
-getCustSubst (nsd, sd, _, _) =
-  let filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (upperFirst sname) (varAccessBySortName sd))) sd
-  in concatMap (\(MkDefSort sname namespaceDecl constr rewrite) ->
-    let filteredNs = [INH x y | INH x y <- namespaceDecl]
-    in map (\ctx ->
-      let secondSort = sortNameForNamespaceName (xnamespace ctx) nsd
-      in Fn
-        (lowerFirst sname ++ secondSort ++ "Substitute")
-        (map (\c ->
-          (
-            [VarParam "orig", VarParam "sub"] ++ paramForCtor ef c
-          ,
-            getExpr sname secondSort c (map nameAndCtxs sd) (varAccessBySortName sd)
-          )
-        ) constr)
-    ) filteredNs
-  ) filtered
-  where
-    getExpr :: SortName -> SortName -> ConstructorDef -> [(SortName, [Context])] -> [(SortName, Bool)] -> Expression
-    getExpr sname secondSort (MkVarConstructor consName _) table _ =
-      IfExpr (EQExpr (VarExpr "var") (VarExpr "orig"))
-        (VarExpr "sub")
-        (ConstrInst (upperFirst consName) [VarExpr "var"])
-    getExpr sname secondSort cons table accessVarTable =
-      let binder = if isBind cons then [VarExpr "b"] else []
-      in ConstrInst (upperFirst (cname cons)) (binder ++ map process idRules ++ [VarExpr (lowerFirst x ++ show n) | (x, n) <- zip (cnatives cons) [1 :: Int ..]])
-      where
-        rules = cattrs cons
-        idRules = attrsByIden rules (folds ++ lists ++ sorts)
-        folds = dropFold (cfolds cons)
-        lists = clists cons
-        sorts = csorts cons
+-- getCustSubst :: Language -> [Function]
+-- getCustSubst (nsd, sd, _, _) =
+--   let filtered = filter (\(MkDefSort sname _ _ _) -> isJust (lookup (upperFirst sname) (varAccessBySortName sd))) sd
+--   in concatMap (\(MkDefSort sname namespaceDecl constr rewrite) ->
+--     let filteredNs = [INH x y | INH x y <- namespaceDecl]
+--     in map (\ctx ->
+--       let secondSort = sortNameForNamespaceName (xnamespace ctx) nsd
+--       in Fn
+--         (lowerFirst sname ++ secondSort ++ "Substitute")
+--         (map (\c ->
+--           (
+--             [VarParam "orig", VarParam "sub"] ++ paramForCtor ef c
+--           ,
+--             getExpr sname secondSort c (map snameAndCtxs sd) (varAccessBySortName sd)
+--           )
+--         ) constr)
+--     ) filteredNs
+--   ) filtered
+--   where
+--     getExpr :: SortName -> SortName -> ConstructorDef -> [(SortName, [Context])] -> [(SortName, Bool)] -> Expression
+--     getExpr sname secondSort (MkVarConstructor consName _) table _ =
+--       IfExpr (EQExpr (VarExpr "var") (VarExpr "orig"))
+--         (VarExpr "sub")
+--         (ConstrInst (upperFirst consName) [VarExpr "var"])
+--     getExpr sname secondSort cons table accessVarTable =
+--       let binder = if isBind cons then [VarExpr "b"] else []
+--       in ConstrInst (upperFirst (cname cons)) (binder ++ map process idRules ++ [VarExpr (lowerFirst x ++ show n) | (x, n) <- zip (cnatives cons) [1 :: Int ..]])
+--       where
+--         rules = cattrs cons
+--         idRules = attrsByIden rules (folds ++ lists ++ sorts)
+--         folds = dropFold (cfolds cons)
+--         lists = clists cons
+--         sorts = csorts cons
 
-        isBind MkBindConstructor{} = True
-        isBind _                   = False
+--         isBind MkBindConstructor{} = True
+--         isBind _                   = False
 
-        process (iden, idenRules)
-          | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst folds) =
-            FnCall "fmap" [FnCall (lowerFirst sname ++ secondSort ++ "Substitute") (addedBinders), VarExpr (lowerFirst iden)]
-          | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst lists) =
-            FnCall "map" [FnCall (lowerFirst sname ++ secondSort ++ "Substitute") (addedBinders), VarExpr (lowerFirst iden)]
-          | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst sorts) =
-            FnCall (lowerFirst sname ++ secondSort ++ "Substitute") (addedBinders ++ [VarExpr (lowerFirst iden)])
-          | otherwise = VarExpr (lowerFirst iden)
-          where
-            addedBinders =
-              applyRuleInheritedNamespaces
-                ef
-                sname
-                rules
-                (iden, idenRules)
-                folds
-                lists
-                sorts
-                table
-                (inhCtxsForSortName sortnameInUse table)
-            sortnameInUse = sortNameForIden iden (folds ++ lists ++ sorts)
+--         process (iden, idenRules)
+--           | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst folds) =
+--             FnCall "fmap" [FnCall (lowerFirst sname ++ secondSort ++ "Substitute") (addedBinders), VarExpr (lowerFirst iden)]
+--           | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst lists) =
+--             FnCall "map" [FnCall (lowerFirst sname ++ secondSort ++ "Substitute") (addedBinders), VarExpr (lowerFirst iden)]
+--           | fromJust (lookup sortnameInUse accessVarTable) && elem iden (map fst sorts) =
+--             FnCall (lowerFirst sname ++ secondSort ++ "Substitute") (addedBinders ++ [VarExpr (lowerFirst iden)])
+--           | otherwise = VarExpr (lowerFirst iden)
+--           where
+--             addedBinders =
+--               applyInhCtxsToAttrs
+--                 ef
+--                 sname
+--                 rules
+--                 (iden, idenRules)
+--                 folds
+--                 lists
+--                 sorts
+--                 table
+--                 (inhCtxsForSortName sortnameInUse table)
+--             sortnameInUse = sortNameForIden iden cons
 
-            applyRuleInheritedNamespaces :: ExternalFunctions -> SortName -> [AttributeDef] -> (IdenName, [AttributeDef]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Context] -> [Expression]
-            applyRuleInheritedNamespaces ef sname rules (iden, rulesOfId) folds lists listSorts table = recurse
-              where
-                newString =
-                  applyTheRuleOneInheritedNamespace
-                    ef
-                    sname
-                    rules
-                    (iden, rulesOfId)
-                    folds
-                    lists
-                    listSorts
-                    table
-                recurse :: [Context] -> [Expression]
-                recurse [] = [VarExpr "orig", VarExpr "sub"]
-                recurse (x:xs) = case newString x (recurse xs) of
-                  Just ex -> ex
-                  Nothing -> recurse xs
+--             applyInhCtxsToAttrs :: ExternalFunctions -> SortName -> [AttributeDef] -> (IdenName, [AttributeDef]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Context] -> [Expression]
+--             applyInhCtxsToAttrs ef sname rules (iden, rulesOfId) folds lists listSorts table = recurse
+--               where
+--                 newString =
+--                   applyOneCtx
+--                     ef
+--                     sname
+--                     rules
+--                     (iden, rulesOfId)
+--                     folds
+--                     lists
+--                     listSorts
+--                     table
+--                 recurse :: [Context] -> [Expression]
+--                 recurse [] = [VarExpr "orig", VarExpr "sub"]
+--                 recurse (x:xs) = case newString x (recurse xs) of
+--                   Just ex -> ex
+--                   Nothing -> recurse xs
 
-                applyTheRuleOneInheritedNamespace :: ExternalFunctions -> SortName -> [AttributeDef] -> (IdenName, [AttributeDef]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> Context -> [Expression] -> Maybe [Expression]
-                applyTheRuleOneInheritedNamespace ef sname rules (_, rulesOfId) folds lists listSorts table currentCtx params
-                  | isJust foundrule = applyOneRuleLogic ef sname currentCtx newrules (fromJust foundrule) folds lists listSorts newtable params
-                  | otherwise = Nothing
-                  where
-                    foundrule = find (\x -> linst (fst x) == xinst currentCtx) rulesOfId
-                    newtable = filterCtxsByNamespace (xnamespace currentCtx) table
-                    newrules = filter (\(l, r) ->
-                        let sortnameId = liden l
-                            snameLookup = fromJust (lookup (upperFirst sname) table)
-                            sortnameIdlookup = fromJust (lookup (sortNameForIden sortnameId (folds ++ lists ++ listSorts)) table)
-                        in (sortnameId == "" && any (\ctx -> linst l == xinst ctx) snameLookup)
-                        || any (\ctx -> linst l == xinst ctx) sortnameIdlookup
-                      ) rules
+--                 applyOneCtx :: ExternalFunctions -> SortName -> [AttributeDef] -> (IdenName, [AttributeDef]) -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> Context -> [Expression] -> Maybe [Expression]
+--                 applyOneCtx ef sname rules (_, rulesOfId) folds lists listSorts table currentCtx params
+--                   | isJust foundrule = applyOneRuleLogic ef sname currentCtx newrules (fromJust foundrule) folds lists listSorts newtable params
+--                   | otherwise = Nothing
+--                   where
+--                     foundrule = find (\x -> linst (fst x) == xinst currentCtx) rulesOfId
+--                     newtable = filterCtxsByNamespace (xnamespace currentCtx) table
+--                     newrules = filter (\(l, r) ->
+--                         let sortnameId = liden l
+--                             snameLookup = fromJust (lookup (upperFirst sname) table)
+--                             sortnameIdlookup = fromJust (lookup (sortNameForIden sortnameId (folds ++ lists ++ listSorts)) table)
+--                         in (sortnameId == "" && any (\ctx -> linst l == xinst ctx) snameLookup)
+--                         || any (\ctx -> linst l == xinst ctx) sortnameIdlookup
+--                       ) rules
 
-                applyOneRuleLogic :: ExternalFunctions -> SortName -> Context -> [AttributeDef] -> AttributeDef -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Expression] -> Maybe [Expression]
-                applyOneRuleLogic _ _ _ _ (_, RightLHS _) _ _ _ _ _ = Nothing
-                applyOneRuleLogic ef sname ctx rules (l, RightAdd expr _) folds lists listSorts table params =
-                  return (fromMaybe [] (applyOneRuleLogic ef sname ctx rules (l, expr) folds lists listSorts table []) ++ params)
-                applyOneRuleLogic ef sname ctx rules (_, RightSub iden context) folds lists listSorts table params
-                  | (elem iden (map fst lists) || elem iden (map fst folds)) && isJust newrule =
-                    return [FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params)]
-                  | elem iden (map fst lists) || elem iden (map fst folds) =
-                    return [FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" [VarExpr iden] : params)]
-                  | isJust newrule =
-                    return [FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) ((VarExpr iden : nextStep) ++ params)]
-                  | otherwise =
-                    return [FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) (VarExpr iden : params)]
-                  where
-                    newrule = find (\(l, _) -> liden l == iden) rules
-                    nextStep = fromMaybe [] (applyOneRuleLogic ef sname ctx rules (fromJust newrule) folds lists listSorts table [])
+--                 applyOneRuleLogic :: ExternalFunctions -> SortName -> Context -> [AttributeDef] -> AttributeDef -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(SortName, [Context])] -> [Expression] -> Maybe [Expression]
+--                 applyOneRuleLogic _ _ _ _ (_, RightLHS _) _ _ _ _ _ = Nothing
+--                 applyOneRuleLogic ef sname ctx rules (l, RightAdd expr _) folds lists listSorts table params =
+--                   return (fromMaybe [] (applyOneRuleLogic ef sname ctx rules (l, expr) folds lists listSorts table []) ++ params)
+--                 applyOneRuleLogic ef sname ctx rules (_, RightSub iden context) folds lists listSorts table params
+--                   | (elem iden (map fst lists) || elem iden (map fst folds)) && isJust newrule =
+--                     return [FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params)]
+--                   | elem iden (map fst lists) || elem iden (map fst folds) =
+--                     return [FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" [VarExpr iden] : params)]
+--                   | isJust newrule =
+--                     return [FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) ((VarExpr iden : nextStep) ++ params)]
+--                   | otherwise =
+--                     return [FnCall ("addToEnvironment" ++ fromJust (lookup iden listSorts) ++ context) (VarExpr iden : params)]
+--                   where
+--                     newrule = find (\(l, _) -> liden l == iden) rules
+--                     nextStep = fromMaybe [] (applyOneRuleLogic ef sname ctx rules (fromJust newrule) folds lists listSorts table [])
