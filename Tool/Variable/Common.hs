@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Variable.Common (getEnvType, getEnvFunctions, freeVarFunctions, mappingFunctions, substFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), inhCtxsForSortName) where
+module Variable.Common (getEnvType, getEnvFunctions, freeVarFunctions, mappingFunctions, substFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..)) where
 
 import Data.List
 import Data.Maybe
@@ -129,14 +129,12 @@ freeVarFunctions (_, sd, _, _) ef =
     -- calls for every identifier of a sort that has access to variables)
     freeVariableCallListForCtor :: ExternalFunctions -> SortName -> ConstructorDef -> [(SortName, [Context])] -> [(SortName, Bool)] -> [Expression]
     freeVariableCallListForCtor ef sname ctor ctxsBySname varAccessBySname
-      = let attrs = cattrs ctor
-            folds = dropFold $ cfolds ctor
+      = let folds = dropFold $ cfolds ctor
             lists = clists ctor
-            sorts = csorts ctor
-            idensAndAttrs = attrsByIden attrs (folds ++ lists ++ sorts)
+            idensAndAttrs = attrsByIden ctor
             callList = concatMap (
               \(iden, iattrs) ->
-                let addedBinders = applyInhCtxsToAttrs ef sname ctor (iden, iattrs) ctxsBySname (inhCtxsForSortName sortNameOfIden ctxsBySname)
+                let addedBinders = applyInhCtxsToAttrs ef sname ctor (iden, iattrs) ctxsBySname
                     sortNameOfIden = sortNameForIden iden ctor
                 in
                   if fromJust (lookup sortNameOfIden varAccessBySname)
@@ -197,11 +195,9 @@ mappingFunctions (_, sd, _, _) ef =
             ++ [VarExpr (lowerFirst x ++ show n) | (x, n) <- zip (cnatives ctor) [1 :: Int ..]]
           )
       where
-        attrs = cattrs ctor
-        idensAndAttrs = attrsByIden attrs (folds ++ lists ++ sorts)
+        idensAndAttrs = attrsByIden ctor
         folds = dropFold (cfolds ctor)
         lists = clists ctor
-        sorts = csorts ctor
 
         -- | Returns whether the given constructor has a binder
         isBind :: ConstructorDef -> Bool
@@ -219,7 +215,7 @@ mappingFunctions (_, sd, _, _) ef =
                   else FnCall (mapFnForSortName sortNameOfIden) (fnCallsForCtxs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders ++ [VarExpr (lowerFirst iden)])
               else VarExpr (lowerFirst iden)
           where
-            addedBinders = [applyInhCtxsToAttrs ef sortName ctor (iden, idenAttrs) ctxsBySname (inhCtxsForSortName sortNameOfIden ctxsBySname)]
+            addedBinders = [applyInhCtxsToAttrs ef sortName ctor (iden, idenAttrs) ctxsBySname]
             sortNameOfIden = sortNameForIden iden ctor
 
             -- | Return a function reference for the processing functions
@@ -300,17 +296,12 @@ sortNameForIden iden ctor = fromJust (lookup iden (dropFold (cfolds ctor) ++ cli
 firstToVarParams :: [(String, String)] -> [Parameter]
 firstToVarParams = map (VarParam . lowerFirst . fst)
 
--- | Drops the third element from each tuple in a list
-dropFold :: [(String, String, String)] -> [(String, String)]
-dropFold = map (\(a, b, _) -> (a, b))
-
--- | For every (inherited) context (of a sort), apply nested modifiers to the
+-- | For every inherited context of a sort, apply nested modifiers to the
 -- returned "c" variable
-applyInhCtxsToAttrs :: ExternalFunctions -> SortName -> ConstructorDef -> (IdenName, [AttributeDef]) -> [(SortName, [Context])] -> [Context] -> Expression
-applyInhCtxsToAttrs _ _ _ (_, _) _ [] = VarExpr "c"
-applyInhCtxsToAttrs ef sname ctor (iden, idenAttrs) ctxsBySname (ctx:ctxs)
- = let rest = applyInhCtxsToAttrs ef sname ctor (iden, idenAttrs) ctxsBySname ctxs
-  in fromMaybe rest (applyOneCtx ctx rest)
+applyInhCtxsToAttrs :: ExternalFunctions -> SortName -> ConstructorDef -> (IdenName, [AttributeDef]) -> [(SortName, [Context])] -> Expression
+applyInhCtxsToAttrs ef sname ctor (iden, idenAttrs) ctxsBySname
+ = let inhCtxs = (inhCtxsForSortName (sortNameForIden iden ctor) ctxsBySname)
+   in foldr (\ctx rest -> fromMaybe rest (applyOneCtx ctx rest)) (VarExpr "c") inhCtxs
   where
     -- | Runs `applyOneRuleLogic` if the identifier's attribute definitions
     -- contain an assignment to an instance of the given context
@@ -321,30 +312,30 @@ applyInhCtxsToAttrs ef sname ctor (iden, idenAttrs) ctxsBySname (ctx:ctxs)
       where
         attrForCtx = find (\(left, _) -> linst left == xinst ctx) idenAttrs
 
-    -- | Apply the necessary wrap based on the attribute assignment type
-    applyOneRuleLogic :: AttributeDef -> [Expression] -> Maybe Expression
-    applyOneRuleLogic (_, RightLHS _) _ = Nothing
-    applyOneRuleLogic (l, RightAdd expr _) params
-      = return (transformForAddAttr ef (xnamespace ctx) (nextStep ++ params))
-      where
-        nextStep = maybeToList (applyOneRuleLogic (l, expr) [])
-    applyOneRuleLogic (_, RightSub iden context) params
-      = if elem iden (map fst lists) || elem iden (map fst folds)
-          then if isJust attrsForIden
-            then return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params))
-            else return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" [VarExpr iden] : params))
-          else if isJust attrsForIden
-            then return (FnCall ("addToEnvironment" ++ fromJust (lookup iden sorts) ++ context) ((VarExpr iden : nextStep) ++ params))
-            else return (FnCall ("addToEnvironment" ++ fromJust (lookup iden sorts) ++ context) (VarExpr iden : params))
-      where
-        newAttrs = filter (\(left, _) ->
-            let iden = liden left
-                ctxsForSort = fromJust (lookup sname ctxsBySname)
-                ctxsForIdenSort = fromJust (lookup (sortNameForIden iden ctor) ctxsBySname)
-            in (iden == "" && any (\ctx -> linst left == xinst ctx) ctxsForSort) || any (\ctx -> linst left == xinst ctx) ctxsForIdenSort
-          ) (cattrs ctor)
-        attrsForIden = find (\(left, _) -> liden left == iden) newAttrs
-        nextStep = maybeToList (applyOneRuleLogic (fromJust attrsForIden) [])
-        lists = clists ctor
-        folds = dropFold $ cfolds ctor
-        sorts = csorts ctor
+        -- | Apply the necessary wrap based on the attribute assignment type
+        applyOneRuleLogic :: AttributeDef -> [Expression] -> Maybe Expression
+        applyOneRuleLogic (_, RightLHS _) _ = Nothing
+        applyOneRuleLogic (l, RightAdd expr _) params
+          = return (transformForAddAttr ef (xnamespace ctx) (nextStep ++ params))
+          where
+            nextStep = maybeToList (applyOneRuleLogic (l, expr) [])
+        applyOneRuleLogic (_, RightSub iden context) params
+          = if elem iden (map fst lists) || elem iden (map fst folds)
+              then if isJust attrsForIden
+                then return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params))
+                else return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" [VarExpr iden] : params))
+              else if isJust attrsForIden
+                then return (FnCall ("addToEnvironment" ++ fromJust (lookup iden sorts) ++ context) ((VarExpr iden : nextStep) ++ params))
+                else return (FnCall ("addToEnvironment" ++ fromJust (lookup iden sorts) ++ context) (VarExpr iden : params))
+          where
+            newAttrs = filter (\(left, _) ->
+                let iden = liden left
+                    ctxsForSort = fromJust (lookup sname ctxsBySname)
+                    ctxsForIdenSort = fromJust (lookup (sortNameForIden iden ctor) ctxsBySname)
+                in (iden == "" && any (\ctx -> linst left == xinst ctx) ctxsForSort) || any (\ctx -> linst left == xinst ctx) ctxsForIdenSort
+              ) (cattrs ctor)
+            attrsForIden = find (\(left, _) -> liden left == iden) newAttrs
+            nextStep = maybeToList (applyOneRuleLogic (fromJust attrsForIden) [])
+            lists = clists ctor
+            folds = dropFold $ cfolds ctor
+            sorts = csorts ctor

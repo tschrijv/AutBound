@@ -69,10 +69,13 @@ filterCtxsByNamespace namespace contextsBySortName = [
 snameAndCtxs :: SortDef -> (SortName, [Context])
 snameAndCtxs s = (sname s, sctxs s)
 
--- Possibly TODO
 -- | Produce a list of pairs with the first element being an identifier, the
 -- second the list of attribute definitions that assign to this identifier
-attrsByIden :: [AttributeDef] -> [(IdenName, SortName)] -> [(IdenName, [AttributeDef])]
-attrsByIden attrs sorts = [
-  (iden, filter (\(l, _) -> liden l == iden) attrs)
-  | (iden, _) <- sorts]
+attrsByIden :: ConstructorDef -> [(IdenName, [AttributeDef])]
+attrsByIden ctor = [
+  (iden, filter (\(l, _) -> liden l == iden) (cattrs ctor))
+  | (iden, _) <- (dropFold (cfolds ctor) ++ clists ctor ++ csorts ctor)]
+
+-- | Drops the third element from each tuple in a list
+dropFold :: [(String, String, String)] -> [(String, String)]
+dropFold = map (\(a, b, _) -> (a, b))
