@@ -75,7 +75,7 @@ printTypeDecls decls =
     printOneType :: (Type, [Constructor]) -> Doc String
     printOneType (t, cs) = hsep [
         pretty "data",
-        pretty t,
+        pretty (upperFirst t),
         pretty "=",
         hsep $ punctuate (pretty " |") (map pretty cs),
         pretty "deriving(Show, Eq)"
@@ -87,7 +87,7 @@ printFunctions fns = intoLines $ punctuate nl (map pretty fns)
 printInstances :: [(Type, Type, [Function])] -> Doc String
 printInstances ids = intoLines $ map (
     \(cls, typ, fns) -> intoLines [
-      hsep [pretty "instance", pretty cls, pretty typ, pretty "where"],
+      hsep [pretty "instance", pretty (upperFirst cls), pretty (upperFirst typ), pretty "where"],
       printFunctions (map (\(Fn n lns) -> Fn ("  " ++ n) lns) fns)
     ]
   ) ids
