@@ -65,7 +65,7 @@ filterCtxsByNamespace namespace contextsBySortName = [
   (sortName, [ctx' | ctx' <- ctxs, xnamespace ctx' == namespace])
   | (sortName, ctxs) <- contextsBySortName]
 
--- TODO
+-- Get the sort's name and contexts as a tuple
 snameAndCtxs :: SortDef -> (SortName, [Context])
 snameAndCtxs s = (sname s, sctxs s)
 

@@ -10,42 +10,44 @@ type IdenName         = String
 type HaskellTypeName  = String
 type InstanceName     = String
 
---the inherited or synthesised contexts
+-- | Definition of an inherited or a synthesized context
 data Context
   = INH { xinst :: InstanceName, xnamespace :: NamespaceName }
   | SYN { xinst :: InstanceName, xnamespace :: NamespaceName }
   deriving (Show, Eq)
 
---the left part of an expression like t1.ctx=lhs.ctx
+-- | The left side of an attribute definition
 data LeftExpr
   = LeftLHS { linst :: InstanceName }
   | LeftSub { _liden :: IdenName, linst :: InstanceName }
   deriving (Show, Eq)
 
+-- | Returns the identifier on the left side of the attribute definition
+-- or an empty string if it is a LHS definition
 liden :: LeftExpr -> IdenName
 liden left@LeftSub{} = _liden left
 liden _                = ""
 
---the right part of an expression like t1.ctx=lhs.ctx
+-- | The right side of an attribute definition
 data RightExpr
   = RightLHS { rinst :: InstanceName }
   | RightSub { riden :: IdenName, rinst :: InstanceName }
   | RightAdd { rexp :: RightExpr, riden :: IdenName }
   deriving (Show, Eq)
 
---the complete expression of like t1.ctx=lhs.ctx
+-- | Attribute definition (e.g. t1.ctx = lhs.ctx, T)
 type AttributeDef = (LeftExpr, RightExpr)
 
---the definition of a namespace declaration
+-- | Namespace declaration
 data NamespaceDef
   = MkNameSpace {
     nname :: NamespaceName,
     nsort :: SortName,
-    nenv :: [String]  -- TODO: what are the envs for?
+    nenv :: [String]
   }
   deriving (Show, Eq)
 
---definition of a sort
+-- | Sort declaration
 data SortDef
   = MkDefSort {
     sname :: SortName,
@@ -55,7 +57,7 @@ data SortDef
   }
   deriving (Show, Eq)
 
---definition of a constructor
+-- | Constructor declaration
 data ConstructorDef
   = MkDefConstructor {
     cname :: ConstructorName,
@@ -80,6 +82,8 @@ data ConstructorDef
   }
   deriving (Show, Eq)
 
+-- | Returns the binder of a constructor or Nothing if it is not a bind
+-- constructor
 cbinder :: ConstructorDef -> Maybe (IdenName, NamespaceName)
 cbinder ctor@MkBindConstructor{} = Just (_cbinder ctor)
 cbinder _                        = Nothing
@@ -89,4 +93,5 @@ isBind :: ConstructorDef -> Bool
 isBind MkBindConstructor{} = True
 isBind _                   = False
 
+-- | Complete definition of a language
 type Language = ([NamespaceDef], [SortDef], [(String, [String])], [String])
