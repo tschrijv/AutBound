@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Variable.Common (getEnvType, getEnvFunctions, freeVarFunctions, mappingFunctions, substFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..)) where
+module Variable.Common (getEnvType, getEnvFunctions, freeVarFunctions, mappingFunctions, substFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs) where
 
 import Data.List
 import Data.Maybe
@@ -287,10 +287,6 @@ inhCtxsForSortName :: SortName -> [(SortName, [Context])] -> [Context]
 inhCtxsForSortName sname ctxsForSortName = [INH x y | INH x y <- ctxs]
   where
     ctxs = fromJust (lookup sname ctxsForSortName)
-
--- | Looks up the sort name for a given identifier in a constructor
-sortNameForIden :: IdenName -> ConstructorDef -> SortName
-sortNameForIden iden ctor = fromJust (lookup iden (dropFold (cfolds ctor) ++ clists ctor ++ csorts ctor))
 
 -- | In a list of tuples, converts the first elements to a list of variable parameters
 firstToVarParams :: [(String, String)] -> [Parameter]

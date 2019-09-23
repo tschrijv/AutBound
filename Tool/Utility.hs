@@ -69,6 +69,10 @@ filterCtxsByNamespace namespace contextsBySortName = [
 snameAndCtxs :: SortDef -> (SortName, [Context])
 snameAndCtxs s = (sname s, sctxs s)
 
+-- | Looks up the sort name for a given identifier in a constructor
+sortNameForIden :: IdenName -> ConstructorDef -> SortName
+sortNameForIden iden ctor = fromJust (lookup iden (dropFold (cfolds ctor) ++ clists ctor ++ csorts ctor))
+
 -- | Produce a list of pairs with the first element being an identifier, the
 -- second the list of attribute definitions that assign to this identifier
 attrsByIden :: ConstructorDef -> [(IdenName, [AttributeDef])]
