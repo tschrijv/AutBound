@@ -137,14 +137,16 @@ sort Coercion rewrite
 
 HaskellCode
 
+-- You need to delete the "b" binder parameters if using De Bruijn indices
+
 rewriteTypeToCoercion:: ValueType ->Coercion
 rewriteTypeToCoercion (ValTyVar hnat) = CoTypeVar (ValTyVar hnat)
 rewriteTypeToCoercion (ValTUnit) = CoUnit
 rewriteTypeToCoercion  (ValTyArr ty1 (ComputationTy ty2 dirt))= CoArrow (rewriteTypeToCoercion ty1) (CoComputation (rewriteTypeToCoercion ty2)  (CoDirt dirt))
 rewriteTypeToCoercion  (ValTyHandler (ComputationTy ty1 dirt1) (ComputationTy ty2 dirt2)) =  CoHandler (CoComputation (rewriteTypeToCoercion ty1)  (CoDirt dirt1)) (CoComputation (rewriteTypeToCoercion ty2)  (CoDirt dirt2))
-rewriteTypeToCoercion  (ValTyAllSkel ty) = CoskeletonAll (rewriteTypeToCoercion ty)
-rewriteTypeToCoercion  (ValTyAll valty skel)= CoTypeAll (rewriteTypeToCoercion valty) skel
-rewriteTypeToCoercion  (ValTyAllDirt valty)=CodirtAll (rewriteTypeToCoercion valty )
+rewriteTypeToCoercion  (ValTyAllSkel b ty) = CoskeletonAll b (rewriteTypeToCoercion ty)
+rewriteTypeToCoercion  (ValTyAll b valty skel)= CoTypeAll b (rewriteTypeToCoercion valty) skel
+rewriteTypeToCoercion  (ValTyAllDirt b valty)=CodirtAll b (rewriteTypeToCoercion valty )
 rewriteTypeToCoercion  (ValTyCoArr pi ty)= CoCoArrow pi (rewriteTypeToCoercion ty)
 
 
@@ -153,8 +155,8 @@ rewriteCoercion (CoTypeVar ty) = rewriteTypeToCoercion ty
 rewriteCoercion  (CoArrow co1 co2) = CoArrow (rewriteCoercion co1) (rewriteCoercion co2)
 rewriteCoercion (CoHandler co1 co2) = CoHandler  (rewriteCoercion co1) (rewriteCoercion co2)
 rewriteCoercion (UnionOp co1 op) = UnionOp (rewriteCoercion co1) op
-rewriteCoercion (CoskeletonAll co) = CoskeletonAll (rewriteCoercion co)
-rewriteCoercion (CoTypeAll co skel) = CoTypeAll (rewriteCoercion co ) skel
+rewriteCoercion (CoskeletonAll b co) = CoskeletonAll b (rewriteCoercion co)
+rewriteCoercion (CoTypeAll b co skel) = CoTypeAll b (rewriteCoercion co ) skel
 rewriteCoercion (CoCoArrow pi co) = CoCoArrow pi (rewriteCoercion co )
 rewriteCoercion (CoComputation co1 co2) = CoComputation (rewriteCoercion co1) (rewriteCoercion co2)
 rewriteCoercion co = co
