@@ -100,13 +100,13 @@ getShiftHelpers sd opName varAccessTable = let filtered = filter (\(MkDefSort sn
   where
     constructorsToCheckShift :: [ConstructorDef] -> SortName -> String -> [Function]
     constructorsToCheckShift cdefs sname op = [
-      Fn (lowerFirst sname ++ "shiftHelp" ++ op)
+      Fn (sname ++ "shiftHelp" ++ op)
       [
-        ([VarParam "d", VarParam "c", ConstrParam (upperFirst consName) [VarParam "var"]],
+        ([VarParam "d", VarParam "c", ConstrParam consName [VarParam "var"]],
         IfExpr
           (GTEExpr (VarExpr "var") (VarExpr "c"))
-          (ConstrInst (upperFirst consName) [FnCall op [VarExpr "var", VarExpr "d"]])
-          (ConstrInst (upperFirst consName) [VarExpr "var"])
+          (ConstrInst consName [FnCall op [VarExpr "var", VarExpr "d"]])
+          (ConstrInst consName [VarExpr "var"])
         )
       ] | MkVarConstructor consName _ <- cdefs]
 
@@ -114,11 +114,11 @@ getShiftFunctions :: [SortDef] -> [NamespaceDef] -> String -> [(SortName, Bool)]
 getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> isJust (lookup (sname s) varAccessTable)) sd
   in map (\(MkDefSort sname namespaceDecl _ _) ->
     Fn
-      (lowerFirst sname ++ "shift" ++ opName)
+      (sname ++ "shift" ++ opName)
       [
         ([VarParam "d", VarParam "t"],
         FnCall
-          (lowerFirst sname ++ "map")
+          (sname ++ "map")
           (declarationsToFunctions namespaceDecl defs opName ++ [ConstrInst "Z" [], VarExpr "t"])
         )
       ]
@@ -131,8 +131,8 @@ getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> i
       ) filtered
 
 _getCtorParams :: ConstructorDef -> [Parameter]
-_getCtorParams (MkVarConstructor consName _) = [ConstrParam (upperFirst consName) [VarParam "var"]]
-_getCtorParams cons = [ConstrParam (upperFirst consName) (firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (lowerFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
+_getCtorParams (MkVarConstructor consName _) = [ConstrParam consName [VarParam "var"]]
+_getCtorParams cons = [ConstrParam consName (firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
   where
     consName = cname cons
     folds = cfolds cons
@@ -147,8 +147,8 @@ _oneDeeper namespace expr = ConstrInst ("S" ++ namespace) expr
 
 _substExpr sname consName =
   IfExpr (EQExpr (VarExpr "var") (VarExpr "c"))
-    (FnCall (lowerFirst sname ++ "shiftplus") [VarExpr "c", VarExpr "sub"])
-    (ConstrInst (upperFirst consName) [VarExpr "var"])
+    (FnCall (sname ++ "shiftplus") [VarExpr "c", VarExpr "sub"])
+    (ConstrInst consName [VarExpr "var"])
 
 ef = EF {
   paramForCtor = _getCtorParams,

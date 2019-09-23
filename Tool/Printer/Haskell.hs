@@ -4,20 +4,21 @@ module Printer.Haskell where
 
 import Data.Text.Prettyprint.Doc
 import Program
+import Utility
 
 instance Pretty Constructor where
-  pretty (Constr n ts) = hsep (pretty n : map pretty ts)
+  pretty (Constr n ts) = hsep (pretty (upperFirst n) : map pretty ts)
 
 instance Pretty Parameter where
-  pretty (VarParam n) = pretty n
-  pretty (ConstrParam n ps) = parens (hsep (pretty n : map pretty ps))
+  pretty (VarParam n) = pretty (lowerFirst n)
+  pretty (ConstrParam n ps) = parens (hsep (pretty (upperFirst n) : map pretty ps))
   pretty (StringParam s) = pretty "\"" <> pretty s <> pretty "\""
   pretty (IntParam i) = pretty i
 
 instance Pretty Expression where
-  pretty (FnCall n ps) = parens $ hsep (pretty n : map pretty ps)
-  pretty (ConstrInst n ps) = parens $ hsep (pretty n : map pretty ps)
-  pretty (VarExpr x) = pretty x
+  pretty (FnCall n ps) = parens $ hsep (pretty (lowerFirst n) : map pretty ps)
+  pretty (ConstrInst n ps) = parens $ hsep (pretty (upperFirst n) : map pretty ps)
+  pretty (VarExpr x) = pretty (lowerFirst x)
   pretty (Minus a b) = parens (pretty a <+> pretty "-" <+> pretty b)
   pretty (IntExpr i) = pretty i
   pretty (StringExpr s) = pretty "\"" <> pretty s <> pretty "\""
@@ -30,7 +31,7 @@ instance Pretty Expression where
 instance Pretty Function where
   pretty (Fn n lns) = intoLines (map oneLine lns) where
     oneLine :: ([Parameter], Expression) -> Doc a
-    oneLine (ps, ex) = hsep $ (pretty n : map pretty ps) ++ [pretty "=", pretty ex]
+    oneLine (ps, ex) = hsep $ (pretty (lowerFirst n) : map pretty ps) ++ [pretty "=", pretty ex]
 
 nl :: Doc a
 nl = pretty "\n"

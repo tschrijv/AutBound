@@ -42,8 +42,8 @@ getVariableFunctions :: Language -> (Type, [Constructor]) -> [Function]
 getVariableFunctions lan _ = mappingFunctions lan ef ++ freeVarFunctions lan ef ++ substFunctionsC lan
 
 _getCtorParams :: ConstructorDef -> [Parameter]
-_getCtorParams (MkVarConstructor consName _) = [ConstrParam (upperFirst consName) [VarParam "var"]]
-_getCtorParams cons = [ConstrParam (upperFirst consName) ((map (\_ -> VarParam "b") (maybeToList (cbinder cons))) ++ firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (lowerFirst x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
+_getCtorParams (MkVarConstructor consName _) = [ConstrParam consName [VarParam "var"]]
+_getCtorParams cons = [ConstrParam consName ((map (\_ -> VarParam "b") (maybeToList (cbinder cons))) ++ firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
   where
     consName = cname cons
     folds = cfolds cons
@@ -57,7 +57,7 @@ _varCtorFreeVar name = IfExpr (FnCall "elem" [VarExpr "var", VarExpr "c"]) (List
 _substExpr sname consName =
   IfExpr (EQExpr (VarExpr "var") (VarExpr "c"))
     (VarExpr "sub")
-    (ConstrInst (upperFirst consName) [VarExpr "var"])
+    (ConstrInst consName [VarExpr "var"])
 
 ef = EF {
   paramForCtor = _getCtorParams,
@@ -78,7 +78,7 @@ substFunctionsC (nsd, sd, _, _) =
     let inhCtxs = [INH x y | INH x y <- ctxs]
     in (map (\ctx ->
       let sortOfCtxNamespace = sortNameForNamespaceName (xnamespace ctx) nsd
-      in Fn (lowerFirst sortName ++ sortOfCtxNamespace ++ "Substitute")
+      in Fn (sortName ++ sortOfCtxNamespace ++ "Substitute")
         (map (\ctor -> substFunctionForCtx sortName sortOfCtxNamespace ctor ctx ctxs nsd rewrite) ctors)
     ) inhCtxs)
   ) sortsWithVarAccess
@@ -105,17 +105,21 @@ substFunctionsC (nsd, sd, _, _) =
         substExprForCtor (MkVarConstructor ctorName _) =
           IfExpr (EQExpr (VarExpr "var") (VarExpr "orig"))
             (VarExpr "sub")
-            (ConstrInst (upperFirst ctorName) [VarExpr "var"])
+            (ConstrInst ctorName [VarExpr "var"])
         substExprForCtor ctor =
           ConstrInst
-            (upperFirst (cname ctor))
+            (cname ctor)
             (
               binder
               ++ map substCallForIden idensAndAttrs
-              ++ [VarExpr (lowerFirst x ++ show n) | (x, n) <- zip (cnatives ctor) [1 :: Int ..]]
+              ++ [VarExpr (x ++ show n) | (x, n) <- zip (cnatives ctor) [1 :: Int ..]]
             )
           where
-            binder = if isBind ctor then [FnCall ("fresh" ++ snd (fromJust (cbinder ctor))) [VarExpr "b", FnCall "concat" [ListExpr (map (\(iden, namespace) -> FnCall ("freeVariables" ++ namespace) [ListExpr [], VarExpr iden]) (dropFold (cfolds ctor) ++ clists ctor ++ csorts ctor))]]] else []
+            binder = if isBind ctor
+              then [FnCall
+                ("fresh" ++ snd (fromJust (cbinder ctor)))
+                [VarExpr "b", FnCall "concat" [ListExpr (map (\(iden, namespace) -> FnCall ("freeVariables" ++ namespace) [ListExpr [], VarExpr iden]) (dropFold (cfolds ctor) ++ clists ctor ++ csorts ctor))]]]
+              else []
             idensAndAttrs = attrsByIden ctor
             folds = dropFold (cfolds ctor)
             lists = clists ctor
@@ -136,7 +140,11 @@ substFunctionsC (nsd, sd, _, _) =
                       else FnCall fnName (substParams ++ [idenExpr])
                   else idenExpr
               where
-                fnName = lowerFirst (sortNameForIden iden ctor) ++ sortOfCtxNamespace ++ "Substitute"
-                idenExpr = if null binder then VarExpr (lowerFirst iden) else FnCall (lowerFirst (sortNameForIden iden ctor) ++ lowerFirst (sortName) ++ "Substitute") [VarExpr "b", head binder, VarExpr (lowerFirst iden)]
+                fnName = sortNameForIden iden ctor ++ sortOfCtxNamespace ++ "Substitute"
+                idenExpr = if null binder
+                  then VarExpr iden
+                  else FnCall
+                    (sortNameForIden iden ctor ++ sortName ++ "Substitute")
+                    [VarExpr "b", head binder, VarExpr iden]
                 substParams = [VarExpr "orig", VarExpr "sub"]
                 sortNameOfIden = sortNameForIden iden ctor

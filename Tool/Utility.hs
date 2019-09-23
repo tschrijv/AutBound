@@ -19,7 +19,7 @@ upperFirst (first:rest) = toUpper first : rest
 -- | Return the sort name for a given namespace name in a list of namespace
 -- definitions
 sortNameForNamespaceName :: NamespaceName -> [NamespaceDef] -> SortName
-sortNameForNamespaceName name nsd = head [lowerFirst $ nsort ns | ns <- nsd, nname ns == name]
+sortNameForNamespaceName name nsd = head [nsort ns | ns <- nsd, nname ns == name]
 
 -- | Return a list of tuples with sort names and a boolean value indicating
 -- whether they access variables
