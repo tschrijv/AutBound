@@ -84,4 +84,9 @@ cbinder :: ConstructorDef -> Maybe (IdenName, NamespaceName)
 cbinder ctor@MkBindConstructor{} = Just (_cbinder ctor)
 cbinder _                        = Nothing
 
+-- | Returns whether the given constructor has a binder
+isBind :: ConstructorDef -> Bool
+isBind MkBindConstructor{} = True
+isBind _                   = False
+
 type Language = ([NamespaceDef], [SortDef], [(String, [String])], [String])

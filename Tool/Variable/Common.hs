@@ -199,11 +199,6 @@ mappingFunctions (_, sd, _, _) ef =
         folds = dropFold (cfolds ctor)
         lists = clists ctor
 
-        -- | Returns whether the given constructor has a binder
-        isBind :: ConstructorDef -> Bool
-        isBind MkBindConstructor{} = True
-        isBind _                   = False
-
         -- | Construct a mapping function call for an identifier
         mapFnCallForIden :: (IdenName, [AttributeDef]) -> Expression
         mapFnCallForIden (iden, idenAttrs)
