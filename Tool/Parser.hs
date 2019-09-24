@@ -326,7 +326,7 @@ pSubExpr = do
 -- | Parse native code if not at the end of file
 pHaskellCode :: Parser [String]
 pHaskellCode = parseEOF <|> do
-  pReserved "HaskellCode"
+  pReserved "NativeCode"
   pHsCode
 
 -- | Parse lines until the end of the file

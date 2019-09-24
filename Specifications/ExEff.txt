@@ -139,7 +139,7 @@ sort Coercion rewrite
     | CoCoArrow (pi: SimpleCoercionType) (Co: Coercion)
     | CoComputation (co1: Coercion) (co2: Coercion)
 
-HaskellCode
+NativeCode
 
 -- You need to delete the "b" binder parameters if using De Bruijn indices
 
