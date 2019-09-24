@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Variable.Common (getEnvType, getEnvFunctions, freeVarFunctions, mappingFunctions, substFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs) where
+module Variable.Common (getEnvType, getEnvFunctions, freeVarFunctions, mappingFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs) where
 
 import Data.List
 import Data.Maybe
@@ -227,23 +227,23 @@ applyInhCtxsToAttrs ef sname ctor (iden, idenAttrs) ctxsBySname
  = let inhCtxs = (inhCtxsForSortName (sortNameForIden iden ctor) ctxsBySname)
    in foldr (\ctx rest -> fromMaybe rest (applyOneCtx ctx rest)) (VarExpr "c") inhCtxs
   where
-    -- | Runs `applyOneRuleLogic` if the identifier's attribute definitions
+    -- | Runs `applyOneAttr` if the identifier's attribute definitions
     -- contain an assignment to an instance of the given context
     applyOneCtx :: Context -> Expression -> Maybe Expression
     applyOneCtx ctx param
-      | isJust attrForCtx = applyOneRuleLogic (fromJust attrForCtx) [param]
+      | isJust attrForCtx = applyOneAttr (fromJust attrForCtx) [param]
       | otherwise = Nothing
       where
         attrForCtx = find (\(left, _) -> linst left == xinst ctx) idenAttrs
 
         -- | Apply the necessary wrap based on the attribute assignment type
-        applyOneRuleLogic :: AttributeDef -> [Expression] -> Maybe Expression
-        applyOneRuleLogic (_, RightLHS _) _ = Nothing
-        applyOneRuleLogic (l, RightAdd expr _) params
+        applyOneAttr :: AttributeDef -> [Expression] -> Maybe Expression
+        applyOneAttr (_, RightLHS _) _ = Nothing
+        applyOneAttr (l, RightAdd expr _) params
           = return (transformForAddAttr ef (xnamespace ctx) (nextStep ++ params))
           where
-            nextStep = maybeToList (applyOneRuleLogic (l, expr) [])
-        applyOneRuleLogic (_, RightSub iden context) params
+            nextStep = maybeToList (applyOneAttr (l, expr) [])
+        applyOneAttr (_, RightSub iden context) params
           = if elem iden (map fst lists) || elem iden (map fst folds)
               then if isJust attrsForIden
                 then return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params))
@@ -259,7 +259,7 @@ applyInhCtxsToAttrs ef sname ctor (iden, idenAttrs) ctxsBySname
                 in (iden == "" && any (\ctx -> linst left == xinst ctx) ctxsForSort) || any (\ctx -> linst left == xinst ctx) ctxsForIdenSort
               ) (cattrs ctor)
             attrsForIden = find (\(left, _) -> liden left == iden) newAttrs
-            nextStep = maybeToList (applyOneRuleLogic (fromJust attrsForIden) [])
+            nextStep = maybeToList (applyOneAttr (fromJust attrsForIden) [])
             lists = clists ctor
             folds = dropFold $ cfolds ctor
             sorts = csorts ctor
