@@ -51,7 +51,7 @@ getVariableInstances (_, hnatc) =
       | otherwise = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "error" [StringExpr "differing namespace found in compare"])
 
 getVariableFunctions :: Language -> (Type, [Constructor]) -> [Function]
-getVariableFunctions lan@(nsd, _, _, _) varT = getHNatModifiers varT ++ getGenerators nsd ++ getShift lan ++ mappingFunctions lan ef ++ substFunctions lan ef ++ freeVarFunctions lan ef
+getVariableFunctions lan@(nsd, _, _, _) varT = getHNatModifiers varT ++ getGenerators nsd ++ getShift lan ++ mappingFunctions lan ef ++ substFunctions lan ++ freeVarFunctions lan ef
 
 getHNatModifiers :: (Type, [Constructor]) -> [Function]
 getHNatModifiers (_, hnatc) =
@@ -130,6 +130,59 @@ getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> i
         FnCall (sortNameForNamespaceName namespaceName nsd ++ "shiftHelp" ++ op) [VarExpr "d"]
       ) filtered
 
+-- | Generates the following for sorts with variable access:
+-- * Substitute helper functions for variable constructors
+-- * Substitute functions for every sort that is related to the given sort by
+-- the first sort having a context with a variable of the type of the second sort
+substFunctions :: Language -> [Function]
+substFunctions (nsd, sd, _, _) =
+  let varAccessBySname = varAccessBySortName sd
+      sortsWithVarAccess = filter (\sort -> isJust (lookup (sname sort) varAccessBySname)) sd
+  in concatMap (\(MkDefSort sortName ctxs ctors rewrite) ->
+    let inhCtxs = [INH x y | INH x y <- ctxs]
+    in
+      [
+        Fn (sortName ++ "SubstituteHelp")
+        [
+          (
+            [VarParam "sub", VarParam "c", ConstrParam ctorName [VarParam "var"]],
+            _substExpr sortName ctorName
+          )
+        ]
+      | MkVarConstructor ctorName _ <- ctors]
+      ++
+      map (\ctx -> substFunctionForCtx sortName ctx ctxs nsd rewrite) inhCtxs
+  ) sortsWithVarAccess
+  where
+    -- | Generate a substitution function for a given sort's given context instance
+    -- where parameters are
+    -- * `orig` for the variable we want to substitute
+    -- * `sub` for the term we want to replace `orig` with
+    -- * `t` for the term we want to run the substitution on
+    substFunctionForCtx :: SortName -> Context -> [Context] -> [NamespaceDef] -> Bool -> Function
+    substFunctionForCtx sortName ctx ctxs nsd rewrite
+      = let sortOfCtxNamespace = sortNameForNamespaceName (xnamespace ctx) nsd
+            mapCall = FnCall (sortName ++ "map") (paramFnCallsForCtxs ctx ctxs nsd ++ [VarExpr "orig", VarExpr "t"])
+        in Fn
+          (sortName ++ sortOfCtxNamespace ++ "Substitute")
+          [
+            (
+              [VarParam "sub", VarParam "orig", VarParam "t"],
+              if rewrite then FnCall ("rewrite" ++ sortName) [mapCall] else mapCall
+            )
+          ]
+      where
+        -- | For each inherited context instance in the list (a sort's contexts) generate
+        -- either a function call to the helper function if the instance is the one
+        -- being substituted, or a lambda function that just returns the variable's
+        -- value
+        paramFnCallsForCtxs :: Context -> [Context] -> [NamespaceDef] -> [Expression]
+        paramFnCallsForCtxs (INH inst namespaceName) ctxs nsd =
+          [if inst == inst'
+              then FnCall (sortNameForNamespaceName namespaceName nsd ++ "SubstituteHelp") [VarExpr "sub"]
+              else LambdaExpr [VarParam "c", VarParam "x"] (VarExpr "x")
+          | INH inst' _ <- ctxs]
+
 _getCtorParams :: ConstructorDef -> [Parameter]
 _getCtorParams (MkVarConstructor consName _) = [ConstrParam consName [VarParam "var"]]
 _getCtorParams cons = [ConstrParam consName (firstToVarParams (dropFold folds ++ lists ++ sorts) ++ [VarParam (x ++ show n) | (x, n) <- zip hTypes [1 :: Int ..]])]
@@ -154,6 +207,5 @@ ef = EF {
   paramForCtor = _getCtorParams,
   freeVarExprForVarCtor = _varCtorFreeVar,
   transformForAddAttr = _oneDeeper,
-  substHelperExprForVarCtor = _substExpr,
   includeBinders = False
 }

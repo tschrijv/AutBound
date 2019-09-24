@@ -13,7 +13,6 @@ data ExternalFunctions = EF {
   paramForCtor :: ConstructorDef -> [Parameter],
   freeVarExprForVarCtor :: String -> Expression,
   transformForAddAttr :: String -> [Expression] -> Expression,
-  substHelperExprForVarCtor :: String -> String -> Expression,
   includeBinders :: Bool
 }
 
@@ -207,62 +206,6 @@ mappingFunctions (_, sd, _, _) ef =
             -- of the namespaces in the list of contexts
             fnCallsForCtxs :: [Context] -> [Expression]
             fnCallsForCtxs ctx = [VarExpr ("on" ++ namespace) | INH _ namespace <- ctx]
-
--- * Substitution functions
--- ----------------------------------------------------------------------------
-
--- | Generates the following for sorts with variable access:
--- * Substitute helper functions for variable constructors
--- * Substitute functions for every sort that is related to the given sort by
--- the first sort having a context with a variable of the type of the second sort
-substFunctions :: Language -> ExternalFunctions -> [Function]
-substFunctions (nsd, sd, _, _) ef =
-  let varAccessBySname = varAccessBySortName sd
-      sortsWithVarAccess = filter (\sort -> isJust (lookup (sname sort) varAccessBySname)) sd
-  in concatMap (\(MkDefSort sortName ctxs ctors rewrite) ->
-    let inhCtxs = [INH x y | INH x y <- ctxs]
-    in
-      [
-        Fn (sortName ++ "SubstituteHelp")
-        [
-          (
-            [VarParam "sub", VarParam "c", ConstrParam ctorName [VarParam "var"]],
-            substHelperExprForVarCtor ef sortName ctorName
-          )
-        ]
-      | MkVarConstructor ctorName _ <- ctors]
-      ++
-      map (\ctx -> substFunctionForCtx sortName ctx ctxs nsd rewrite) inhCtxs
-  ) sortsWithVarAccess
-  where
-    -- | Generate a substitution function for a given sort's given context instance
-    -- where parameters are
-    -- * `orig` for the variable we want to substitute
-    -- * `sub` for the term we want to replace `orig` with
-    -- * `t` for the term we want to run the substitution on
-    substFunctionForCtx :: SortName -> Context -> [Context] -> [NamespaceDef] -> Bool -> Function
-    substFunctionForCtx sortName ctx ctxs nsd rewrite
-      = let sortOfCtxNamespace = sortNameForNamespaceName (xnamespace ctx) nsd
-            mapCall = FnCall (sortName ++ "map") (paramFnCallsForCtxs ctx ctxs nsd ++ [VarExpr "orig", VarExpr "t"])
-        in Fn
-          (sortName ++ sortOfCtxNamespace ++ "Substitute")
-          [
-            (
-              [VarParam "sub", VarParam "orig", VarParam "t"],
-              if rewrite then FnCall ("rewrite" ++ sortName) [mapCall] else mapCall
-            )
-          ]
-      where
-        -- | For each inherited context instance in the list (a sort's contexts) generate
-        -- either a function call to the helper function if the instance is the one
-        -- being substituted, or a lambda function that just returns the variable's
-        -- value
-        paramFnCallsForCtxs :: Context -> [Context] -> [NamespaceDef] -> [Expression]
-        paramFnCallsForCtxs (INH inst namespaceName) ctxs nsd =
-          [if inst == inst'
-              then FnCall (sortNameForNamespaceName namespaceName nsd ++ "SubstituteHelp") [VarExpr "sub"]
-              else LambdaExpr [VarParam "c", VarParam "x"] (VarExpr "x")
-          | INH inst' _ <- ctxs]
 
 -- * Helper functions
 -- ----------------------------------------------------------------------------

@@ -64,7 +64,6 @@ ef = EF {
   paramForCtor = _getCtorParams,
   freeVarExprForVarCtor = _varCtorFreeVar,
   transformForAddAttr = (\n e -> head e),
-  substHelperExprForVarCtor = _substExpr,
   includeBinders = True
 }
 
