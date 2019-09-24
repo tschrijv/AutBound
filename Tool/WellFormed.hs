@@ -1,4 +1,4 @@
--- {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall #-}
 
 module WellFormed (wellFormed) where
 
@@ -10,7 +10,7 @@ import Data.Maybe
 wellFormed :: Language -> Either String Bool
 wellFormed ([], [], _, _) = Left "Empty Language"
 wellFormed (namespaces, sorts, imps, _) = do
-  o <- helpWellFormedVariablesNamespace sorts namespaces
+  _ <- helpWellFormedVariablesNamespace sorts namespaces
   helpWellFormed (namespaces, sorts, imps) [] [] [] [] [] [] []
 
 --accumulates the sortnames, constructornames, and the sortnames contained in the constructors,
@@ -23,31 +23,30 @@ helpWellFormed (namespacedef:lanrest, sorts, imp) sortnames consnames sortconsna
     sortnames
     consnames
     sortconsnames
-    ((nname namespacedef) : namespacenames)
-    ((nsort namespacedef) : sortnamespaces)
+    (nname namespacedef : namespacenames)
+    (nsort namespacedef : sortnamespaces)
     instTable
     sortdefs
 helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
-  a <- isEmptySort s
-  b <- helpWellFormedNameSpaceNameInConstructors (getNamespaceNamesUsedInSort s) namespacenames
-  c <- wellFormedConstructors (sctors s) (map xinst (sctxs s))
-  d <- helpWellFormedInstances (getInstanceSortsNameSpaceNames s) namespacenames
-  e <- helpWellFormedVariables (sctors s) (sctxs s)
-  f <- helpWellFormedInstanceNames (map xinst (sctxs s))
+  _ <- isEmptySort s
+  _ <- helpWellFormedNameSpaceNameInConstructors getNamespaceNamesUsedInSort namespacenames
+  _ <- wellFormedConstructors (sctors s)
+  _ <- helpWellFormedInstances (getInstanceSortsNameSpaceNames s) namespacenames
+  _ <- helpWellFormedVariables (sctors s) (sctxs s)
+  _ <- helpWellFormedInstanceNames (map xinst (sctxs s))
   helpWellFormed
     ([], lanrest, imp)
-    ((sname s) : sortnames)
-    ((getConstructorNames s) ++ consnames)
-    ((getSortsUsedByConstructors s) ++ sortconsnames)
+    (sname s : sortnames)
+    (getConstructorNames s ++ consnames)
+    (getSortsUsedByConstructors ++ sortconsnames)
     namespacenames
     sortnamespaces
     (snameAndCtxs s : instTable)
     (s : sortdefs)
     where
       --get the namespaces used by the constructors
-      getNamespaceNamesUsedInSort :: SortDef -> [NamespaceName]
-      getNamespaceNamesUsedInSort s =
-        map fromJust (filter isJust (map (getNamespaceNameConstructor) (sctors s)))
+      getNamespaceNamesUsedInSort :: [NamespaceName]
+      getNamespaceNamesUsedInSort = map fromJust (filter isJust (map getNamespaceNameConstructor (sctors s)))
         where
           --getNamespaceName of a ConstructorDef
           getNamespaceNameConstructor :: ConstructorDef -> Maybe NamespaceName
@@ -65,76 +64,75 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
       getConstructorNames (MkDefSort _ _ cnames _) = map cname cnames
 
       --get the sorts used in all constructors of the sort
-      getSortsUsedByConstructors :: SortDef -> [SortName]
-      getSortsUsedByConstructors s =
-        (getSortsOfConstructors (sctors s))
+      getSortsUsedByConstructors :: [SortName]
+      getSortsUsedByConstructors = getSortsOfConstructors (sctors s)
         where
           -- get the sorts used by constructors in a list of constructors
           getSortsOfConstructors :: [ConstructorDef] -> [SortName]
-          getSortsOfConstructors constrs = concatMap (getSortsConstructor) constrs where
+          getSortsOfConstructors = concatMap getSortsConstructor where
             --get the sorts used in the constructor
             getSortsConstructor :: ConstructorDef -> [SortName]
-            getSortsConstructor (MkDefConstructor _ lists sorts folds _ _) = map snd sorts ++ map snd lists ++ map (\(x, y, z) -> y) folds
-            getSortsConstructor (MkBindConstructor _ lists sorts folds _ _ _) = map snd sorts ++ map snd lists ++ map (\(x, y, z) -> y) folds
+            getSortsConstructor (MkDefConstructor _ lists sorts folds _ _) = map snd sorts ++ map snd lists ++ map (\(_, y, _) -> y) folds
+            getSortsConstructor (MkBindConstructor _ lists sorts folds _ _ _) = map snd sorts ++ map snd lists ++ map (\(_, y, _) -> y) folds
             getSortsConstructor _ = []
-helpWellFormed ([], [], imp) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
-  a <- helpWellFormedSortName sortnames
-  b <- helpWellFormedConstructorName consnames
-  c <- helpWellFormedNameSpaceName namespacenames
-  d <- helpWellFormedConstructorAndSort consnames sortnames
-  e <- helpWellFormedNameSpaceAndSort namespacenames sortnames
-  f <- helpWellFormedNameSpaceAndConstructor namespacenames consnames
-  g <- helpWellFormedSortNameInConstructors sortconsnames sortnames
-  h <- helpWellFormedSortNameInNamespaces sortnamespaces sortnames
-  k <- helpWellFormedRulesInstances sortdefs instTable
-  l <- isWellFormedBindToContext sortdefs instTable
-  m <- helpWellFormedRulesLHSExpressions sortdefs instTable
+helpWellFormed ([], [], _) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
+  _ <- helpWellFormedSortName sortnames
+  _ <- helpWellFormedConstructorName consnames
+  _ <- helpWellFormedNameSpaceName namespacenames
+  _ <- helpWellFormedConstructorAndSort consnames sortnames
+  _ <- helpWellFormedNameSpaceAndSort namespacenames sortnames
+  _ <- helpWellFormedNameSpaceAndConstructor namespacenames consnames
+  _ <- helpWellFormedSortNameInConstructors sortconsnames sortnames
+  _ <- helpWellFormedSortNameInNamespaces sortnamespaces sortnames
+  _ <- helpWellFormedRulesInstances sortdefs instTable
+  _ <- isWellFormedBindToContext sortdefs instTable
+  _ <- helpWellFormedRulesLHSExpressions sortdefs instTable
   return True
 
-wellFormedConstructors :: [ConstructorDef] -> [InstanceName] -> Either String Bool
-wellFormedConstructors [] _ = return True
-wellFormedConstructors (c:crest) xinst = do
-  a <- wellFormedConstructor c xinst
-  wellFormedConstructors crest xinst
+wellFormedConstructors :: [ConstructorDef] -> Either String Bool
+wellFormedConstructors [] = return True
+wellFormedConstructors (c:crest) = do
+  _ <- wellFormedConstructor c
+  wellFormedConstructors crest
 
-wellFormedConstructor :: ConstructorDef -> [InstanceName] -> Either String Bool
-wellFormedConstructor cons xinst = do
-  a <- helpWellFormedIdentifiers (getIdentifiersConstructor cons)
-  b <- helpWellFormedRulesIdentifiers (getAllIds cons) (getIdentifiersConstructor cons)
-  c <- helpWellFormedIdentifierBindingInRightExpr (getRightExprIdsConstructorBinding cons) (getBinding cons)
-  d <- helpWellFormedIdentifierInLeftExpr (getLeftExprIdsConstructor cons) (getIdentifiersWithoutBinding cons)
-  e <- helpWellFormedIdentifierInRightExpr (getRightExprIdsConstructor cons) (getIdentifiersWithoutBinding cons)
-  g <- helpWellFormedIdentifiers (getIdentifiersWithoutBinding cons)
+wellFormedConstructor :: ConstructorDef -> Either String Bool
+wellFormedConstructor cons = do
+  _ <- helpWellFormedIdentifiers (getIdentifiersConstructor cons)
+  _ <- helpWellFormedRulesIdentifiers (getAllIds cons) (getIdentifiersConstructor cons)
+  _ <- helpWellFormedIdentifierBindingInRightExpr (getRightExprIdsConstructorBinding cons) (getBinding cons)
+  _ <- helpWellFormedIdentifierInLeftExpr (getLeftExprIdsConstructor cons) (getIdentifiersWithoutBinding cons)
+  _ <- helpWellFormedIdentifierInRightExpr (getRightExprIdsConstructor cons) (getIdentifiersWithoutBinding cons)
+  _ <- helpWellFormedIdentifiers (getIdentifiersWithoutBinding cons)
   return True
   where
     --get the Identifiers of the arguments of a constructor (including the binder)
     getIdentifiersConstructor :: ConstructorDef -> [String]
-    getIdentifiersConstructor (MkDefConstructor _ lists sorts folds _ _) = map fst lists ++ (map fst sorts) ++ map (\(x, y, z) -> x) folds
-    getIdentifiersConstructor (MkBindConstructor _ lists sorts folds namespace _ _) = map fst lists ++ map fst sorts ++ map (\(x, y, z) -> x) folds ++ [fst namespace]
+    getIdentifiersConstructor (MkDefConstructor _ lists sorts folds _ _) = map fst lists ++ map fst sorts ++ map (\(x, _, _) -> x) folds
+    getIdentifiersConstructor (MkBindConstructor _ lists sorts folds namespace _ _) = map fst lists ++ map fst sorts ++ map (\(x, _, _) -> x) folds ++ [fst namespace]
     getIdentifiersConstructor _ = []
 
     --get the ids of the RightExpr that bind, including the binder added
     getRightExprIdsConstructorBinding :: ConstructorDef -> [IdenName]
-    getRightExprIdsConstructorBinding (MkDefConstructor _ _ sorts _ rules _) = concatMap getRightExprIdBinding (map snd rules)
-    getRightExprIdsConstructorBinding (MkBindConstructor _ _ sorts _ namespace rules _) = concatMap getRightExprIdBinding (map snd rules)
+    getRightExprIdsConstructorBinding (MkDefConstructor _ _ _ _ rules _) = concatMap (getRightExprIdBinding . snd) rules
+    getRightExprIdsConstructorBinding (MkBindConstructor _ _ _ _ _ rules _) = concatMap (getRightExprIdBinding . snd) rules
     getRightExprIdsConstructorBinding _ = []
 
     -- get the name on the right expression
     getRightExprIdBinding :: RightExpr -> [IdenName]
     getRightExprIdBinding (RightLHS _)       = []
     getRightExprIdBinding (RightSub _ _)     = []
-    getRightExprIdBinding (RightAdd expr id) = (id : (getRightExprIdBinding expr))
+    getRightExprIdBinding (RightAdd expr iden) = iden : getRightExprIdBinding expr
 
     -- get all the identifiers without the binder included
     getIdentifiersWithoutBinding :: ConstructorDef -> [String]
-    getIdentifiersWithoutBinding (MkDefConstructor _ lists sorts folds _ _) = (map fst sorts) ++ (map fst lists) ++ map (\(x, y, z) -> x) folds
-    getIdentifiersWithoutBinding (MkBindConstructor _ lists sorts folds _ _ _) = (map fst sorts) ++ (map fst lists) ++ map (\(x, y, z) -> x) folds
+    getIdentifiersWithoutBinding (MkDefConstructor _ lists sorts folds _ _) = map fst sorts ++ map fst lists ++ map (\(x, _, _) -> x) folds
+    getIdentifiersWithoutBinding (MkBindConstructor _ lists sorts folds _ _ _) = map fst sorts ++ map fst lists ++ map (\(x, _, _) -> x) folds
     getIdentifiersWithoutBinding _ = []
 
     --get the identifiers used in the rules defined in the constructor
     getAllIds :: ConstructorDef -> [IdenName]
-    getAllIds (MkDefConstructor _ _ sorts _ rules _) = concatMap getRuleIdentifiers rules
-    getAllIds (MkBindConstructor _ _ sorts _ namespace rules _) = concatMap getRuleIdentifiers rules
+    getAllIds (MkDefConstructor _ _ _ _ rules _) = concatMap getRuleIdentifiers rules
+    getAllIds (MkBindConstructor _ _ _ _ _ rules _) = concatMap getRuleIdentifiers rules
     getAllIds _ = []
 
     --get identifiers of the rule, left expression+the rightexpr
@@ -148,14 +146,14 @@ wellFormedConstructor cons xinst = do
 
     -- get the ids of the RightExpr without any binders included
     getRightExprIdsConstructor :: ConstructorDef -> [IdenName]
-    getRightExprIdsConstructor (MkDefConstructor _ _ sorts _ rules _) = concatMap getRightExprId (map snd rules)
-    getRightExprIdsConstructor (MkBindConstructor _ _ sorts _ namespace rules _) = concatMap getRightExprId (map snd rules)
+    getRightExprIdsConstructor (MkDefConstructor _ _ _ _ rules _) = concatMap (getRightExprId . snd) rules
+    getRightExprIdsConstructor (MkBindConstructor _ _ _ _ _ rules _) = concatMap (getRightExprId . snd) rules
     getRightExprIdsConstructor _ = []
 
     --get the ids of the LeftExpr
     getLeftExprIdsConstructor :: ConstructorDef -> [IdenName]
-    getLeftExprIdsConstructor (MkDefConstructor _ _ sorts _ rules _) = concatMap getLeftExprId (map fst rules)
-    getLeftExprIdsConstructor (MkBindConstructor _ _ sorts _ namespace rules _) = concatMap getLeftExprId (map fst rules)
+    getLeftExprIdsConstructor (MkDefConstructor _ _ _ _ rules _) = concatMap (getLeftExprId . fst) rules
+    getLeftExprIdsConstructor (MkBindConstructor _ _ _ _ _ rules _) = concatMap (getLeftExprId . fst) rules
     getLeftExprIdsConstructor _ = []
 isEmptySort :: SortDef -> Either String Bool
 isEmptySort (MkDefSort name _ [] _) = Left (show name ++ " has no constructor")
@@ -164,8 +162,8 @@ isEmptySort _ = return True
 -- variables in a sort can only access the inherited namespaces
 helpWellFormedVariables :: [ConstructorDef] -> [Context] -> Either String Bool
 helpWellFormedVariables [] _ = return True
-helpWellFormedVariables ((MkVarConstructor _ contextName):rest) instances = do
-  a <- shouldBeInSecondList [contextName] ([name | INH name _ <- instances]) "Namespace is not an inherited namespace "
+helpWellFormedVariables (MkVarConstructor _ contextName:rest) instances = do
+  _ <- shouldBeInSecondList [contextName] [name | INH name _ <- instances] "Namespace is not an inherited namespace "
   helpWellFormedVariables rest instances
 helpWellFormedVariables (_:rest) instances =
   helpWellFormedVariables rest instances
@@ -181,35 +179,35 @@ helpWellFormedInstanceNames l = isUniqueInList l "Instance is not a unique name 
 --variables should only refer to namespace they are part of
 helpWellFormedVariablesNamespace :: [SortDef] -> [NamespaceDef] -> Either String Bool
 helpWellFormedVariablesNamespace [] _ = return True
-helpWellFormedVariablesNamespace ((MkDefSort sname ctxs cons _):rest) namespaces = do
-  helpWellFormedVariablesCons sname cons ctxs namespaces
+helpWellFormedVariablesNamespace (MkDefSort sortName ctxs cons _:rest) namespaces = do
+  _ <- helpWellFormedVariablesCons sortName cons ctxs namespaces
   helpWellFormedVariablesNamespace rest namespaces
 
 helpWellFormedVariablesCons :: SortName -> [ConstructorDef] -> [Context] -> [NamespaceDef] -> Either String Bool
-helpWellFormedVariablesCons sname [] _ _ = Right True
-helpWellFormedVariablesCons sname (MkVarConstructor name instanceName:rest) ctxs namespaces = do
-  a <- helpWellFormedVarInst sname instanceName ctxs namespaces
-  helpWellFormedVariablesCons sname rest ctxs namespaces
-helpWellFormedVariablesCons sname (_:rest) ctxs namespace =
-  helpWellFormedVariablesCons sname rest ctxs namespace
+helpWellFormedVariablesCons _ [] _ _ = Right True
+helpWellFormedVariablesCons sortName (MkVarConstructor _ instanceName:rest) ctxs namespaces = do
+  _ <- helpWellFormedVarInst sortName instanceName ctxs namespaces
+  helpWellFormedVariablesCons sortName rest ctxs namespaces
+helpWellFormedVariablesCons sortName (_:rest) ctxs namespace =
+  helpWellFormedVariablesCons sortName rest ctxs namespace
 
 helpWellFormedVarInst :: SortName -> InstanceName -> [Context] -> [NamespaceDef] -> Either String Bool
-helpWellFormedVarInst sname name [] namespaces =
+helpWellFormedVarInst _ name [] _ =
   Left ("No instance found with that name in " ++ name)
-helpWellFormedVarInst sname name (ctx:rest) namespaces =
+helpWellFormedVarInst sortName name (ctx:rest) namespaces =
   if xinst ctx == name
-    then helpVarnamespace sname (xnamespace ctx) namespaces
-    else helpWellFormedVarInst sname name rest namespaces
+    then helpVarnamespace sortName (xnamespace ctx) namespaces
+    else helpWellFormedVarInst sortName name rest namespaces
 
 helpVarnamespace :: SortName -> String -> [NamespaceDef] -> Either String Bool
-helpVarnamespace sname name [] =
+helpVarnamespace _ _ [] =
   Left "Instance and namespace in variable do not coincide"
-helpVarnamespace sname name (MkNameSpace namespacename sortname _:rest) =
+helpVarnamespace sortName name (MkNameSpace namespacename sortname _:rest) =
   if namespacename == name
-    then (if sname == sortname
+    then (if sortName == sortname
             then return True
-            else Left ("sort cannot use this namespace in " ++ sname))
-    else helpVarnamespace sname name rest
+            else Left ("sort cannot use this namespace in " ++ sortName))
+    else helpVarnamespace sortName name rest
 
 --function to detect if all identifiers used in the rules exist as fields
 helpWellFormedRulesIdentifiers :: [IdenName] -> [IdenName] -> Either String Bool
@@ -274,7 +272,7 @@ helpWellFormedIdentifierInRightExpr l l2 =
 --LeftExpressions that are LeftLHS should be SYN contexts
 helpWellFormedRulesLHSExpressions :: [SortDef] -> [(SortName, [Context])] -> Either String Bool
 helpWellFormedRulesLHSExpressions sdefs table
-  | (length errors) > 0 = head errors
+  | not (null errors) = head errors
   | otherwise = return True
   where
     errors =
@@ -288,66 +286,66 @@ helpWellFormedRulesLHSExpressionsSort table s =
   concatMap (helpWellFormedRulesLHSExpressionsConstructor (sname s) table) (sctors s)
 
 helpWellFormedRulesLHSExpressionsConstructor :: SortName -> [(SortName, [Context])] -> ConstructorDef -> [Either String Bool]
-helpWellFormedRulesLHSExpressionsConstructor sname table (MkDefConstructor _ _ sortids _ rules _) =
-  map (helpWellFormedRulesInstancesRuleLHSLeft sname sortids table) rules
-helpWellFormedRulesLHSExpressionsConstructor sname table (MkBindConstructor _ _ sortids _ (id, namespacename) rules _) =
-  map (helpWellFormedRulesInstancesRuleLHSLeft sname sortids table) rules
+helpWellFormedRulesLHSExpressionsConstructor sortName table (MkDefConstructor _ _ sortids _ rules _) =
+  map (helpWellFormedRulesInstancesRuleLHSLeft sortName sortids table) rules
+helpWellFormedRulesLHSExpressionsConstructor sortName table (MkBindConstructor _ _ sortids _ (_, _) rules _) =
+  map (helpWellFormedRulesInstancesRuleLHSLeft sortName sortids table) rules
 helpWellFormedRulesLHSExpressionsConstructor _ _ _ = [Right True]
 
 --checks if the left hand side and right hand side are wellformed in the sense that inherited contexts and synthesised contexts cannot be used in every position
 helpWellFormedRulesInstancesRuleLHSLeft :: SortName -> [(IdenName, SortName)] -> [(SortName, [Context])] -> AttributeDef -> Either String Bool
-helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LeftLHS contextName, RightLHS contextName2)
-  | length (findContextToNamespaceInstanceSyn contextName sname tableInstances) > 0 && length (findContextToNamespaceInstanceInh contextName2 sname tableInstances) > 0 = return True
+helpWellFormedRulesInstancesRuleLHSLeft sortName _ tableInstances (LeftLHS contextName, RightLHS contextName2)
+  | not (null (findContextToNamespaceInstanceSyn contextName sortName tableInstances)) && not (null (findContextToNamespaceInstanceInh contextName2 sortName tableInstances)) = return True
   | otherwise = Left (contextName ++ contextName2 ++ "not a good combination of synthesised and inherited namespaces")
-helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LeftLHS contextName, RightSub fieldname2 contextName2)
-  | (lookup fieldname2 tableIdentifiers) == Nothing = return True
-  | length (findContextToNamespaceInstanceSyn contextName sname tableInstances) > 0 && length (findContextToNamespaceInstanceSyn contextName2 (fromJust (lookup fieldname2 tableIdentifiers)) tableInstances) > 0 = return True
+helpWellFormedRulesInstancesRuleLHSLeft sortName tableIdentifiers tableInstances (LeftLHS contextName, RightSub fieldname2 contextName2)
+  | isNothing (lookup fieldname2 tableIdentifiers) = return True
+  | not (null (findContextToNamespaceInstanceSyn contextName sortName tableInstances)) && not (null (findContextToNamespaceInstanceSyn contextName2 (fromJust (lookup fieldname2 tableIdentifiers)) tableInstances)) = return True
   | otherwise = Left (contextName ++ "is not a synthesised namespace")
-helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (leftexpr, RightAdd expr _) =
-  helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (leftexpr, expr)
-helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LeftSub fieldname contextName, RightSub fieldname2 contextName2)
-  | sname2 == Nothing || sname1 == Nothing = return True
+helpWellFormedRulesInstancesRuleLHSLeft sortName tableIdentifiers tableInstances (leftexpr, RightAdd expr _) =
+  helpWellFormedRulesInstancesRuleLHSLeft sortName tableIdentifiers tableInstances (leftexpr, expr)
+helpWellFormedRulesInstancesRuleLHSLeft _ tableIdentifiers tableInstances (LeftSub fieldname contextName, RightSub fieldname2 contextName2)
+  | isNothing sname2 || isNothing sname1 = return True
   | fieldname == fieldname2 = Left (fieldname ++ "appears on both sides of a rule, which would cause infinite recursion")
-  | length (findContextToNamespaceInstanceInh contextName (fromJust sname1) tableInstances) > 0 && length (findContextToNamespaceInstanceSyn contextName2 (fromJust sname2) tableInstances) > 0 = return True
+  | not (null (findContextToNamespaceInstanceInh contextName (fromJust sname1) tableInstances)) && not (null (findContextToNamespaceInstanceSyn contextName2 (fromJust sname2) tableInstances)) = return True
   | otherwise = Left (contextName ++ "is not a synthesised namespace")
   where
-    sname2 = (lookup fieldname2 tableIdentifiers)
-    sname1 = (lookup fieldname tableIdentifiers)
-helpWellFormedRulesInstancesRuleLHSLeft sname tableIdentifiers tableInstances (LeftSub fieldname contextName, RightLHS contextName2)
-  | (lookup fieldname tableIdentifiers) == Nothing = return True
-  | length (findContextToNamespaceInstanceInh contextName (fromJust (lookup fieldname tableIdentifiers)) tableInstances) > 0 && length (findContextToNamespaceInstanceInh contextName2 sname tableInstances) > 0 = return True
+    sname2 = lookup fieldname2 tableIdentifiers
+    sname1 = lookup fieldname tableIdentifiers
+helpWellFormedRulesInstancesRuleLHSLeft sortName tableIdentifiers tableInstances (LeftSub fieldname contextName, RightLHS contextName2)
+  | isNothing (lookup fieldname tableIdentifiers) = return True
+  | not (null (findContextToNamespaceInstanceInh contextName (fromJust (lookup fieldname tableIdentifiers)) tableInstances)) && not (null (findContextToNamespaceInstanceInh contextName2 sortName tableInstances)) = return True
   | otherwise = Left (contextName ++ "is not a synthesised namespace")
 
 -- filters all the synthesised namespaces
 findContextToNamespaceInstanceSyn :: InstanceName -> SortName -> [(SortName, [Context])] -> [Context]
-findContextToNamespaceInstanceSyn instName sname table =
+findContextToNamespaceInstanceSyn instName sortName table =
   filter
     (\ctx -> xinst ctx == instName)
     [ SYN ctxNamesyn namespacename
-    | SYN ctxNamesyn namespacename <- fromJust (lookup sname table)
+    | SYN ctxNamesyn namespacename <- fromJust (lookup sortName table)
     ]
 
 -- filters all the inherited namespaces
 findContextToNamespaceInstanceInh :: InstanceName -> SortName -> [(SortName, [Context])] -> [Context]
-findContextToNamespaceInstanceInh instName sname table =
+findContextToNamespaceInstanceInh instName sortName table =
   filter
     (\ctx -> xinst ctx == instName)
     [ INH ctxNameinh namespacename
-    | INH ctxNameinh namespacename <- fromJust (lookup sname table)
+    | INH ctxNameinh namespacename <- fromJust (lookup sortName table)
     ]
 
   -- checking if the binding to a constructorrule is ok by looking if the right expression is of the right type
 isWellFormedBindToContextConstructorRule :: SortName -> NamespaceName -> [(IdenName, SortName)] -> [(SortName, [Context])] -> AttributeDef -> Either String Bool
-isWellFormedBindToContextConstructorRule sname namespacebind tableIdentifiers tableInstances (_, RightAdd expr id)
- | getRightExprId expr == [] && any (\ctx -> getInstanceNamesOfRuleRight expr == xinst ctx && xnamespace ctx == namespacebind) (fromJust (lookup sname tableInstances)) = return True
- | getRightExprId expr /= [] && any (\ctx -> getInstanceNamesOfRuleRight expr == xinst ctx && xnamespace ctx == namespacebind) (fromJust (lookup (fromJust (lookup (head (getRightExprId expr)) tableIdentifiers)) tableInstances)) = return True
+isWellFormedBindToContextConstructorRule sortName namespacebind tableIdentifiers tableInstances (_, RightAdd expr _)
+ | null (getRightExprId expr) && any (\ctx -> getInstanceNamesOfRuleRight expr == xinst ctx && xnamespace ctx == namespacebind) (fromJust (lookup sortName tableInstances)) = return True
+ | not (null (getRightExprId expr)) && any (\ctx -> getInstanceNamesOfRuleRight expr == xinst ctx && xnamespace ctx == namespacebind) (fromJust (lookup (fromJust (lookup (head (getRightExprId expr)) tableIdentifiers)) tableInstances)) = return True
  | otherwise = Left "incorrect binding"
 isWellFormedBindToContextConstructorRule _ _ _ _ _ = return True
  -- checking if the binding to a constructor is ok by looking if the right expression is of the right type for all the rules of its constructor (only checks bindingConstructors)
 
 isWellFormedBindToContextConstructor :: SortName -> [(SortName, [Context])] -> ConstructorDef -> [Either String Bool]
-isWellFormedBindToContextConstructor sname table (MkBindConstructor _ _ sortids _ (id, namespacename) rules _) =
- map (isWellFormedBindToContextConstructorRule sname namespacename sortids table) rules
+isWellFormedBindToContextConstructor sortName table (MkBindConstructor _ _ sortids _ (_, namespacename) rules _) =
+ map (isWellFormedBindToContextConstructorRule sortName namespacename sortids table) rules
 isWellFormedBindToContextConstructor _ _ _ = [return True]
 
 --helper for the binding check when
@@ -358,33 +356,33 @@ isWellFormedBindToContextSort table s =
 --binders should only be added to contexts that correspond to the same namespace (not necessarily the same context)
 isWellFormedBindToContext :: [SortDef] -> [(SortName, [Context])] -> Either String Bool
 isWellFormedBindToContext sdefs table
- | (length errors) > 0 = head errors
+ | not (null errors) = head errors
  | otherwise = return True
  where
    errors = [Left x | Left x <- concatMap (isWellFormedBindToContextSort table) sdefs]
 
 --checks whether both the lefthandside and the right hand side abide by the check of whether they refer to the same namespace
 helpWellFormedRulesInstancesRule :: SortName -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName, FoldName)] -> [(SortName, [Context])] -> AttributeDef -> Either String Bool
-helpWellFormedRulesInstancesRule sname lists tableIdentifiers folds tableInstances (leftexpr, rightexpr)
- | getRightExprId rightexpr /= [] && elem (head (getRightExprId rightexpr)) (map fst lists ++ map (\(x, y, z) -> x) folds) = return True
- | getLeftExprId leftexpr /= [] && elem (head (getLeftExprId leftexpr)) (map fst lists ++ map (\(a, b, c) -> a) folds) = return True
- | getRightExprId rightexpr == [] && length rightInstanceLHS > 0 && getLeftExprId leftexpr == [] && length leftInstanceLHS > 0 && xnamespace (head rightInstanceLHS) == xnamespace (head leftInstanceLHS) = return True
- | getRightExprId rightexpr /= [] && length rightInstanceNoLHS > 0 && getLeftExprId leftexpr == [] && length leftInstanceLHS > 0 && xnamespace (head rightInstanceNoLHS) == xnamespace (head leftInstanceLHS) = return True
- | getRightExprId rightexpr /= [] && length rightInstanceNoLHS > 0 && getLeftExprId leftexpr /= [] && length leftInstanceNoLHS > 0 && xnamespace (head rightInstanceNoLHS) == xnamespace (head leftInstanceNoLHS) = return True
- | getRightExprId rightexpr == [] && length rightInstanceLHS > 0 && getLeftExprId leftexpr /= [] && length leftInstanceNoLHS > 0 && xnamespace (head rightInstanceLHS) == xnamespace (head leftInstanceNoLHS) = return True
- | otherwise = Left ("incorrect context for this sort " ++ sname)
+helpWellFormedRulesInstancesRule sortName lists tableIdentifiers folds tableInstances (leftexpr, rightexpr)
+ | not (null (getRightExprId rightexpr)) && elem (head (getRightExprId rightexpr)) (map fst lists ++ map (\(x, _, _) -> x) folds) = return True
+ | not (null (getLeftExprId leftexpr)) && elem (head (getLeftExprId leftexpr)) (map fst lists ++ map (\(a, _, _) -> a) folds) = return True
+ | null (getRightExprId rightexpr) && not (null rightInstanceLHS) && null (getLeftExprId leftexpr) && not (null leftInstanceLHS) && xnamespace (head rightInstanceLHS) == xnamespace (head leftInstanceLHS) = return True
+ | not (null (getRightExprId rightexpr)) && not (null rightInstanceNoLHS) && null (getLeftExprId leftexpr) && not (null leftInstanceLHS) && xnamespace (head rightInstanceNoLHS) == xnamespace (head leftInstanceLHS) = return True
+ | not (null (getRightExprId rightexpr)) && not (null rightInstanceNoLHS) && not (null (getLeftExprId leftexpr)) && not (null leftInstanceNoLHS) && xnamespace (head rightInstanceNoLHS) == xnamespace (head leftInstanceNoLHS) = return True
+ | null (getRightExprId rightexpr) && not (null rightInstanceLHS) && not (null (getLeftExprId leftexpr)) && not (null leftInstanceNoLHS) && xnamespace (head rightInstanceLHS) == xnamespace (head leftInstanceNoLHS) = return True
+ | otherwise = Left ("incorrect context for this sort " ++ sortName)
  where
-   rightInstanceLHS = (filter (\ctx -> getInstanceNamesOfRuleRight rightexpr == xinst ctx) (fromJust (lookup sname tableInstances)))
-   rightInstanceNoLHS = (filter (\ctx -> getInstanceNamesOfRuleRight rightexpr == xinst ctx) (fromJust (lookup (fromJust (lookup (head (getRightExprId rightexpr)) tableIdentifiers)) tableInstances)))
-   leftInstanceLHS = (filter (\ctx -> linst leftexpr == xinst ctx) (fromJust (lookup sname tableInstances)))
-   leftInstanceNoLHS = (filter (\ctx -> linst leftexpr == xinst ctx) (fromJust (lookup (fromJust (lookup (head (getLeftExprId leftexpr)) tableIdentifiers)) tableInstances)))
+   rightInstanceLHS = filter (\ctx -> getInstanceNamesOfRuleRight rightexpr == xinst ctx) (fromJust (lookup sortName tableInstances))
+   rightInstanceNoLHS = filter (\ctx -> getInstanceNamesOfRuleRight rightexpr == xinst ctx) (fromJust (lookup (fromJust (lookup (head (getRightExprId rightexpr)) tableIdentifiers)) tableInstances))
+   leftInstanceLHS = filter (\ctx -> linst leftexpr == xinst ctx) (fromJust (lookup sortName tableInstances))
+   leftInstanceNoLHS = filter (\ctx -> linst leftexpr == xinst ctx) (fromJust (lookup (fromJust (lookup (head (getLeftExprId leftexpr)) tableIdentifiers)) tableInstances))
 
 --checks if all the rules are welldefined for the normal constructors and the binding constructors
 helpWellFormedRulesInstancesConstructor :: SortName -> [(SortName, [Context])] -> ConstructorDef -> [Either String Bool]
-helpWellFormedRulesInstancesConstructor sname table (MkDefConstructor _ listids sortids folds rules _) =
- map (helpWellFormedRulesInstancesRule sname listids sortids folds table) rules
-helpWellFormedRulesInstancesConstructor sname table (MkBindConstructor _ listids sortids folds (id, namespacename) rules _) =
- map (helpWellFormedRulesInstancesRule sname listids sortids folds table) rules
+helpWellFormedRulesInstancesConstructor sortName table (MkDefConstructor _ listids sortids folds rules _) =
+ map (helpWellFormedRulesInstancesRule sortName listids sortids folds table) rules
+helpWellFormedRulesInstancesConstructor sortName table (MkBindConstructor _ listids sortids folds (_, _) rules _) =
+ map (helpWellFormedRulesInstancesRule sortName listids sortids folds table) rules
 helpWellFormedRulesInstancesConstructor _ _ _ = [return True]
 
 --checks if all the constructors have welltyped rules
@@ -395,7 +393,7 @@ helpWellFormedRulesInstancesSort table s =
 -- identifiers in Rules can only use contexts they are allowed to use
 helpWellFormedRulesInstances :: [SortDef] -> [(SortName, [Context])] -> Either String Bool
 helpWellFormedRulesInstances sdefs table
- | (length errors) > 0 = head errors
+ | not (null errors) = head errors
  | otherwise = return True
  where
    errors =
@@ -424,22 +422,22 @@ getInstanceNamesOfRuleRight (RightSub _ name) = name
 isUniqueInList :: [String] -> String -> Either String Bool
 isUniqueInList [] _ = return True
 isUniqueInList (str:strs) err =
-  if any (\x -> x == str) strs
-    then Left (show (str) ++ err)
+  if str `elem` strs
+    then Left (show str ++ err)
     else isUniqueInList strs err
 
 --helper to detect if different lists have unique names
 shouldNotBeInSecondList :: [String] -> [String] -> String -> Either String Bool
 shouldNotBeInSecondList [] _ _ = return True
 shouldNotBeInSecondList (str:crest) sorts err =
-  if any (\x -> x == str) sorts
-    then Left (show (str) ++ err)
-    else (shouldNotBeInSecondList crest sorts err)
+  if str `elem` sorts
+    then Left (show str ++ err)
+    else shouldNotBeInSecondList crest sorts err
 
 --helper to detect if names in the first list  exist in the available second list
 shouldBeInSecondList :: [String] -> [String] -> String -> Either String Bool
 shouldBeInSecondList [] _ _ = return True
 shouldBeInSecondList (str:strs) sorts err =
-  if any (\x -> x == str) sorts
-    then (shouldBeInSecondList strs sorts err)
-    else Left (show (str) ++ err)
+  if str `elem` sorts
+    then shouldBeInSecondList strs sorts err
+    else Left (show str ++ err)
