@@ -49,6 +49,7 @@ printProgram name program =
     printTypeDecls (types program),
     nl,
     freshVarFunctions (types program),
+    nl,
     printFunctions (functions program),
     printInstances (instances program),
     printCode (code program)
