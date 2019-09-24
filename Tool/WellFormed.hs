@@ -9,17 +9,17 @@ import Data.Maybe
 --when is this syntax wellFormed : 1. when there are no duplicate constructors in the language i.e. there are no duplicate names among constructors or sorts and every sort has at the least one constructor
 wellFormed :: Language -> Either String Bool
 wellFormed ([], [], _, _) = Left "Empty Language"
-wellFormed (namespaces, sorts, imps, _) = do
+wellFormed (namespaces, sorts, _, _) = do
   _ <- helpWellFormedVariablesNamespace sorts namespaces
-  helpWellFormed (namespaces, sorts, imps) [] [] [] [] [] [] []
+  helpWellFormed (namespaces, sorts) [] [] [] [] [] [] []
 
 --accumulates the sortnames, constructornames, and the sortnames contained in the constructors,
 --then looks up if all sortnames,namespacenames and contructornames are unique, if all sorts in the constructors exist,
 --and whether sorts and constructors and namespaces have distinct names. Also namespacenames used in sorts should exist and constructors can only use variablebindings of namespaces they can access in the sort
-helpWellFormed :: ([NamespaceDef], [SortDef], [(String, [String])]) -> [SortName] -> [ConstructorName] -> [SortName] -> [NamespaceName] -> [SortName] -> [(SortName, [Context])] -> [SortDef] -> Either String Bool
-helpWellFormed (namespacedef:lanrest, sorts, imp) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs =
+helpWellFormed :: ([NamespaceDef], [SortDef]) -> [SortName] -> [ConstructorName] -> [SortName] -> [NamespaceName] -> [SortName] -> [(SortName, [Context])] -> [SortDef] -> Either String Bool
+helpWellFormed (namespacedef:lanrest, sorts) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs =
   helpWellFormed
-    (lanrest, sorts, imp)
+    (lanrest, sorts)
     sortnames
     consnames
     sortconsnames
@@ -27,7 +27,7 @@ helpWellFormed (namespacedef:lanrest, sorts, imp) sortnames consnames sortconsna
     (nsort namespacedef : sortnamespaces)
     instTable
     sortdefs
-helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
+helpWellFormed ([], s:lanrest) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
   _ <- isEmptySort s
   _ <- helpWellFormedNameSpaceNameInConstructors getNamespaceNamesUsedInSort namespacenames
   _ <- wellFormedConstructors (sctors s)
@@ -35,7 +35,7 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
   _ <- helpWellFormedVariables (sctors s) (sctxs s)
   _ <- helpWellFormedInstanceNames (map xinst (sctxs s))
   helpWellFormed
-    ([], lanrest, imp)
+    ([], lanrest)
     (sname s : sortnames)
     (getConstructorNames s ++ consnames)
     (getSortsUsedByConstructors ++ sortconsnames)
@@ -75,7 +75,7 @@ helpWellFormed ([], s:lanrest, imp) sortnames consnames sortconsnames namespacen
             getSortsConstructor (MkDefConstructor _ lists sorts folds _ _) = map snd sorts ++ map snd lists ++ map (\(_, y, _) -> y) folds
             getSortsConstructor (MkBindConstructor _ lists sorts folds _ _ _) = map snd sorts ++ map snd lists ++ map (\(_, y, _) -> y) folds
             getSortsConstructor _ = []
-helpWellFormed ([], [], _) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
+helpWellFormed ([], []) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
   _ <- helpWellFormedSortName sortnames
   _ <- helpWellFormedConstructorName consnames
   _ <- helpWellFormedNameSpaceName namespacenames
@@ -155,6 +155,7 @@ wellFormedConstructor cons = do
     getLeftExprIdsConstructor (MkDefConstructor _ _ _ _ rules _) = concatMap (getLeftExprId . fst) rules
     getLeftExprIdsConstructor (MkBindConstructor _ _ _ _ _ rules _) = concatMap (getLeftExprId . fst) rules
     getLeftExprIdsConstructor _ = []
+
 isEmptySort :: SortDef -> Either String Bool
 isEmptySort (MkDefSort name _ [] _) = Left (show name ++ " has no constructor")
 isEmptySort _ = return True
