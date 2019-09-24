@@ -8,6 +8,7 @@ import Utility
 
 import Data.Maybe
 import Data.List
+import Debug.Trace
 
 getFunctions :: ConvertFunctions
 getFunctions
@@ -190,7 +191,7 @@ substFunctionsC (nsd, sd, _, _) =
         -- | Construct a mapping function call for an identifier
         substCallForIden :: (IdenName, [AttributeDef]) -> Expression
         substCallForIden (iden, idenAttrs)
-          | sortHasCtxForSort (sortNameForIden iden ctor) sortName
+          | sortHasCtxForSort (sortNameForIden iden ctor) sortOfCtxNamespace nsd ctxsBySname
             = if fromJust (lookup sortNameOfIden varAccessBySname)
                 then if iden `elem` map fst folds
                   then FnCall "fmap" [FnCall fnName substParams, idenExpr]
@@ -206,8 +207,3 @@ substFunctionsC (nsd, sd, _, _) =
               else varReplaceCall ctor [VarExpr "b", head binder] iden
             substParams = [VarExpr "orig", VarExpr "sub"]
             sortNameOfIden = sortNameForIden iden ctor
-
-        sortHasCtxForSort :: SortName -> SortName -> Bool
-        sortHasCtxForSort sortName ctxSort
-          = let ctxs = [INH x y | INH x y <- fromJust (lookup sortName ctxsBySname)]
-          in any (\ctx -> sortNameForNamespaceName (xnamespace ctx) nsd == ctxSort) ctxs

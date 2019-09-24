@@ -83,3 +83,9 @@ attrsByIden ctor = [
 -- | Drops the third element from each tuple in a list
 dropFold :: [(String, String, String)] -> [(String, String)]
 dropFold = map (\(a, b, _) -> (a, b))
+
+-- | Determines if a given sort has a context for another sort
+sortHasCtxForSort :: SortName -> SortName -> [NamespaceDef] -> [(SortName, [Context])] -> Bool
+sortHasCtxForSort sortName ctxSort nsd ctxsBySname
+  = let ctxs = [INH x y | INH x y <- fromJust (lookup sortName ctxsBySname)]
+  in any (\ctx -> sortNameForNamespaceName (xnamespace ctx) nsd == ctxSort) ctxs
