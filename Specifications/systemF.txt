@@ -1,0 +1,26 @@
+namespace TermVar: Term, Type
+namespace TypeVar: Type
+
+sort Term
+    inh ctx  TermVar
+    inh tctx TypeVar
+    | TmVar (x@ctx)
+    | TmAbs (x: Term) (t: Type) [z: TermVar]
+        x.tctx = lhs.tctx
+        x.ctx = lhs.ctx, z
+        t.tyctx = lhs.tctx
+    | TmApp (t1: Term) (t2: Term)
+    | TmTApp (t1: Term) (t: Type)
+    | TmTAbs (t1: Term) [t: TypeVar]
+        t1.ctx = lhs.ctx
+        t1.tctx = lhs.tctx, t
+
+sort Type
+    inh tyctx TypeVar
+    | TyVar (t@tyctx)
+    | TyArr (t1: Type) (t2: Type)
+        t1.tyctx = lhs.tyctx
+        t2.tyctx = lhs.tyctx
+    | TyAll (t1: Type) [t: TypeVar]
+        t1.tyctx = lhs.tyctx, t
+    | TyBase
