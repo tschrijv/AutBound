@@ -18,8 +18,16 @@ getFunctions
     userTypes = getTypes,
     variableInstances = getVariableInstances,
     variableFunctions = getVariableFunctions,
-    envFunctions = getEnvFunctions
+    envFunctions = getEnvFunctions,
+    nativeCode = freshVarFunctions
   }
+
+freshVarFunctions :: Language -> (Type, [Constructor]) -> [String]
+freshVarFunctions _ varType
+  = let ctors = snd varType
+        names = map (\(Constr name _) -> tail name) ctors
+    in ["fresh" ++ name ++ " x b = if not (x `elem` b) then x else head [S" ++ name ++ " ('v' : show n) | n <- [0..], not (S" ++ name ++ " ('v' : show n) `elem` b)]"
+    | name <- names]
 
 getVariableType :: Language -> (Type, [Constructor])
 getVariableType (nsd, _, _, _) = ("Variable", map (\ns -> Constr ('S' : nname ns) ["String"]) nsd)

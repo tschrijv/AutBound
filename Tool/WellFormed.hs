@@ -10,8 +10,39 @@ import Data.Maybe
 wellFormed :: Language -> Either String Bool
 wellFormed ([], [], _, _) = Left "Empty Language"
 wellFormed (namespaces, sorts, _, _) = do
-  _ <- helpWellFormedVariablesNamespace sorts namespaces
+  _ <- helpWellFormedVariablesNamespace sorts
   helpWellFormed (namespaces, sorts) [] [] [] [] [] [] []
+  where
+    --variables should only refer to namespace they are part of
+    helpWellFormedVariablesNamespace :: [SortDef] -> Either String Bool
+    helpWellFormedVariablesNamespace [] = return True
+    helpWellFormedVariablesNamespace (MkDefSort sortName ctxs cons _:rest) = do
+      _ <- helpWellFormedVariablesCons sortName cons ctxs
+      helpWellFormedVariablesNamespace rest
+
+    helpWellFormedVariablesCons :: SortName -> [ConstructorDef] -> [Context] -> Either String Bool
+    helpWellFormedVariablesCons _ [] _ = Right True
+    helpWellFormedVariablesCons sortName (MkVarConstructor _ instanceName:rest) ctxs = do
+      _ <- helpWellFormedVarInst sortName instanceName ctxs
+      helpWellFormedVariablesCons sortName rest ctxs
+    helpWellFormedVariablesCons sortName (_:rest) ctxs =
+      helpWellFormedVariablesCons sortName rest ctxs
+
+    helpWellFormedVarInst :: SortName -> InstanceName -> [Context] -> Either String Bool
+    helpWellFormedVarInst _ name [] = Left ("No instance found with that name in " ++ name)
+    helpWellFormedVarInst sortName name (ctx:rest) =
+      if xinst ctx == name
+        then helpVarnamespace sortName (xnamespace ctx) namespaces
+        else helpWellFormedVarInst sortName name rest
+
+    helpVarnamespace :: SortName -> String -> [NamespaceDef] -> Either String Bool
+    helpVarnamespace _ _ [] = Left "Instance and namespace in variable do not coincide"
+    helpVarnamespace sortName name (MkNameSpace namespacename sortname _:rest) =
+      if namespacename == name
+        then (if sortName == sortname
+                then return True
+                else Left ("sort cannot use this namespace in " ++ sortName))
+        else helpVarnamespace sortName name rest
 
 --accumulates the sortnames, constructornames, and the sortnames contained in the constructors,
 --then looks up if all sortnames,namespacenames and contructornames are unique, if all sorts in the constructors exist,
@@ -167,39 +198,6 @@ helpWellFormedInstances l l2 = shouldBeInSecondList l l2 "Instance does not refe
 --all instancenames across sorts should be unique
 helpWellFormedInstanceNames :: [InstanceName] -> Either String Bool
 helpWellFormedInstanceNames l = isUniqueInList l "Instance is not a unique name in the declaration "
-
---variables should only refer to namespace they are part of
-helpWellFormedVariablesNamespace :: [SortDef] -> [NamespaceDef] -> Either String Bool
-helpWellFormedVariablesNamespace [] _ = return True
-helpWellFormedVariablesNamespace (MkDefSort sortName ctxs cons _:rest) namespaces = do
-  _ <- helpWellFormedVariablesCons sortName cons ctxs namespaces
-  helpWellFormedVariablesNamespace rest namespaces
-
-helpWellFormedVariablesCons :: SortName -> [ConstructorDef] -> [Context] -> [NamespaceDef] -> Either String Bool
-helpWellFormedVariablesCons _ [] _ _ = Right True
-helpWellFormedVariablesCons sortName (MkVarConstructor _ instanceName:rest) ctxs namespaces = do
-  _ <- helpWellFormedVarInst sortName instanceName ctxs namespaces
-  helpWellFormedVariablesCons sortName rest ctxs namespaces
-helpWellFormedVariablesCons sortName (_:rest) ctxs namespace =
-  helpWellFormedVariablesCons sortName rest ctxs namespace
-
-helpWellFormedVarInst :: SortName -> InstanceName -> [Context] -> [NamespaceDef] -> Either String Bool
-helpWellFormedVarInst _ name [] _ =
-  Left ("No instance found with that name in " ++ name)
-helpWellFormedVarInst sortName name (ctx:rest) namespaces =
-  if xinst ctx == name
-    then helpVarnamespace sortName (xnamespace ctx) namespaces
-    else helpWellFormedVarInst sortName name rest namespaces
-
-helpVarnamespace :: SortName -> String -> [NamespaceDef] -> Either String Bool
-helpVarnamespace _ _ [] =
-  Left "Instance and namespace in variable do not coincide"
-helpVarnamespace sortName name (MkNameSpace namespacename sortname _:rest) =
-  if namespacename == name
-    then (if sortName == sortname
-            then return True
-            else Left ("sort cannot use this namespace in " ++ sortName))
-    else helpVarnamespace sortName name rest
 
 --function to detect if all identifiers used in the rules exist as fields
 helpWellFormedRulesIdentifiers :: [IdenName] -> [IdenName] -> Either String Bool

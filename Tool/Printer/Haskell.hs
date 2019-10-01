@@ -48,8 +48,6 @@ printProgram name program =
     printImports (("Data.List", []) : imports program),
     printTypeDecls (types program),
     nl,
-    freshVarFunctions (types program),
-    nl,
     printFunctions (functions program),
     printInstances (instances program),
     printCode (code program)
@@ -95,11 +93,3 @@ printInstances ids = intoLines $ map (
 
 printCode :: [String] -> Doc String
 printCode lns = intoLines $ map pretty lns
-
-freshVarFunctions :: [(Type, [Constructor])] -> Doc String
-freshVarFunctions types
-  = let ctors = fromJust (lookup "Variable" types)
-        names = map (\(Constr name _) -> tail name) ctors
-    in intoLines [
-      pretty ("fresh" ++ name ++ " x b = if not (x `elem` b) then x else head [S" ++ name ++ " ('v' : show n) | n <- [0..], not (S" ++ name ++ " ('v' : show n) `elem` b)]")
-    | name <- names]

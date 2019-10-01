@@ -11,7 +11,8 @@ data ConvertFunctions = VF {
   userTypes :: Language -> [(Type, [Constructor])],
   variableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])],
   variableFunctions :: Language -> (Type, [Constructor]) -> [Function],
-  envFunctions :: Language -> [Function]
+  envFunctions :: Language -> [Function],
+  nativeCode :: Language -> (Type, [Constructor])-> [String]
 }
 
 -- | Convert a language into a program using the specified variable functions
@@ -25,5 +26,5 @@ convert lan@(nsd, sd, imp, cd) vf =
     instances = (variableInstances vf) var,
     functions = (variableFunctions vf) lan var ++
                 (envFunctions vf) lan,
-    code = cd
+    code = (nativeCode vf) lan var ++ cd
   }

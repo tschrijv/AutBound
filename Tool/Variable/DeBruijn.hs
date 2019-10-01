@@ -17,7 +17,8 @@ getFunctions
     userTypes = getTypes,
     variableInstances = getVariableInstances,
     variableFunctions = getVariableFunctions,
-    envFunctions = getEnvFunctions
+    envFunctions = getEnvFunctions,
+    nativeCode = (\_ _ -> [])
   }
 
 getVariableType :: Language -> (Type, [Constructor])

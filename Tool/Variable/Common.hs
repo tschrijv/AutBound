@@ -75,7 +75,7 @@ getEnvFunctions (nsd, sd, _, _)
                 collectRulesOfIdSyn iden = (iden, filter (\(LeftSub fieldname _, RightSub _ _) -> fieldname == iden) attrs)
 
             navigateAttrs :: AttributeDef -> Expression
-            navigateAttrs (l, RightAdd expr _) = FnCall ("S" ++ xnamespace ctx) [navigateAttrs (l, expr)]
+            navigateAttrs (l, RightAdd expr _) = ConstrInst ("S" ++ xnamespace ctx) [navigateAttrs (l, expr)]
             navigateAttrs (LeftLHS _, RightLHS _) = VarExpr "c"
             navigateAttrs (LeftSub _ _, RightLHS _) = VarExpr "c"
             navigateAttrs (_, RightSub iden _)

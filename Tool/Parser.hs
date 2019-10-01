@@ -24,7 +24,7 @@ myDef =
         , "c"
         , "rewrite"
         , "import"
-        , "HaskellCode"
+        , "NativeCode"
         ]
     , reservedOpNames = ["@", "=", ",", ".", ";", ":", "|"]
     }

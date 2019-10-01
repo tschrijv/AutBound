@@ -14,7 +14,7 @@ sort Term
 sort Pat
     inh ictx TermVar
     syn sctx TermVar
-    | PVar (x: TermVar)
+    | PVar [x: TermVar]
         lhs.sctx = lhs.ictx, x
     | PProd (p1: Pat) (p2: Pat)
         p1.ictx = lhs.ictx
