@@ -50,14 +50,12 @@ helpWellFormed ([], s:lanrest) sortnames consnames sortconsnames namespacenames 
         where
           --getNamespaceName of a ConstructorDef
           getNamespaceNameConstructor :: ConstructorDef -> Maybe NamespaceName
-          getNamespaceNameConstructor (MkBindConstructor _ _ _ _ name _ _) =
-            Just (snd name)
+          getNamespaceNameConstructor (MkBindConstructor _ _ _ _ name _ _) = Just (snd name)
           getNamespaceNameConstructor _ = Nothing
 
       --get the instances used by sorts
       getInstanceSortsNameSpaceNames :: SortDef -> [NamespaceName]
-      getInstanceSortsNameSpaceNames (MkDefSort _ ctxs _ _) =
-        map xnamespace ctxs
+      getInstanceSortsNameSpaceNames (MkDefSort _ ctxs _ _) = map xnamespace ctxs
 
       --get the constructornames of a sortDef
       getConstructorNames :: SortDef -> [ConstructorName]
@@ -72,9 +70,8 @@ helpWellFormed ([], s:lanrest) sortnames consnames sortconsnames namespacenames 
           getSortsOfConstructors = concatMap getSortsConstructor where
             --get the sorts used in the constructor
             getSortsConstructor :: ConstructorDef -> [SortName]
-            getSortsConstructor (MkDefConstructor _ lists sorts folds _ _) = map snd sorts ++ map snd lists ++ map (\(_, y, _) -> y) folds
-            getSortsConstructor (MkBindConstructor _ lists sorts folds _ _ _) = map snd sorts ++ map snd lists ++ map (\(_, y, _) -> y) folds
-            getSortsConstructor _ = []
+            getSortsConstructor (MkVarConstructor _ _) = []
+            getSortsConstructor ctor =  map snd (csorts ctor) ++ map snd (clists ctor) ++ map (\(_, y, _) -> y) (cfolds ctor)
 helpWellFormed ([], []) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
   _ <- helpWellFormedSortName sortnames
   _ <- helpWellFormedConstructorName consnames
@@ -107,15 +104,13 @@ wellFormedConstructor cons = do
   where
     --get the Identifiers of the arguments of a constructor (including the binder)
     getIdentifiersConstructor :: ConstructorDef -> [String]
-    getIdentifiersConstructor (MkDefConstructor _ lists sorts folds _ _) = map fst lists ++ map fst sorts ++ map (\(x, _, _) -> x) folds
-    getIdentifiersConstructor (MkBindConstructor _ lists sorts folds namespace _ _) = map fst lists ++ map fst sorts ++ map (\(x, _, _) -> x) folds ++ [fst namespace]
-    getIdentifiersConstructor _ = []
+    getIdentifiersConstructor (MkVarConstructor _ _) = []
+    getIdentifiersConstructor ctor = map fst (clists ctor) ++ map fst (csorts ctor) ++ map (\(x, _, _) -> x) (cfolds ctor) ++ maybe [] (\b -> [fst b]) (cbinder ctor)
 
     --get the ids of the RightExpr that bind, including the binder added
     getRightExprIdsConstructorBinding :: ConstructorDef -> [IdenName]
-    getRightExprIdsConstructorBinding (MkDefConstructor _ _ _ _ rules _) = concatMap (getRightExprIdBinding . snd) rules
-    getRightExprIdsConstructorBinding (MkBindConstructor _ _ _ _ _ rules _) = concatMap (getRightExprIdBinding . snd) rules
-    getRightExprIdsConstructorBinding _ = []
+    getRightExprIdsConstructorBinding (MkVarConstructor _ _) = []
+    getRightExprIdsConstructorBinding ctor = concatMap (getRightExprIdBinding . snd) (cattrs ctor)
 
     -- get the name on the right expression
     getRightExprIdBinding :: RightExpr -> [IdenName]
@@ -125,15 +120,13 @@ wellFormedConstructor cons = do
 
     -- get all the identifiers without the binder included
     getIdentifiersWithoutBinding :: ConstructorDef -> [String]
-    getIdentifiersWithoutBinding (MkDefConstructor _ lists sorts folds _ _) = map fst sorts ++ map fst lists ++ map (\(x, _, _) -> x) folds
-    getIdentifiersWithoutBinding (MkBindConstructor _ lists sorts folds _ _ _) = map fst sorts ++ map fst lists ++ map (\(x, _, _) -> x) folds
-    getIdentifiersWithoutBinding _ = []
+    getIdentifiersWithoutBinding (MkVarConstructor _ _) = []
+    getIdentifiersWithoutBinding ctor = map fst (csorts ctor) ++ map fst (clists ctor) ++ map (\(x, _, _) -> x) (cfolds ctor)
 
     --get the identifiers used in the rules defined in the constructor
     getAllIds :: ConstructorDef -> [IdenName]
-    getAllIds (MkDefConstructor _ _ _ _ rules _) = concatMap getRuleIdentifiers rules
-    getAllIds (MkBindConstructor _ _ _ _ _ rules _) = concatMap getRuleIdentifiers rules
-    getAllIds _ = []
+    getAllIds (MkVarConstructor _ _) = []
+    getAllIds ctor = concatMap getRuleIdentifiers (cattrs ctor)
 
     --get identifiers of the rule, left expression+the rightexpr
     getRuleIdentifiers :: AttributeDef -> [IdenName]
@@ -146,15 +139,13 @@ wellFormedConstructor cons = do
 
     -- get the ids of the RightExpr without any binders included
     getRightExprIdsConstructor :: ConstructorDef -> [IdenName]
-    getRightExprIdsConstructor (MkDefConstructor _ _ _ _ rules _) = concatMap (getRightExprId . snd) rules
-    getRightExprIdsConstructor (MkBindConstructor _ _ _ _ _ rules _) = concatMap (getRightExprId . snd) rules
-    getRightExprIdsConstructor _ = []
+    getRightExprIdsConstructor (MkVarConstructor _ _) = []
+    getRightExprIdsConstructor ctor = concatMap (getRightExprId . snd) (cattrs ctor)
 
     --get the ids of the LeftExpr
     getLeftExprIdsConstructor :: ConstructorDef -> [IdenName]
-    getLeftExprIdsConstructor (MkDefConstructor _ _ _ _ rules _) = concatMap (getLeftExprId . fst) rules
-    getLeftExprIdsConstructor (MkBindConstructor _ _ _ _ _ rules _) = concatMap (getLeftExprId . fst) rules
-    getLeftExprIdsConstructor _ = []
+    getLeftExprIdsConstructor (MkVarConstructor _ _) = []
+    getLeftExprIdsConstructor ctor = concatMap (getLeftExprId . fst) (cattrs ctor)
 
 isEmptySort :: SortDef -> Either String Bool
 isEmptySort (MkDefSort name _ [] _) = Left (show name ++ " has no constructor")
@@ -287,11 +278,9 @@ helpWellFormedRulesLHSExpressionsSort table s =
   concatMap (helpWellFormedRulesLHSExpressionsConstructor (sname s) table) (sctors s)
 
 helpWellFormedRulesLHSExpressionsConstructor :: SortName -> [(SortName, [Context])] -> ConstructorDef -> [Either String Bool]
-helpWellFormedRulesLHSExpressionsConstructor sortName table (MkDefConstructor _ _ sortids _ rules _) =
-  map (helpWellFormedRulesInstancesRuleLHSLeft sortName sortids table) rules
-helpWellFormedRulesLHSExpressionsConstructor sortName table (MkBindConstructor _ _ sortids _ (_, _) rules _) =
-  map (helpWellFormedRulesInstancesRuleLHSLeft sortName sortids table) rules
-helpWellFormedRulesLHSExpressionsConstructor _ _ _ = [Right True]
+helpWellFormedRulesLHSExpressionsConstructor _ _ (MkVarConstructor _ _) = [Right True]
+helpWellFormedRulesLHSExpressionsConstructor sortName table ctor =
+  map (helpWellFormedRulesInstancesRuleLHSLeft sortName (csorts ctor) table) (cattrs ctor)
 
 --checks if the left hand side and right hand side are wellformed in the sense that inherited contexts and synthesised contexts cannot be used in every position
 helpWellFormedRulesInstancesRuleLHSLeft :: SortName -> [(IdenName, SortName)] -> [(SortName, [Context])] -> AttributeDef -> Either String Bool
@@ -380,11 +369,9 @@ helpWellFormedRulesInstancesRule sortName lists tableIdentifiers folds tableInst
 
 --checks if all the rules are welldefined for the normal constructors and the binding constructors
 helpWellFormedRulesInstancesConstructor :: SortName -> [(SortName, [Context])] -> ConstructorDef -> [Either String Bool]
-helpWellFormedRulesInstancesConstructor sortName table (MkDefConstructor _ listids sortids folds rules _) =
- map (helpWellFormedRulesInstancesRule sortName listids sortids folds table) rules
-helpWellFormedRulesInstancesConstructor sortName table (MkBindConstructor _ listids sortids folds (_, _) rules _) =
- map (helpWellFormedRulesInstancesRule sortName listids sortids folds table) rules
-helpWellFormedRulesInstancesConstructor _ _ _ = [return True]
+helpWellFormedRulesInstancesConstructor _ _ (MkVarConstructor _ _) = [return True]
+helpWellFormedRulesInstancesConstructor sortName table ctor =
+ map (helpWellFormedRulesInstancesRule sortName (clists ctor) (csorts ctor) (cfolds ctor) table) (cattrs ctor)
 
 --checks if all the constructors have welltyped rules
 helpWellFormedRulesInstancesSort :: [(SortName, [Context])] -> SortDef -> [Either String Bool]
