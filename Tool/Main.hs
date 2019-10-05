@@ -39,11 +39,10 @@ checkAndConvert :: Language -> String -> IO (Either String Program)
 checkAndConvert lang varType =
   case wellFormed lang of
     Left failtxt2 -> return (Left failtxt2)
-    Right True -> case varType of
+    Right () -> case varType of
       "DeBruijn" -> return (Right (convert lang VDB.getFunctions))
       "String"   -> return (Right (convert lang VS.getFunctions))
       _          -> error "Unknown variable representation!"
-    Right False -> error "Language is not well formed!"
 
 -- | Convert the abstract syntax of the implementation to a specific language
 -- and output it as a file
