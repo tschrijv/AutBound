@@ -8,11 +8,26 @@ import Data.Maybe
 import Data.List
 
 --when is this syntax wellFormed : 1. when there are no duplicate constructors in the language i.e. there are no duplicate names among constructors or sorts and every sort has at the least one constructor
+--accumulates the sortnames, constructornames, and the sortnames contained in the constructors,
+--then looks up if all sortnames,namespacenames and contructornames are unique, if all sorts in the constructors exist,
+--and whether sorts and constructors and namespaces have distinct names. Also namespacenames used in sorts should exist and constructors can only use variablebindings of namespaces they can access in the sort
 wellFormed :: Language -> Either String ()
-wellFormed ([], [], _, _) = Left "Empty Language"
 wellFormed (namespaces, sorts, _, _)
-  = let namespaceNames = map nname namespaces
+  = let sortnames = map sname sorts
+        consnames = concatMap getConstructorNames sorts
+        sortconsnames = concatMap getSortsUsedByConstructors sorts
+        namespaceNames = map nname namespaces
+        sortnamespaces = map nsort namespaces
+        instTable = map snameAndCtxs sorts
     in do
+      noDuplicatesOrError sortnames "not unique sortname"
+      noDuplicatesOrError consnames "not unique constructor"
+      noDuplicatesOrError namespaceNames "not unique namespace"
+      disjointOrError consnames sortnames "constructor and sort have same name"
+      disjointOrError namespaceNames sortnames "namespace and sort have same name"
+      disjointOrError namespaceNames consnames "constructor and namespace have same name"
+      subsetOfOrError sortconsnames sortnames "sortname in constructor does not appear"
+      subsetOfOrError sortnamespaces sortnames "sortname in namespace does not appear"
       mapM_ (
         \sort ->
           let ctors = sctors sort
@@ -25,7 +40,9 @@ wellFormed (namespaces, sorts, _, _)
             wellFormedConstructors ctors
             helpWellFormedVariables ctors (sctxs sort)
         ) sorts
-      helpWellFormed sorts namespaces
+      helpWellFormedRulesInstances sorts instTable
+      isWellFormedBindToContext sorts instTable
+      helpWellFormedRulesLHSExpressions sorts instTable
   where
     checkVarCtors :: SortDef -> Either String ()
     checkVarCtors (MkDefSort name ctxs ctors _) = mapM_ (
@@ -121,30 +138,6 @@ wellFormed (namespaces, sorts, _, _)
     getInstanceSortsNameSpaceNames :: SortDef -> [NamespaceName]
     getInstanceSortsNameSpaceNames (MkDefSort _ ctxs _ _) = map xnamespace ctxs
 
---accumulates the sortnames, constructornames, and the sortnames contained in the constructors,
---then looks up if all sortnames,namespacenames and contructornames are unique, if all sorts in the constructors exist,
---and whether sorts and constructors and namespaces have distinct names. Also namespacenames used in sorts should exist and constructors can only use variablebindings of namespaces they can access in the sort
-helpWellFormed :: [SortDef] -> [NamespaceDef] -> Either String ()
-helpWellFormed sorts namespaces
-  = let sortnames = map sname sorts
-        consnames = concatMap getConstructorNames sorts
-        sortconsnames = concatMap getSortsUsedByConstructors sorts
-        namespacenames = map nname namespaces
-        sortnamespaces = map nsort namespaces
-        instTable = map snameAndCtxs sorts
-    in do
-      noDuplicatesOrError sortnames "not unique sortname"
-      noDuplicatesOrError consnames "not unique constructor"
-      noDuplicatesOrError namespacenames "not unique namespace"
-      disjointOrError consnames sortnames "constructor and sort have same name"
-      disjointOrError namespacenames sortnames "namespace and sort have same name"
-      disjointOrError namespacenames consnames "constructor and namespace have same name"
-      subsetOfOrError sortconsnames sortnames "sortname in constructor does not appear"
-      subsetOfOrError sortnamespaces sortnames "sortname in namespace does not appear"
-      helpWellFormedRulesInstances sorts instTable
-      isWellFormedBindToContext sorts instTable
-      helpWellFormedRulesLHSExpressions sorts instTable
-  where
     --get the constructornames of a sortDef
     getConstructorNames :: SortDef -> [ConstructorName]
     getConstructorNames (MkDefSort _ _ cnames _) = map cname cnames
