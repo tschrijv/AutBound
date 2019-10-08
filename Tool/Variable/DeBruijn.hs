@@ -204,9 +204,53 @@ _substExpr sname consName =
     (FnCall (sname ++ "shiftplus") [VarExpr "c", VarExpr "sub"])
     (ConstrInst consName [VarExpr "var"])
 
+-- | For every inherited context of a sort, apply nested modifiers to the
+-- returned "c" variable
+_applyInhCtxsToAttrs :: SortName -> ConstructorDef -> (IdenName, [AttributeDef]) -> [(SortName, [Context])] -> Expression
+_applyInhCtxsToAttrs sname ctor (iden, idenAttrs) ctxsBySname
+ = let inhCtxs = (inhCtxsForSortName (sortNameForIden iden ctor) ctxsBySname)
+   in foldr (\ctx rest -> fromMaybe rest (applyOneCtx ctx rest)) (VarExpr "c") inhCtxs
+  where
+    -- | Runs `applyOneAttr` if the identifier's attribute definitions
+    -- contain an assignment to an instance of the given context
+    applyOneCtx :: Context -> Expression -> Maybe Expression
+    applyOneCtx ctx param
+      | isJust attrForCtx = applyOneAttr (fromJust attrForCtx) [param]
+      | otherwise = Nothing
+      where
+        attrForCtx = find (\(left, _) -> linst left == xinst ctx) idenAttrs
+
+        -- | Apply the necessary wrap based on the attribute assignment type
+        applyOneAttr :: AttributeDef -> [Expression] -> Maybe Expression
+        applyOneAttr (_, RightLHS _) _ = Nothing
+        applyOneAttr (l, RightAdd expr _) params
+          = return (_oneDeeper (xnamespace ctx) (nextStep ++ params))
+          where
+            nextStep = maybeToList (applyOneAttr (l, expr) [])
+        applyOneAttr (_, RightSub iden context) params
+          = if elem iden (map fst lists) || elem iden (map fst folds)
+              then if isJust attrsForIden
+                then return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params))
+                else return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" [VarExpr iden] : params))
+              else if isJust attrsForIden
+                then return (FnCall ("addToEnvironment" ++ fromJust (lookup iden sorts) ++ context) ((VarExpr iden : nextStep) ++ params))
+                else return (FnCall ("addToEnvironment" ++ fromJust (lookup iden sorts) ++ context) (VarExpr iden : params))
+          where
+            newAttrs = filter (\(left, _) ->
+                let iden = liden left
+                    ctxsForSort = fromJust (lookup sname ctxsBySname)
+                    ctxsForIdenSort = fromJust (lookup (sortNameForIden iden ctor) ctxsBySname)
+                in (iden == "" && any (\ctx -> linst left == xinst ctx) ctxsForSort) || any (\ctx -> linst left == xinst ctx) ctxsForIdenSort
+              ) (cattrs ctor)
+            attrsForIden = find (\(left, _) -> liden left == iden) newAttrs
+            nextStep = maybeToList (applyOneAttr (fromJust attrsForIden) [])
+            lists = clists ctor
+            folds = dropFold $ cfolds ctor
+            sorts = csorts ctor
+
 ef = EF {
   paramForCtor = _getCtorParams,
   freeVarExprForVarCtor = _varCtorFreeVar,
-  transformForAddAttr = _oneDeeper,
+  applyInhCtxsToAttrs = _applyInhCtxsToAttrs,
   includeBinders = False
 }
