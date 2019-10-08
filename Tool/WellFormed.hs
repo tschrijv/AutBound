@@ -10,178 +10,190 @@ import Data.List
 --when is this syntax wellFormed : 1. when there are no duplicate constructors in the language i.e. there are no duplicate names among constructors or sorts and every sort has at the least one constructor
 wellFormed :: Language -> Either String ()
 wellFormed ([], [], _, _) = Left "Empty Language"
-wellFormed (namespaces, sorts, _, _) = do
-  mapM_ checkVarCtors sorts
-  helpWellFormed sorts [] [] [] (map nname namespaces) (map nsort namespaces) [] []
+wellFormed (namespaces, sorts, _, _)
+  = let namespaceNames = map nname namespaces
+    in do
+      mapM_ (
+        \sort ->
+          let ctors = sctors sort
+          in do
+            checkVarCtors sort
+            notEmpty sort
+            checkBinderNamespaces [snd (fromJust (cbinder ctor)) | ctor <- ctors, isBind ctor] namespaceNames
+            wellFormedConstructors ctors
+            helpWellFormedInstances (getInstanceSortsNameSpaceNames sort) namespaceNames
+            helpWellFormedVariables ctors (sctxs sort)
+            helpWellFormedInstanceNames (map xinst (sctxs sort))
+        ) sorts
+      helpWellFormed sorts namespaces
   where
     checkVarCtors :: SortDef -> Either String ()
     checkVarCtors (MkDefSort name ctxs ctors _) = mapM_ (
         \ctor -> checkInst name (cinst ctor) ctxs
       ) [MkVarConstructor n i | MkVarConstructor n i <- ctors]
+      where
+        checkInst :: SortName -> InstanceName -> [Context] -> Either String ()
+        checkInst sortName name ctxs
+          = let match = find (\ctx -> xinst ctx == name) ctxs
+            in case match of
+              Nothing  -> Left ("No instance found with that name in " ++ name)
+              Just ctx -> checkNsSort sortName (xnamespace ctx) namespaces
 
-    checkInst :: SortName -> InstanceName -> [Context] -> Either String ()
-    checkInst sortName name ctxs
-      = let match = find (\ctx -> xinst ctx == name) ctxs
-        in case match of
-          Nothing  -> Left ("No instance found with that name in " ++ name)
-          Just ctx -> checkNsSort sortName (xnamespace ctx) namespaces
+        checkNsSort :: SortName -> NamespaceName -> [NamespaceDef] -> Either String ()
+        checkNsSort sortName namespaceName nsd
+          = let match = find (\ns -> nname ns == namespaceName) nsd
+            in case match of
+              Nothing -> Left "Instance and namespace in variable do not coincide"
+              Just ns -> if nsort ns == sortName
+                          then return ()
+                          else Left ("sort cannot use this namespace in " ++ sortName)
 
-    checkNsSort :: SortName -> NamespaceName -> [NamespaceDef] -> Either String ()
-    checkNsSort sortName namespaceName nsd
-      = let match = find (\ns -> nname ns == namespaceName) nsd
-        in case match of
-          Nothing -> Left "Instance and namespace in variable do not coincide"
-          Just ns -> if nsort ns == sortName
-                       then return ()
-                       else Left ("sort cannot use this namespace in " ++ sortName)
+    notEmpty :: SortDef -> Either String ()
+    notEmpty (MkDefSort name _ [] _) = Left (show name ++ " has no constructor")
+    notEmpty _ = return ()
+
+    --function to detect if all namespacenames in constructors are valid (or in other words: are declared )
+    checkBinderNamespaces :: [NamespaceName] -> [NamespaceName] -> Either String ()
+    checkBinderNamespaces l l2 = shouldBeInSecondList l l2 "Namespace in constructor is not a declared namespace"
+
+    wellFormedConstructors :: [ConstructorDef] -> Either String ()
+    wellFormedConstructors ctors = mapM_ wellFormedConstructor ctors
+      where
+        wellFormedConstructor :: ConstructorDef -> Either String ()
+        wellFormedConstructor cons = do
+          helpWellFormedIdentifiers (getIdentifiersConstructor cons)
+          helpWellFormedRulesIdentifiers (getAllIds cons) (getIdentifiersConstructor cons)
+          helpWellFormedIdentifierBindingInRightExpr (getRightExprIdsConstructorBinding cons) (getBinding cons)
+          helpWellFormedIdentifierInLeftExpr (getLeftExprIdsConstructor cons) (getIdentifiersWithoutBinding cons)
+          helpWellFormedIdentifierInRightExpr (getRightExprIdsConstructor cons) (getIdentifiersWithoutBinding cons)
+          helpWellFormedIdentifiers (getIdentifiersWithoutBinding cons)
+          where
+            --function to detect if all identifiers are unique in the fields of a constructor
+            helpWellFormedIdentifiers :: [IdenName] -> Either String ()
+            helpWellFormedIdentifiers l = isUniqueInList l "not unique identifier"
+
+            --function to detect if all identifiers used in the rules exist as fields
+            helpWellFormedRulesIdentifiers :: [IdenName] -> [IdenName] -> Either String ()
+            helpWellFormedRulesIdentifiers l l2 = shouldBeInSecondList l l2 "identifier not used in constructor"
+
+            --detects if an identifier in the right expression does not appear as a binder
+            helpWellFormedIdentifierBindingInRightExpr :: [IdenName] -> [IdenName] -> Either String ()
+            helpWellFormedIdentifierBindingInRightExpr l l2 = shouldBeInSecondList l l2 "Identifier in right expression does not appear as binder"
+
+            --detects if an identifier in the right expression does not appear as constructorfield
+            helpWellFormedIdentifierInLeftExpr :: [IdenName] -> [IdenName] -> Either String ()
+            helpWellFormedIdentifierInLeftExpr l l2 = shouldBeInSecondList l l2 "Identifier in left expression does not appear as constructorfield"
+
+            --detects if an identifier in the right expression does not appear as constructorfield
+            helpWellFormedIdentifierInRightExpr :: [IdenName] -> [IdenName] -> Either String ()
+            helpWellFormedIdentifierInRightExpr l l2 = shouldBeInSecondList l l2 "Identifier in right expression does not appear as constructorfield"
+
+            --get the Identifiers of the arguments of a constructor (including the binder)
+            getIdentifiersConstructor :: ConstructorDef -> [String]
+            getIdentifiersConstructor (MkVarConstructor _ _) = []
+            getIdentifiersConstructor ctor = map fst (clists ctor) ++ map fst (csorts ctor) ++ map (\(x, _, _) -> x) (cfolds ctor) ++ maybe [] (\b -> [fst b]) (cbinder ctor)
+
+            --get the ids of the RightExpr that bind, including the binder added
+            getRightExprIdsConstructorBinding :: ConstructorDef -> [IdenName]
+            getRightExprIdsConstructorBinding (MkVarConstructor _ _) = []
+            getRightExprIdsConstructorBinding ctor = concatMap (getRightExprIdBinding . snd) (cattrs ctor)
+
+            -- get the name on the right expression
+            getRightExprIdBinding :: RightExpr -> [IdenName]
+            getRightExprIdBinding (RightLHS _)       = []
+            getRightExprIdBinding (RightSub _ _)     = []
+            getRightExprIdBinding (RightAdd expr iden) = iden : getRightExprIdBinding expr
+
+            -- get all the identifiers without the binder included
+            getIdentifiersWithoutBinding :: ConstructorDef -> [String]
+            getIdentifiersWithoutBinding (MkVarConstructor _ _) = []
+            getIdentifiersWithoutBinding ctor = map fst (csorts ctor) ++ map fst (clists ctor) ++ map (\(x, _, _) -> x) (cfolds ctor)
+
+            --get the identifiers used in the rules defined in the constructor
+            getAllIds :: ConstructorDef -> [IdenName]
+            getAllIds (MkVarConstructor _ _) = []
+            getAllIds ctor = concatMap getRuleIdentifiers (cattrs ctor)
+
+            --get identifiers of the rule, left expression+the rightexpr
+            getRuleIdentifiers :: AttributeDef -> [IdenName]
+            getRuleIdentifiers (l, r) = getLeftExprId l ++ getRightExprIdBinding r ++ getRightExprId r
+
+            --get the binding of a constructor
+            getBinding :: ConstructorDef -> [IdenName]
+            getBinding (MkBindConstructor _ _ _ _ name _ _) = [fst name]
+            getBinding _                                    = []
+
+            -- get the ids of the RightExpr without any binders included
+            getRightExprIdsConstructor :: ConstructorDef -> [IdenName]
+            getRightExprIdsConstructor (MkVarConstructor _ _) = []
+            getRightExprIdsConstructor ctor = concatMap (getRightExprId . snd) (cattrs ctor)
+
+            --get the ids of the LeftExpr
+            getLeftExprIdsConstructor :: ConstructorDef -> [IdenName]
+            getLeftExprIdsConstructor (MkVarConstructor _ _) = []
+            getLeftExprIdsConstructor ctor = concatMap (getLeftExprId . fst) (cattrs ctor)
+
+    --function to detect if all namespaces used in instances in sorts exist
+    helpWellFormedInstances :: [NamespaceName] -> [NamespaceName] -> Either String ()
+    helpWellFormedInstances l l2 = shouldBeInSecondList l l2 "Instance does not reference an existing namespace"
+
+    -- variables in a sort can only access the inherited namespaces
+    helpWellFormedVariables :: [ConstructorDef] -> [Context] -> Either String ()
+    helpWellFormedVariables [] _ = return ()
+    helpWellFormedVariables (MkVarConstructor _ contextName:rest) instances = do
+      _ <- shouldBeInSecondList [contextName] [name | INH name _ <- instances] "Namespace is not an inherited namespace "
+      helpWellFormedVariables rest instances
+    helpWellFormedVariables (_:rest) instances =
+      helpWellFormedVariables rest instances
+
+    --all instancenames across sorts should be unique
+    helpWellFormedInstanceNames :: [InstanceName] -> Either String ()
+    helpWellFormedInstanceNames l = isUniqueInList l "Instance is not a unique name in the declaration "
+
+    --get the instances used by sorts
+    getInstanceSortsNameSpaceNames :: SortDef -> [NamespaceName]
+    getInstanceSortsNameSpaceNames (MkDefSort _ ctxs _ _) = map xnamespace ctxs
 
 --accumulates the sortnames, constructornames, and the sortnames contained in the constructors,
 --then looks up if all sortnames,namespacenames and contructornames are unique, if all sorts in the constructors exist,
 --and whether sorts and constructors and namespaces have distinct names. Also namespacenames used in sorts should exist and constructors can only use variablebindings of namespaces they can access in the sort
-helpWellFormed :: [SortDef] -> [SortName] -> [ConstructorName] -> [SortName] -> [NamespaceName] -> [SortName] -> [(SortName, [Context])] -> [SortDef] -> Either String ()
-helpWellFormed (s:lanrest) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
-  notEmpty s
-  checkBinderNamespaces [snd (fromJust (cbinder ctor)) | ctor <- sctors s, isBind ctor] namespacenames
-  wellFormedConstructors (sctors s)
-  helpWellFormedInstances (getInstanceSortsNameSpaceNames s) namespacenames
-  helpWellFormedVariables (sctors s) (sctxs s)
-  helpWellFormedInstanceNames (map xinst (sctxs s))
-  helpWellFormed lanrest (sname s : sortnames) (getConstructorNames s ++ consnames) (getSortsUsedByConstructors ++ sortconsnames) namespacenames sortnamespaces (snameAndCtxs s : instTable) (s : sortdefs)
-    where
-      notEmpty :: SortDef -> Either String ()
-      notEmpty (MkDefSort name _ [] _) = Left (show name ++ " has no constructor")
-      notEmpty _ = return ()
-
-      --function to detect if all namespacenames in constructors are valid (or in other words: are declared )
-      checkBinderNamespaces :: [NamespaceName] -> [NamespaceName] -> Either String ()
-      checkBinderNamespaces l l2 = shouldBeInSecondList l l2 "Namespace in constructor is not a declared namespace"
-
-      wellFormedConstructors :: [ConstructorDef] -> Either String ()
-      wellFormedConstructors ctors = mapM_ wellFormedConstructor ctors
-        where
-          wellFormedConstructor :: ConstructorDef -> Either String ()
-          wellFormedConstructor cons = do
-            helpWellFormedIdentifiers (getIdentifiersConstructor cons)
-            helpWellFormedRulesIdentifiers (getAllIds cons) (getIdentifiersConstructor cons)
-            helpWellFormedIdentifierBindingInRightExpr (getRightExprIdsConstructorBinding cons) (getBinding cons)
-            helpWellFormedIdentifierInLeftExpr (getLeftExprIdsConstructor cons) (getIdentifiersWithoutBinding cons)
-            helpWellFormedIdentifierInRightExpr (getRightExprIdsConstructor cons) (getIdentifiersWithoutBinding cons)
-            helpWellFormedIdentifiers (getIdentifiersWithoutBinding cons)
-            where
-              --function to detect if all identifiers are unique in the fields of a constructor
-              helpWellFormedIdentifiers :: [IdenName] -> Either String ()
-              helpWellFormedIdentifiers l = isUniqueInList l "not unique identifier"
-
-              --function to detect if all identifiers used in the rules exist as fields
-              helpWellFormedRulesIdentifiers :: [IdenName] -> [IdenName] -> Either String ()
-              helpWellFormedRulesIdentifiers l l2 = shouldBeInSecondList l l2 "identifier not used in constructor"
-
-              --detects if an identifier in the right expression does not appear as a binder
-              helpWellFormedIdentifierBindingInRightExpr :: [IdenName] -> [IdenName] -> Either String ()
-              helpWellFormedIdentifierBindingInRightExpr l l2 = shouldBeInSecondList l l2 "Identifier in right expression does not appear as binder"
-
-              --detects if an identifier in the right expression does not appear as constructorfield
-              helpWellFormedIdentifierInLeftExpr :: [IdenName] -> [IdenName] -> Either String ()
-              helpWellFormedIdentifierInLeftExpr l l2 = shouldBeInSecondList l l2 "Identifier in left expression does not appear as constructorfield"
-
-              --detects if an identifier in the right expression does not appear as constructorfield
-              helpWellFormedIdentifierInRightExpr :: [IdenName] -> [IdenName] -> Either String ()
-              helpWellFormedIdentifierInRightExpr l l2 = shouldBeInSecondList l l2 "Identifier in right expression does not appear as constructorfield"
-
-              --get the Identifiers of the arguments of a constructor (including the binder)
-              getIdentifiersConstructor :: ConstructorDef -> [String]
-              getIdentifiersConstructor (MkVarConstructor _ _) = []
-              getIdentifiersConstructor ctor = map fst (clists ctor) ++ map fst (csorts ctor) ++ map (\(x, _, _) -> x) (cfolds ctor) ++ maybe [] (\b -> [fst b]) (cbinder ctor)
-
-              --get the ids of the RightExpr that bind, including the binder added
-              getRightExprIdsConstructorBinding :: ConstructorDef -> [IdenName]
-              getRightExprIdsConstructorBinding (MkVarConstructor _ _) = []
-              getRightExprIdsConstructorBinding ctor = concatMap (getRightExprIdBinding . snd) (cattrs ctor)
-
-              -- get the name on the right expression
-              getRightExprIdBinding :: RightExpr -> [IdenName]
-              getRightExprIdBinding (RightLHS _)       = []
-              getRightExprIdBinding (RightSub _ _)     = []
-              getRightExprIdBinding (RightAdd expr iden) = iden : getRightExprIdBinding expr
-
-              -- get all the identifiers without the binder included
-              getIdentifiersWithoutBinding :: ConstructorDef -> [String]
-              getIdentifiersWithoutBinding (MkVarConstructor _ _) = []
-              getIdentifiersWithoutBinding ctor = map fst (csorts ctor) ++ map fst (clists ctor) ++ map (\(x, _, _) -> x) (cfolds ctor)
-
-              --get the identifiers used in the rules defined in the constructor
-              getAllIds :: ConstructorDef -> [IdenName]
-              getAllIds (MkVarConstructor _ _) = []
-              getAllIds ctor = concatMap getRuleIdentifiers (cattrs ctor)
-
-              --get identifiers of the rule, left expression+the rightexpr
-              getRuleIdentifiers :: AttributeDef -> [IdenName]
-              getRuleIdentifiers (l, r) = getLeftExprId l ++ getRightExprIdBinding r ++ getRightExprId r
-
-              --get the binding of a constructor
-              getBinding :: ConstructorDef -> [IdenName]
-              getBinding (MkBindConstructor _ _ _ _ name _ _) = [fst name]
-              getBinding _                                    = []
-
-              -- get the ids of the RightExpr without any binders included
-              getRightExprIdsConstructor :: ConstructorDef -> [IdenName]
-              getRightExprIdsConstructor (MkVarConstructor _ _) = []
-              getRightExprIdsConstructor ctor = concatMap (getRightExprId . snd) (cattrs ctor)
-
-              --get the ids of the LeftExpr
-              getLeftExprIdsConstructor :: ConstructorDef -> [IdenName]
-              getLeftExprIdsConstructor (MkVarConstructor _ _) = []
-              getLeftExprIdsConstructor ctor = concatMap (getLeftExprId . fst) (cattrs ctor)
-
-      --function to detect if all namespaces used in instances in sorts exist
-      helpWellFormedInstances :: [NamespaceName] -> [NamespaceName] -> Either String ()
-      helpWellFormedInstances l l2 = shouldBeInSecondList l l2 "Instance does not reference an existing namespace"
-
-      -- variables in a sort can only access the inherited namespaces
-      helpWellFormedVariables :: [ConstructorDef] -> [Context] -> Either String ()
-      helpWellFormedVariables [] _ = return ()
-      helpWellFormedVariables (MkVarConstructor _ contextName:rest) instances = do
-        _ <- shouldBeInSecondList [contextName] [name | INH name _ <- instances] "Namespace is not an inherited namespace "
-        helpWellFormedVariables rest instances
-      helpWellFormedVariables (_:rest) instances =
-        helpWellFormedVariables rest instances
-
-      --all instancenames across sorts should be unique
-      helpWellFormedInstanceNames :: [InstanceName] -> Either String ()
-      helpWellFormedInstanceNames l = isUniqueInList l "Instance is not a unique name in the declaration "
-
-      --get the instances used by sorts
-      getInstanceSortsNameSpaceNames :: SortDef -> [NamespaceName]
-      getInstanceSortsNameSpaceNames (MkDefSort _ ctxs _ _) = map xnamespace ctxs
-
-      --get the constructornames of a sortDef
-      getConstructorNames :: SortDef -> [ConstructorName]
-      getConstructorNames (MkDefSort _ _ cnames _) = map cname cnames
-
-      --get the sorts used in all constructors of the sort
-      getSortsUsedByConstructors :: [SortName]
-      getSortsUsedByConstructors = getSortsOfConstructors (sctors s)
-        where
-          -- get the sorts used by constructors in a list of constructors
-          getSortsOfConstructors :: [ConstructorDef] -> [SortName]
-          getSortsOfConstructors = concatMap getSortsConstructor where
-            --get the sorts used in the constructor
-            getSortsConstructor :: ConstructorDef -> [SortName]
-            getSortsConstructor (MkVarConstructor _ _) = []
-            getSortsConstructor ctor =  map snd (csorts ctor) ++ map snd (clists ctor) ++ map (\(_, y, _) -> y) (cfolds ctor)
-helpWellFormed [] sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
-  helpWellFormedSortName sortnames
-  helpWellFormedConstructorName consnames
-  helpWellFormedNameSpaceName namespacenames
-  helpWellFormedConstructorAndSort consnames sortnames
-  helpWellFormedNameSpaceAndSort namespacenames sortnames
-  helpWellFormedNameSpaceAndConstructor namespacenames consnames
-  helpWellFormedSortNameInConstructors sortconsnames sortnames
-  helpWellFormedSortNameInNamespaces sortnamespaces sortnames
-  helpWellFormedRulesInstances sortdefs instTable
-  isWellFormedBindToContext sortdefs instTable
-  helpWellFormedRulesLHSExpressions sortdefs instTable
+helpWellFormed :: [SortDef] -> [NamespaceDef] -> Either String ()
+helpWellFormed sorts namespaces
+  = let sortnames = map sname sorts
+        consnames = concatMap getConstructorNames sorts
+        sortconsnames = concatMap getSortsUsedByConstructors sorts
+        namespacenames = map nname namespaces
+        sortnamespaces = map nsort namespaces
+        instTable = map snameAndCtxs sorts
+    in do
+      helpWellFormedSortName sortnames
+      helpWellFormedConstructorName consnames
+      helpWellFormedNameSpaceName namespacenames
+      helpWellFormedConstructorAndSort consnames sortnames
+      helpWellFormedNameSpaceAndSort namespacenames sortnames
+      helpWellFormedNameSpaceAndConstructor namespacenames consnames
+      helpWellFormedSortNameInConstructors sortconsnames sortnames
+      helpWellFormedSortNameInNamespaces sortnamespaces sortnames
+      helpWellFormedRulesInstances sorts instTable
+      isWellFormedBindToContext sorts instTable
+      helpWellFormedRulesLHSExpressions sorts instTable
   where
+    --get the constructornames of a sortDef
+    getConstructorNames :: SortDef -> [ConstructorName]
+    getConstructorNames (MkDefSort _ _ cnames _) = map cname cnames
+
+    --get the sorts used in all constructors of the sort
+    getSortsUsedByConstructors :: SortDef -> [SortName]
+    getSortsUsedByConstructors s = getSortsOfConstructors (sctors s)
+      where
+        -- get the sorts used by constructors in a list of constructors
+        getSortsOfConstructors :: [ConstructorDef] -> [SortName]
+        getSortsOfConstructors = concatMap getSortsConstructor where
+          --get the sorts used in the constructor
+          getSortsConstructor :: ConstructorDef -> [SortName]
+          getSortsConstructor (MkVarConstructor _ _) = []
+          getSortsConstructor ctor =  map snd (csorts ctor) ++ map snd (clists ctor) ++ map (\(_, y, _) -> y) (cfolds ctor)
+
     --function to detect if all sortnames are unique
     helpWellFormedSortName :: [SortName] -> Either String ()
     helpWellFormedSortName l = isUniqueInList l "not unique sortname"
@@ -322,18 +334,14 @@ helpWellFormed [] sortnames consnames sortconsnames namespacenames sortnamespace
         findContextToNamespaceInstanceSyn instName sortName table =
           filter
             (\ctx -> xinst ctx == instName)
-            [ SYN ctxNamesyn namespacename
-            | SYN ctxNamesyn namespacename <- fromJust (lookup sortName table)
-            ]
+            [SYN ctxNamesyn namespacename | SYN ctxNamesyn namespacename <- fromJust (lookup sortName table)]
 
         -- filters all the inherited namespaces
         findContextToNamespaceInstanceInh :: InstanceName -> SortName -> [(SortName, [Context])] -> [Context]
         findContextToNamespaceInstanceInh instName sortName table =
           filter
             (\ctx -> xinst ctx == instName)
-            [ INH ctxNameinh namespacename
-            | INH ctxNameinh namespacename <- fromJust (lookup sortName table)
-            ]
+            [INH ctxNameinh namespacename | INH ctxNameinh namespacename <- fromJust (lookup sortName table)]
 
 -- get the name on the left expression
 getLeftExprId :: LeftExpr -> [IdenName]
