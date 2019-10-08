@@ -5,47 +5,42 @@ module WellFormed (wellFormed) where
 import GeneralTerms
 import Utility
 import Data.Maybe
+import Data.List
 
 --when is this syntax wellFormed : 1. when there are no duplicate constructors in the language i.e. there are no duplicate names among constructors or sorts and every sort has at the least one constructor
 wellFormed :: Language -> Either String ()
 wellFormed ([], [], _, _) = Left "Empty Language"
 wellFormed (namespaces, sorts, _, _) = do
-  mapM_ helpWellFormedVariablesCons sorts
+  mapM_ checkVarCtors sorts
   helpWellFormed (namespaces, sorts) [] [] [] [] [] [] []
   where
-    helpWellFormedVariablesCons :: SortDef -> Either String ()
-    helpWellFormedVariablesCons (MkDefSort name ctxs ctors _) = mapM_ (\ctor -> helpWellFormedVarInst name (cinst ctor) ctxs) [MkVarConstructor n i | MkVarConstructor n i <- ctors]
+    checkVarCtors :: SortDef -> Either String ()
+    checkVarCtors (MkDefSort name ctxs ctors _) = mapM_ (
+        \ctor -> checkInst name (cinst ctor) ctxs
+      ) [MkVarConstructor n i | MkVarConstructor n i <- ctors]
 
-    helpWellFormedVarInst :: SortName -> InstanceName -> [Context] -> Either String ()
-    helpWellFormedVarInst _ name [] = Left ("No instance found with that name in " ++ name)
-    helpWellFormedVarInst sortName name (ctx:rest) =
-      if xinst ctx == name
-        then helpVarnamespace sortName (xnamespace ctx) namespaces
-        else helpWellFormedVarInst sortName name rest
+    checkInst :: SortName -> InstanceName -> [Context] -> Either String ()
+    checkInst sortName name ctxs
+      = let match = find (\ctx -> xinst ctx == name) ctxs
+        in case match of
+          Nothing  -> Left ("No instance found with that name in " ++ name)
+          Just ctx -> checkNsSort sortName (xnamespace ctx) namespaces
 
-    helpVarnamespace :: SortName -> String -> [NamespaceDef] -> Either String ()
-    helpVarnamespace _ _ [] = Left "Instance and namespace in variable do not coincide"
-    helpVarnamespace sortName name (MkNameSpace namespacename sortname _:rest) =
-      if namespacename == name
-        then (if sortName == sortname
-                then return ()
-                else Left ("sort cannot use this namespace in " ++ sortName))
-        else helpVarnamespace sortName name rest
+    checkNsSort :: SortName -> NamespaceName -> [NamespaceDef] -> Either String ()
+    checkNsSort sortName namespaceName nsd
+      = let match = find (\ns -> nname ns == namespaceName) nsd
+        in case match of
+          Nothing -> Left "Instance and namespace in variable do not coincide"
+          Just ns -> if nsort ns == sortName
+                       then return ()
+                       else Left ("sort cannot use this namespace in " ++ sortName)
 
 --accumulates the sortnames, constructornames, and the sortnames contained in the constructors,
 --then looks up if all sortnames,namespacenames and contructornames are unique, if all sorts in the constructors exist,
 --and whether sorts and constructors and namespaces have distinct names. Also namespacenames used in sorts should exist and constructors can only use variablebindings of namespaces they can access in the sort
 helpWellFormed :: ([NamespaceDef], [SortDef]) -> [SortName] -> [ConstructorName] -> [SortName] -> [NamespaceName] -> [SortName] -> [(SortName, [Context])] -> [SortDef] -> Either String ()
 helpWellFormed (namespacedef:lanrest, sorts) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs =
-  helpWellFormed
-    (lanrest, sorts)
-    sortnames
-    consnames
-    sortconsnames
-    (nname namespacedef : namespacenames)
-    (nsort namespacedef : sortnamespaces)
-    instTable
-    sortdefs
+  helpWellFormed (lanrest, sorts) sortnames consnames sortconsnames (nname namespacedef : namespacenames) (nsort namespacedef : sortnamespaces) instTable sortdefs
 helpWellFormed ([], s:lanrest) sortnames consnames sortconsnames namespacenames sortnamespaces instTable sortdefs = do
   _ <- isEmptySort s
   _ <- helpWellFormedNameSpaceNameInConstructors getNamespaceNamesUsedInSort namespacenames
@@ -53,15 +48,7 @@ helpWellFormed ([], s:lanrest) sortnames consnames sortconsnames namespacenames 
   _ <- helpWellFormedInstances (getInstanceSortsNameSpaceNames s) namespacenames
   _ <- helpWellFormedVariables (sctors s) (sctxs s)
   _ <- helpWellFormedInstanceNames (map xinst (sctxs s))
-  helpWellFormed
-    ([], lanrest)
-    (sname s : sortnames)
-    (getConstructorNames s ++ consnames)
-    (getSortsUsedByConstructors ++ sortconsnames)
-    namespacenames
-    sortnamespaces
-    (snameAndCtxs s : instTable)
-    (s : sortdefs)
+  helpWellFormed ([], lanrest) (sname s : sortnames) (getConstructorNames s ++ consnames) (getSortsUsedByConstructors ++ sortconsnames) namespacenames sortnamespaces (snameAndCtxs s : instTable) (s : sortdefs)
     where
       --get the namespaces used by the constructors
       getNamespaceNamesUsedInSort :: [NamespaceName]
