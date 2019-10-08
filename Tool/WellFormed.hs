@@ -17,13 +17,13 @@ wellFormed (namespaces, sorts, _, _)
         \sort ->
           let ctors = sctors sort
           in do
-            checkVarCtors sort
+            noDuplicatesOrError (map xinst (sctxs sort)) "Instance is not a unique name in the declaration "
+            subsetOfOrError [snd (fromJust (cbinder ctor)) | ctor <- ctors, isBind ctor] namespaceNames "Namespace in constructor is not a declared namespace"
+            subsetOfOrError (getInstanceSortsNameSpaceNames sort) namespaceNames "Instance does not reference an existing namespace"
             notEmpty sort
-            checkBinderNamespaces [snd (fromJust (cbinder ctor)) | ctor <- ctors, isBind ctor] namespaceNames
+            checkVarCtors sort
             wellFormedConstructors ctors
-            helpWellFormedInstances (getInstanceSortsNameSpaceNames sort) namespaceNames
             helpWellFormedVariables ctors (sctxs sort)
-            helpWellFormedInstanceNames (map xinst (sctxs sort))
         ) sorts
       helpWellFormed sorts namespaces
   where
@@ -52,42 +52,17 @@ wellFormed (namespaces, sorts, _, _)
     notEmpty (MkDefSort name _ [] _) = Left (show name ++ " has no constructor")
     notEmpty _ = return ()
 
-    --function to detect if all namespacenames in constructors are valid (or in other words: are declared )
-    checkBinderNamespaces :: [NamespaceName] -> [NamespaceName] -> Either String ()
-    checkBinderNamespaces l l2 = shouldBeInSecondList l l2 "Namespace in constructor is not a declared namespace"
-
     wellFormedConstructors :: [ConstructorDef] -> Either String ()
     wellFormedConstructors ctors = mapM_ wellFormedConstructor ctors
       where
         wellFormedConstructor :: ConstructorDef -> Either String ()
         wellFormedConstructor cons = do
-          helpWellFormedIdentifiers (getIdentifiersConstructor cons)
-          helpWellFormedRulesIdentifiers (getAllIds cons) (getIdentifiersConstructor cons)
-          helpWellFormedIdentifierBindingInRightExpr (getRightExprIdsConstructorBinding cons) (getBinding cons)
-          helpWellFormedIdentifierInLeftExpr (getLeftExprIdsConstructor cons) (getIdentifiersWithoutBinding cons)
-          helpWellFormedIdentifierInRightExpr (getRightExprIdsConstructor cons) (getIdentifiersWithoutBinding cons)
-          helpWellFormedIdentifiers (getIdentifiersWithoutBinding cons)
+          noDuplicatesOrError (getIdentifiersConstructor cons) "not unique identifier"
+          subsetOfOrError (getAllIds cons) (getIdentifiersConstructor cons) "identifier not used in constructor"
+          subsetOfOrError (getRightExprIdsConstructorBinding cons) (getBinding cons) "Identifier in right expression does not appear as binder"
+          subsetOfOrError (getLeftExprIdsConstructor cons) (getIdentifiersWithoutBinding cons) "Identifier in left expression does not appear as constructorfield"
+          subsetOfOrError (getRightExprIdsConstructor cons) (getIdentifiersWithoutBinding cons) "Identifier in right expression does not appear as constructorfield"
           where
-            --function to detect if all identifiers are unique in the fields of a constructor
-            helpWellFormedIdentifiers :: [IdenName] -> Either String ()
-            helpWellFormedIdentifiers l = isUniqueInList l "not unique identifier"
-
-            --function to detect if all identifiers used in the rules exist as fields
-            helpWellFormedRulesIdentifiers :: [IdenName] -> [IdenName] -> Either String ()
-            helpWellFormedRulesIdentifiers l l2 = shouldBeInSecondList l l2 "identifier not used in constructor"
-
-            --detects if an identifier in the right expression does not appear as a binder
-            helpWellFormedIdentifierBindingInRightExpr :: [IdenName] -> [IdenName] -> Either String ()
-            helpWellFormedIdentifierBindingInRightExpr l l2 = shouldBeInSecondList l l2 "Identifier in right expression does not appear as binder"
-
-            --detects if an identifier in the right expression does not appear as constructorfield
-            helpWellFormedIdentifierInLeftExpr :: [IdenName] -> [IdenName] -> Either String ()
-            helpWellFormedIdentifierInLeftExpr l l2 = shouldBeInSecondList l l2 "Identifier in left expression does not appear as constructorfield"
-
-            --detects if an identifier in the right expression does not appear as constructorfield
-            helpWellFormedIdentifierInRightExpr :: [IdenName] -> [IdenName] -> Either String ()
-            helpWellFormedIdentifierInRightExpr l l2 = shouldBeInSecondList l l2 "Identifier in right expression does not appear as constructorfield"
-
             --get the Identifiers of the arguments of a constructor (including the binder)
             getIdentifiersConstructor :: ConstructorDef -> [String]
             getIdentifiersConstructor (MkVarConstructor _ _) = []
@@ -133,22 +108,14 @@ wellFormed (namespaces, sorts, _, _)
             getLeftExprIdsConstructor (MkVarConstructor _ _) = []
             getLeftExprIdsConstructor ctor = concatMap (getLeftExprId . fst) (cattrs ctor)
 
-    --function to detect if all namespaces used in instances in sorts exist
-    helpWellFormedInstances :: [NamespaceName] -> [NamespaceName] -> Either String ()
-    helpWellFormedInstances l l2 = shouldBeInSecondList l l2 "Instance does not reference an existing namespace"
-
     -- variables in a sort can only access the inherited namespaces
     helpWellFormedVariables :: [ConstructorDef] -> [Context] -> Either String ()
     helpWellFormedVariables [] _ = return ()
     helpWellFormedVariables (MkVarConstructor _ contextName:rest) instances = do
-      _ <- shouldBeInSecondList [contextName] [name | INH name _ <- instances] "Namespace is not an inherited namespace "
+      _ <- subsetOfOrError [contextName] [name | INH name _ <- instances] "Namespace is not an inherited namespace "
       helpWellFormedVariables rest instances
     helpWellFormedVariables (_:rest) instances =
       helpWellFormedVariables rest instances
-
-    --all instancenames across sorts should be unique
-    helpWellFormedInstanceNames :: [InstanceName] -> Either String ()
-    helpWellFormedInstanceNames l = isUniqueInList l "Instance is not a unique name in the declaration "
 
     --get the instances used by sorts
     getInstanceSortsNameSpaceNames :: SortDef -> [NamespaceName]
@@ -166,14 +133,14 @@ helpWellFormed sorts namespaces
         sortnamespaces = map nsort namespaces
         instTable = map snameAndCtxs sorts
     in do
-      helpWellFormedSortName sortnames
-      helpWellFormedConstructorName consnames
-      helpWellFormedNameSpaceName namespacenames
-      helpWellFormedConstructorAndSort consnames sortnames
-      helpWellFormedNameSpaceAndSort namespacenames sortnames
-      helpWellFormedNameSpaceAndConstructor namespacenames consnames
-      helpWellFormedSortNameInConstructors sortconsnames sortnames
-      helpWellFormedSortNameInNamespaces sortnamespaces sortnames
+      noDuplicatesOrError sortnames "not unique sortname"
+      noDuplicatesOrError consnames "not unique constructor"
+      noDuplicatesOrError namespacenames "not unique namespace"
+      disjointOrError consnames sortnames "constructor and sort have same name"
+      disjointOrError namespacenames sortnames "namespace and sort have same name"
+      disjointOrError namespacenames consnames "constructor and namespace have same name"
+      subsetOfOrError sortconsnames sortnames "sortname in constructor does not appear"
+      subsetOfOrError sortnamespaces sortnames "sortname in namespace does not appear"
       helpWellFormedRulesInstances sorts instTable
       isWellFormedBindToContext sorts instTable
       helpWellFormedRulesLHSExpressions sorts instTable
@@ -193,38 +160,6 @@ helpWellFormed sorts namespaces
           getSortsConstructor :: ConstructorDef -> [SortName]
           getSortsConstructor (MkVarConstructor _ _) = []
           getSortsConstructor ctor =  map snd (csorts ctor) ++ map snd (clists ctor) ++ map (\(_, y, _) -> y) (cfolds ctor)
-
-    --function to detect if all sortnames are unique
-    helpWellFormedSortName :: [SortName] -> Either String ()
-    helpWellFormedSortName l = isUniqueInList l "not unique sortname"
-
-    --function to detect if all constructors are unique
-    helpWellFormedConstructorName :: [ConstructorName] -> Either String ()
-    helpWellFormedConstructorName l = isUniqueInList l "not unique constructor"
-
-    --function to detect if all NameSpaceNames are unique
-    helpWellFormedNameSpaceName :: [NamespaceName] -> Either String ()
-    helpWellFormedNameSpaceName l = isUniqueInList l "not unique namespace"
-
-    --function to detect if all ConstructorName and Sortnames are unique
-    helpWellFormedConstructorAndSort :: [ConstructorName] -> [SortName] -> Either String ()
-    helpWellFormedConstructorAndSort l l2 = shouldNotBeInSecondList l l2 "constructor and sort have same name"
-
-    --function to detect if all NameSpaceNames and Sortnames are unique
-    helpWellFormedNameSpaceAndSort :: [NamespaceName] -> [SortName] -> Either String ()
-    helpWellFormedNameSpaceAndSort l l2 = shouldNotBeInSecondList l l2 "namespace and sort have same name"
-
-    --function to detect if all constructornames and namespacenames are unique
-    helpWellFormedNameSpaceAndConstructor :: [NamespaceName] -> [ConstructorName] -> Either String ()
-    helpWellFormedNameSpaceAndConstructor l l2 = shouldNotBeInSecondList l l2 "constructor and namespace have same name"
-
-    --function to detect if all sortnames in constructors are valid
-    helpWellFormedSortNameInConstructors :: [SortName] -> [SortName] -> Either String ()
-    helpWellFormedSortNameInConstructors l l2 = shouldBeInSecondList l l2 "sortname in constructor does not appear"
-
-    --function to detect if all sortnames in constructors are valid
-    helpWellFormedSortNameInNamespaces :: [SortName] -> [SortName] -> Either String ()
-    helpWellFormedSortNameInNamespaces l l2 = shouldBeInSecondList l l2 "sortname in namespace does not appear"
 
     -- identifiers in Rules can only use contexts they are allowed to use
     helpWellFormedRulesInstances :: [SortDef] -> [(SortName, [Context])] -> Either String ()
@@ -361,25 +296,25 @@ getInstanceNamesOfRuleRight (RightLHS name) = name
 getInstanceNamesOfRuleRight (RightSub _ name) = name
 
 --function to detect if all names are unique
-isUniqueInList :: [String] -> String -> Either String ()
-isUniqueInList [] _ = return ()
-isUniqueInList (str:strs) err =
+noDuplicatesOrError :: [String] -> String -> Either String ()
+noDuplicatesOrError [] _ = return ()
+noDuplicatesOrError (str:strs) err =
   if str `elem` strs
     then Left (show str ++ err)
-    else isUniqueInList strs err
+    else noDuplicatesOrError strs err
 
 --helper to detect if different lists have unique names
-shouldNotBeInSecondList :: [String] -> [String] -> String -> Either String ()
-shouldNotBeInSecondList [] _ _ = return ()
-shouldNotBeInSecondList (str:crest) sorts err =
+disjointOrError :: [String] -> [String] -> String -> Either String ()
+disjointOrError [] _ _ = return ()
+disjointOrError (str:crest) sorts err =
   if str `elem` sorts
     then Left (show str ++ err)
-    else shouldNotBeInSecondList crest sorts err
+    else disjointOrError crest sorts err
 
 --helper to detect if names in the first list  exist in the available second list
-shouldBeInSecondList :: [String] -> [String] -> String -> Either String ()
-shouldBeInSecondList [] _ _ = return ()
-shouldBeInSecondList (str:strs) sorts err =
+subsetOfOrError :: [String] -> [String] -> String -> Either String ()
+subsetOfOrError [] _ _ = return ()
+subsetOfOrError (str:strs) sorts err =
   if str `elem` sorts
-    then shouldBeInSecondList strs sorts err
+    then subsetOfOrError strs sorts err
     else Left (show str ++ err)
