@@ -126,7 +126,7 @@ wellFormed (namespaces, sorts, _, _)
     helpWellFormedVariables ctors instances
       = let inhNames = [name | INH name _ <- instances]
         in mapM_
-          (\ctor -> subsetOfOrError [cname ctor] inhNames "Namespace is not an inherited namespace")
+          (\ctor -> subsetOfOrError [cinst ctor] inhNames "Namespace is not an inherited namespace")
           [MkVarConstructor n i | MkVarConstructor n i <- ctors]
 
     --get the sorts used in all constructors of the sort
