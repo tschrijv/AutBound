@@ -68,10 +68,12 @@ _substExpr sname consName =
     (VarExpr "sub")
     (ConstrInst consName [VarExpr "var"])
 
+_oneDeeper namespace expr = FnCall "concat" [ListExpr (ListExpr [VarExpr "b"] : expr)]
+
 ef = EF {
   paramForCtor = _getCtorParams,
   freeVarExprForVarCtor = _varCtorFreeVar,
-  transformForAddAttr = (\n e -> head e),
+  transformForAddAttr = _oneDeeper,
   includeBinders = True
 }
 
