@@ -14,7 +14,7 @@ import Data.List
 wellFormed :: Language -> Either String ()
 wellFormed (namespaces, sorts, _, _)
   = let sortnames = map sname sorts
-        consnames = concatMap getConstructorNames sorts
+        consnames = concatMap (\sort -> map cname (sctors sort)) sorts
         sortconsnames = concatMap getSortsUsedByConstructors sorts
         namespaceNames = map nname namespaces
         sortnamespaces = map nsort namespaces
@@ -31,14 +31,15 @@ wellFormed (namespaces, sorts, _, _)
       mapM_ (
         \sort ->
           let ctors = sctors sort
+              ctxs = sctxs sort
           in do
-            noDuplicatesOrError (map xinst (sctxs sort)) "Instance is not a unique name in the declaration "
+            noDuplicatesOrError (map xinst ctxs) "Instance is not a unique name in the declaration "
             subsetOfOrError [snd (fromJust (cbinder ctor)) | ctor <- ctors, isBind ctor] namespaceNames "Namespace in constructor is not a declared namespace"
-            subsetOfOrError (getInstanceSortsNameSpaceNames sort) namespaceNames "Instance does not reference an existing namespace"
+            subsetOfOrError (map xnamespace ctxs) namespaceNames "Instance does not reference an existing namespace"
             notEmpty sort
             checkVarCtors sort
             wellFormedConstructors ctors
-            helpWellFormedVariables ctors (sctxs sort)
+            helpWellFormedVariables ctors ctxs
         ) sorts
       helpWellFormedRulesInstances sorts instTable
       isWellFormedBindToContext sorts instTable
@@ -76,7 +77,7 @@ wellFormed (namespaces, sorts, _, _)
         wellFormedConstructor cons = do
           noDuplicatesOrError (getIdentifiersConstructor cons) "not unique identifier"
           subsetOfOrError (getAllIds cons) (getIdentifiersConstructor cons) "identifier not used in constructor"
-          subsetOfOrError (getRightExprIdsConstructorBinding cons) (getBinding cons) "Identifier in right expression does not appear as binder"
+          subsetOfOrError (getRightExprIdsConstructorBinding cons) (maybe [] (\b -> [fst b]) (cbinder cons)) "Identifier in right expression does not appear as binder"
           subsetOfOrError (getLeftExprIdsConstructor cons) (getIdentifiersWithoutBinding cons) "Identifier in left expression does not appear as constructorfield"
           subsetOfOrError (getRightExprIdsConstructor cons) (getIdentifiersWithoutBinding cons) "Identifier in right expression does not appear as constructorfield"
           where
@@ -110,11 +111,6 @@ wellFormed (namespaces, sorts, _, _)
             getRuleIdentifiers :: AttributeDef -> [IdenName]
             getRuleIdentifiers (l, r) = getLeftExprId l ++ getRightExprIdBinding r ++ getRightExprId r
 
-            --get the binding of a constructor
-            getBinding :: ConstructorDef -> [IdenName]
-            getBinding (MkBindConstructor _ _ _ _ name _ _) = [fst name]
-            getBinding _                                    = []
-
             -- get the ids of the RightExpr without any binders included
             getRightExprIdsConstructor :: ConstructorDef -> [IdenName]
             getRightExprIdsConstructor (MkVarConstructor _ _) = []
@@ -127,20 +123,11 @@ wellFormed (namespaces, sorts, _, _)
 
     -- variables in a sort can only access the inherited namespaces
     helpWellFormedVariables :: [ConstructorDef] -> [Context] -> Either String ()
-    helpWellFormedVariables [] _ = return ()
-    helpWellFormedVariables (MkVarConstructor _ contextName:rest) instances = do
-      _ <- subsetOfOrError [contextName] [name | INH name _ <- instances] "Namespace is not an inherited namespace "
-      helpWellFormedVariables rest instances
-    helpWellFormedVariables (_:rest) instances =
-      helpWellFormedVariables rest instances
-
-    --get the instances used by sorts
-    getInstanceSortsNameSpaceNames :: SortDef -> [NamespaceName]
-    getInstanceSortsNameSpaceNames (MkDefSort _ ctxs _ _) = map xnamespace ctxs
-
-    --get the constructornames of a sortDef
-    getConstructorNames :: SortDef -> [ConstructorName]
-    getConstructorNames (MkDefSort _ _ cnames _) = map cname cnames
+    helpWellFormedVariables ctors instances
+      = let inhNames = [name | INH name _ <- instances]
+        in mapM_
+          (\ctor -> subsetOfOrError [cname ctor] inhNames "Namespace is not an inherited namespace")
+          [MkVarConstructor n i | MkVarConstructor n i <- ctors]
 
     --get the sorts used in all constructors of the sort
     getSortsUsedByConstructors :: SortDef -> [SortName]
@@ -176,11 +163,11 @@ wellFormed (namespaces, sorts, _, _)
         helpWellFormedRulesInstancesRule :: SortName -> [(IdenName, SortName)] -> [(IdenName, SortName)] -> [(IdenName, SortName, FoldName)] -> [(SortName, [Context])] -> AttributeDef -> Either String ()
         helpWellFormedRulesInstancesRule sortName lists tableIdentifiers folds tableInstances (leftexpr, rightexpr)
           | not (null (getRightExprId rightexpr)) && elem (head (getRightExprId rightexpr)) (map fst lists ++ map (\(x, _, _) -> x) folds) = return ()
-          | not (null (getLeftExprId leftexpr)) && elem (head (getLeftExprId leftexpr)) (map fst lists ++ map (\(a, _, _) -> a) folds) = return ()
-          | null (getRightExprId rightexpr) && not (null rightInstanceLHS) && null (getLeftExprId leftexpr) && not (null leftInstanceLHS) && xnamespace (head rightInstanceLHS) == xnamespace (head leftInstanceLHS) = return ()
-          | not (null (getRightExprId rightexpr)) && not (null rightInstanceNoLHS) && null (getLeftExprId leftexpr) && not (null leftInstanceLHS) && xnamespace (head rightInstanceNoLHS) == xnamespace (head leftInstanceLHS) = return ()
-          | not (null (getRightExprId rightexpr)) && not (null rightInstanceNoLHS) && not (null (getLeftExprId leftexpr)) && not (null leftInstanceNoLHS) && xnamespace (head rightInstanceNoLHS) == xnamespace (head leftInstanceNoLHS) = return ()
-          | null (getRightExprId rightexpr) && not (null rightInstanceLHS) && not (null (getLeftExprId leftexpr)) && not (null leftInstanceNoLHS) && xnamespace (head rightInstanceLHS) == xnamespace (head leftInstanceNoLHS) = return ()
+          | not (null (getLeftExprId leftexpr))   && elem (head (getLeftExprId leftexpr))   (map fst lists ++ map (\(x, _, _) -> x) folds) = return ()
+          | null (getRightExprId rightexpr)       && not (null rightInstanceLHS)   && null (getLeftExprId leftexpr)       && not (null leftInstanceLHS)   && xnamespace (head rightInstanceLHS)   == xnamespace (head leftInstanceLHS)    = return ()
+          | not (null (getRightExprId rightexpr)) && not (null rightInstanceNoLHS) && null (getLeftExprId leftexpr)       && not (null leftInstanceLHS)   && xnamespace (head rightInstanceNoLHS) == xnamespace (head leftInstanceLHS)    = return ()
+          | not (null (getRightExprId rightexpr)) && not (null rightInstanceNoLHS) && not (null (getLeftExprId leftexpr)) && not (null leftInstanceNoLHS) && xnamespace (head rightInstanceNoLHS) == xnamespace (head leftInstanceNoLHS)  = return ()
+          | null (getRightExprId rightexpr)       && not (null rightInstanceLHS)   && not (null (getLeftExprId leftexpr)) && not (null leftInstanceNoLHS) && xnamespace (head rightInstanceLHS)   == xnamespace (head leftInstanceNoLHS)  = return ()
           | otherwise = Left ("incorrect context for this sort " ++ sortName)
           where
             rightInstanceLHS = filter (\ctx -> getInstanceNamesOfRuleRight rightexpr == xinst ctx) (fromJust (lookup sortName tableInstances))
