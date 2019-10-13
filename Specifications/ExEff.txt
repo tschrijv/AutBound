@@ -1,10 +1,10 @@
 import (Operations)
 
-namespace TermVar: Value, ValueType
+namespace TermVar: Value
 namespace SkelTypeVar: SkeletonType
 namespace DirtVar: Dirt
-namespace TypeVar: ValueType, SkeletonType
-namespace CoVar: Coercion, SimpleCoercionType
+namespace TypeVar: ValueType
+namespace CoVar: Coercion
 
 sort Value
     inh ctx TermVar

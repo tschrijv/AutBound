@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Variable.Common (getEnvType, getEnvFunctions, freeVarFunctions, mappingFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs, inhCtxsForSortName) where
+module Variable.Common (getEnvFunctions, freeVarFunctions, mappingFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs, inhCtxsForSortName) where
 
 import Data.List
 import Data.Maybe
@@ -18,15 +18,6 @@ data ExternalFunctions = EF {
 
 -- * Types
 -- ----------------------------------------------------------------------------
-
--- | Generate the data type definition for Env
-getEnvType :: Language -> (Type, [Constructor])
-getEnvType (nsd, _, _, _) =
-  ("Env",
-  Constr "Nil" []
-  : map (
-    \(MkNameSpace name _ env) -> Constr ('E' : name) (env ++ ["Env"])
-  ) nsd)
 
 -- | ??
 getEnvFunctions :: Language -> [Function]

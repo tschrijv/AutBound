@@ -7,7 +7,6 @@ import GeneralTerms
 -- variable representation
 data ConvertFunctions = VF {
   variableType :: Language -> (Type, [Constructor]),
-  envType :: Language -> (Type, [Constructor]),
   userTypes :: Language -> [(Type, [Constructor])],
   variableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])],
   variableFunctions :: Language -> (Type, [Constructor]) -> [Function],
@@ -19,10 +18,9 @@ data ConvertFunctions = VF {
 convert :: Language -> ConvertFunctions -> Program
 convert lan@(nsd, sd, imp, cd) vf =
   let var = (variableType vf) lan
-      env = (envType vf) lan
   in P {
     imports = imp,
-    types = var : env : (userTypes vf) lan,
+    types = var : (userTypes vf) lan,
     instances = (variableInstances vf) var,
     functions = (variableFunctions vf) lan var ++
                 (envFunctions vf) lan,

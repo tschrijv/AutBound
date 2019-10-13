@@ -42,8 +42,7 @@ type AttributeDef = (LeftExpr, RightExpr)
 data NamespaceDef
   = MkNameSpace {
     nname :: NamespaceName,
-    nsort :: SortName,
-    nenv :: [String]
+    nsort :: SortName
   }
   deriving (Show, Eq)
 

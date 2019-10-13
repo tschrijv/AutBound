@@ -1,4 +1,4 @@
-namespace TermVar: Term, Type
+namespace TermVar: Term
 namespace TypeVar: Type
 
 sort Term

@@ -100,8 +100,7 @@ pImportChoose = try (pParens $ many pIdentifier) <|> return []
 pNameSpaceDecl :: Parser NamespaceDef
 pNameSpaceDecl =
   MkNameSpace <$ pReserved "namespace" <*> pNameSpaceName <* pReservedOp ":" <*>
-  pSortName <*>
-  pEnvAdd
+  pSortName
 
 -- | Parse a namespace's name
 pNameSpaceName :: Parser NamespaceName
@@ -110,13 +109,6 @@ pNameSpaceName = pIdentifier
 -- | Parse a sort's name
 pSortName :: Parser SortName
 pSortName = pIdentifier
-
-
-pEnvAdd :: Parser [String]
-pEnvAdd =
-  many $ do
-    pReservedOp ","
-    pIdentifier
 
 -- * Sort declarations
 -- ----------------------------------------------------------------------------

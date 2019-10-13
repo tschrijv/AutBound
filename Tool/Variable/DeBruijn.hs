@@ -13,7 +13,6 @@ getFunctions :: ConvertFunctions
 getFunctions
   = VF {
     variableType = getVariableType,
-    envType = getEnvType,
     userTypes = getTypes,
     variableInstances = getVariableInstances,
     variableFunctions = getVariableFunctions,

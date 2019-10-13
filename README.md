@@ -96,18 +96,16 @@ generated functions use its functions.
 
 ### Namespace declarations
 
-A namespace declaration consists of the namespace's name, a sort name, and
-optionally additional comma separated sort names (the environment of the
-namespace).
+A namespace declaration consists of the namespace's name and the associated sort
+name.
 
 ```
-namespace NAMESPACENAME: SORTNAME[, SORTNAME]*
+namespace NAMESPACENAME: SORTNAME
 ```
 
 Example:
 ```
-namespace TermVar: Term, Type
-namespace TypeVar: Type
+namespace TermVar: Term
 ```
 
 ### Sort declarations

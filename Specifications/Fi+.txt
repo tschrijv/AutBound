@@ -1,5 +1,5 @@
-namespace TermVar: FiTerm, FiType
-namespace TypeVar: FiType, FiType
+namespace TermVar: FiTerm
+namespace TypeVar: FiType
 
 sort FiTerm
     inh ctx   TermVar
