@@ -16,7 +16,6 @@ getFunctions
     userTypes = getTypes,
     variableInstances = getVariableInstances,
     variableFunctions = getVariableFunctions,
-    envFunctions = getEnvFunctions,
     nativeCode = freshVarFunctions
   }
 

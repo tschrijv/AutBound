@@ -10,7 +10,6 @@ data ConvertFunctions = VF {
   userTypes :: Language -> [(Type, [Constructor])],
   variableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])],
   variableFunctions :: Language -> (Type, [Constructor]) -> [Function],
-  envFunctions :: Language -> [Function],
   nativeCode :: Language -> (Type, [Constructor])-> [String]
 }
 
@@ -22,7 +21,6 @@ convert lan@(nsd, sd, imp, cd) vf =
     imports = imp,
     types = var : (userTypes vf) lan,
     instances = (variableInstances vf) var,
-    functions = (variableFunctions vf) lan var ++
-                (envFunctions vf) lan,
+    functions = (variableFunctions vf) lan var,
     code = (nativeCode vf) lan var ++ cd
   }

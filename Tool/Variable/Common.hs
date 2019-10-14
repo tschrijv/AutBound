@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Variable.Common (getEnvFunctions, freeVarFunctions, mappingFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs, inhCtxsForSortName) where
+module Variable.Common (freeVarFunctions, mappingFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs, inhCtxsForSortName) where
 
 import Data.List
 import Data.Maybe
@@ -15,66 +15,6 @@ data ExternalFunctions = EF {
   applyInhCtxsToAttrs :: SortName -> ConstructorDef -> (IdenName, [AttributeDef]) -> [(SortName, [Context])] -> Expression,
   includeBinders :: Bool
 }
-
--- * Types
--- ----------------------------------------------------------------------------
-
--- | ??
-getEnvFunctions :: Language -> [Function]
-getEnvFunctions (nsd, sd, _, _)
-  = let ctxsBySname = map snameAndCtxs sd
-    in concatMap (\sort ->
-      let synCtxs = [SYN x y | SYN x y <- sctxs sort]
-      in if null synCtxs then [] else
-      map (\ctor ->
-        generateSortSynSystemOneConstructor (sname sort) nsd ctxsBySname ctor (head synCtxs)
-      ) (sctors sort)
-    ) sd
-    where
-      generateSortSynSystemOneConstructor :: SortName -> [NamespaceDef] -> [(SortName, [Context])] -> ConstructorDef -> Context -> Function
-      generateSortSynSystemOneConstructor sname _ _ (MkVarConstructor ctorName _) _
-        = Fn ("addToEnvironment" ++ sname) [([ConstrParam ctorName [VarParam "var"], VarParam "c"], VarExpr "c")]
-      generateSortSynSystemOneConstructor sname nsd ctxsBySname ctor ctx
-        = Fn ("addToEnvironment" ++ sname ++ xinst ctx) [([ConstrParam ctorName (firstToVarParams sorts ++ [VarParam "_" | _ <- hTypes]), VarParam "c"], getEnvFunctionGenerate)]
-          where
-            filteredSnameAndCtxs = filterCtxsByNamespace (xnamespace ctx) ctxsBySname
-            ctorName = cname ctor
-            sorts = csorts ctor
-            hTypes = cnatives ctor
-            attrs = cattrs ctor
-
-            getEnvFunctionGenerate :: Expression
-            getEnvFunctionGenerate
-              | null $ fromJust (lookup "lhs" allrules) = VarExpr "c"
-              | otherwise = navigateAttrs start
-              where
-                allrules = collectRulesSyn
-                start = fromJust (
-                  find
-                    (\x -> linst (fst x) == xinst ctx)
-                    (fromJust (lookup "lhs" allrules))
-                  )
-
-            collectRulesSyn :: [(IdenName, [AttributeDef])]
-            collectRulesSyn =
-              foldl
-                (++)
-                [("lhs", [(LeftLHS c, r) | (LeftLHS c, r) <- attrs])]
-                (map (\(iden, _) -> [collectRulesOfIdSyn iden]) sorts)
-              where
-                collectRulesOfIdSyn :: IdenName -> (IdenName, [AttributeDef])
-                collectRulesOfIdSyn iden = (iden, filter (\(LeftSub fieldname _, RightSub _ _) -> fieldname == iden) attrs)
-
-            navigateAttrs :: AttributeDef -> Expression
-            navigateAttrs (l, RightAdd expr _) = ConstrInst ("S" ++ xnamespace ctx) [navigateAttrs (l, expr)]
-            navigateAttrs (LeftLHS _, RightLHS _) = VarExpr "c"
-            navigateAttrs (LeftSub _ _, RightLHS _) = VarExpr "c"
-            navigateAttrs (_, RightSub iden _)
-              | isJust newrule = FnCall functionName [VarExpr iden, navigateAttrs (fromJust newrule)]
-              | otherwise = FnCall functionName [VarExpr iden, VarExpr "c"]
-              where
-                newrule = find (\(l, _) -> liden l == iden) attrs
-                functionName = "addToEnvironment" ++ fromJust (lookup iden sorts) ++ xinst ctx
 
 -- * Free variables
 -- ----------------------------------------------------------------------------
