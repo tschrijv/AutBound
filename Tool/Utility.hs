@@ -56,7 +56,7 @@ varAccessBySortName sd = map (\s -> (sname s, sortCanAccessVariables [] s)) sd
             (\sortName ->
               sortCanAccessVariables visited' (head (filter (\s -> sname s == sortName) sd))
             )
-            (map snd (csorts ctor ++ clists ctor) ++ map (\(_, b, _) -> b) (cfolds ctor))
+            (cidenSorts ctor)
 
 -- | Given a namespace name and a list of tuples containing a sort name
 -- and assigned contexts, remove the contexts that use different namespaces
@@ -78,7 +78,7 @@ sortNameForIden iden ctor = fromJust (lookup iden (dropFold (cfolds ctor) ++ cli
 attrsByIden :: ConstructorDef -> [(IdenName, [AttributeDef])]
 attrsByIden ctor = [
   (iden, filter (\(l, _) -> liden l == iden) (cattrs ctor))
-  | (iden, _) <- (dropFold (cfolds ctor) ++ clists ctor ++ csorts ctor)]
+  | iden <- cidens ctor]
 
 -- | Drops the third element from each tuple in a list
 dropFold :: [(String, String, String)] -> [(String, String)]

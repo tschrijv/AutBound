@@ -84,7 +84,7 @@ wellFormed (namespaces, sorts, _, _)
             --get the Identifiers of the arguments of a constructor (including the binder)
             getIdentifiersConstructor :: ConstructorDef -> [String]
             getIdentifiersConstructor (MkVarConstructor _ _) = []
-            getIdentifiersConstructor ctor = map fst (clists ctor) ++ map fst (csorts ctor) ++ map (\(x, _, _) -> x) (cfolds ctor) ++ maybe [] (\b -> [fst b]) (cbinder ctor)
+            getIdentifiersConstructor ctor = cidens ctor ++ maybe [] (\b -> [fst b]) (cbinder ctor)
 
             --get the ids of the RightExpr that bind, including the binder added
             getRightExprIdsConstructorBinding :: ConstructorDef -> [IdenName]
@@ -100,7 +100,7 @@ wellFormed (namespaces, sorts, _, _)
             -- get all the identifiers without the binder included
             getIdentifiersWithoutBinding :: ConstructorDef -> [String]
             getIdentifiersWithoutBinding (MkVarConstructor _ _) = []
-            getIdentifiersWithoutBinding ctor = map fst (csorts ctor) ++ map fst (clists ctor) ++ map (\(x, _, _) -> x) (cfolds ctor)
+            getIdentifiersWithoutBinding ctor = cidens ctor
 
             --get the identifiers used in the rules defined in the constructor
             getAllIds :: ConstructorDef -> [IdenName]
@@ -139,7 +139,7 @@ wellFormed (namespaces, sorts, _, _)
           --get the sorts used in the constructor
           getSortsConstructor :: ConstructorDef -> [SortName]
           getSortsConstructor (MkVarConstructor _ _) = []
-          getSortsConstructor ctor =  map snd (csorts ctor) ++ map snd (clists ctor) ++ map (\(_, y, _) -> y) (cfolds ctor)
+          getSortsConstructor ctor =  cidenSorts ctor
 
     -- identifiers in Rules can only use contexts they are allowed to use
     helpWellFormedRulesInstances :: [SortDef] -> [(SortName, [Context])] -> Either String ()

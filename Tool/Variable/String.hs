@@ -118,10 +118,7 @@ ef = EF {
 
 boundVarFunctions :: Language -> [Function]
 boundVarFunctions (_, sd, _, _) =
-  let ctxsBySname = map snameAndCtxs sd
-      varAccessBySname = varAccessBySortName sd
-      sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> fromJust (lookup sname varAccessBySname)) sd
-  in map (\sort ->
+  map (\sort ->
     Fn ("boundVariables" ++ sname sort)
     (map (\ctor ->
       (paramForCtor ef ctor,
@@ -132,14 +129,14 @@ boundVarFunctions (_, sd, _, _) =
           -> FnCall "nub" [
               FnCall "concat"
                 [ListExpr (ListExpr [VarExpr "b"] :
-                    boundVariableCallListForCtor (sname sort) ctor ctxsBySname varAccessBySname
+                    boundVariableCallListForCtor (sname sort) ctor
                 )]
              ]
         (MkDefConstructor {})
           -> FnCall "nub" [
               FnCall "concat"
                 [ListExpr (
-                  boundVariableCallListForCtor (sname sort) ctor ctxsBySname varAccessBySname
+                  boundVariableCallListForCtor (sname sort) ctor
                 )]
             ]
       )
@@ -149,8 +146,8 @@ boundVarFunctions (_, sd, _, _) =
     -- | Generate a list of expressions, that when concatenated together give
     -- the union of free variables for a given constructor (free variable
     -- calls for every identifier of a sort that has access to variables)
-    boundVariableCallListForCtor :: SortName -> ConstructorDef -> [(SortName, [Context])] -> [(SortName, Bool)] -> [Expression]
-    boundVariableCallListForCtor sname ctor ctxsBySname varAccessBySname
+    boundVariableCallListForCtor :: SortName -> ConstructorDef -> [Expression]
+    boundVariableCallListForCtor sname ctor
       = let folds = dropFold $ cfolds ctor
             lists = clists ctor
             idensAndAttrs = attrsByIden ctor

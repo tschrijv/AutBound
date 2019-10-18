@@ -92,5 +92,13 @@ isBind :: ConstructorDef -> Bool
 isBind MkBindConstructor{} = True
 isBind _                   = False
 
+cidens :: ConstructorDef -> [IdenName]
+cidens MkVarConstructor{} = []
+cidens ctor               = map fst (clists ctor ++ csorts ctor) ++ map (\(n, _, _) -> n) (cfolds ctor)
+
+cidenSorts :: ConstructorDef -> [SortName]
+cidenSorts MkVarConstructor{} = []
+cidenSorts ctor               = map snd (clists ctor ++ csorts ctor) ++ map (\(_, s, _) -> s) (cfolds ctor)
+
 -- | Complete definition of a language
 type Language = ([NamespaceDef], [SortDef], [(String, [String])], [String])
