@@ -192,7 +192,7 @@ getEnvFunctions (nsd, sd, _, _)
 substFunctions :: Language -> [Function]
 substFunctions (nsd, sd, _, _) =
   let varAccessBySname = varAccessBySortName sd
-      sortsWithVarAccess = filter (\sort -> isJust (lookup (sname sort) varAccessBySname)) sd
+      sortsWithVarAccess = filter (\sort -> fromJust (lookup (sname sort) varAccessBySname)) sd
   in concatMap (\(MkDefSort sortName ctxs ctors rewrite) ->
     let inhCtxs = [INH x y | INH x y <- ctxs]
     in

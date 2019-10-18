@@ -25,7 +25,7 @@ freeVarFunctions :: Language -> ExternalFunctions -> [Function]
 freeVarFunctions (_, sd, _, _) ef =
   let ctxsBySname = map snameAndCtxs sd
       varAccessBySname = varAccessBySortName sd
-      sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> isJust (lookup sname varAccessBySname)) sd
+      sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> fromJust (lookup sname varAccessBySname)) sd
   in map (\sort ->
     Fn ("freeVariables" ++ sname sort)
     (map (\ctor ->
@@ -76,7 +76,7 @@ mappingFunctions :: Language -> ExternalFunctions -> [Function]
 mappingFunctions (_, sd, _, _) ef =
   let ctxsBySname = map snameAndCtxs sd
       varAccessBySname = varAccessBySortName sd
-      sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> isJust (lookup sname varAccessBySname)) sd
+      sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> fromJust (lookup sname varAccessBySname)) sd
   in map (
     \(MkDefSort sortName ctxs ctors _) ->
         Fn (mapFnForSortName sortName)

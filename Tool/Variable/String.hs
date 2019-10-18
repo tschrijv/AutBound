@@ -120,7 +120,7 @@ boundVarFunctions :: Language -> [Function]
 boundVarFunctions (_, sd, _, _) =
   let ctxsBySname = map snameAndCtxs sd
       varAccessBySname = varAccessBySortName sd
-      sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> isJust (lookup sname varAccessBySname)) sd
+      sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> fromJust (lookup sname varAccessBySname)) sd
   in map (\sort ->
     Fn ("boundVariables" ++ sname sort)
     (map (\ctor ->
@@ -144,7 +144,7 @@ boundVarFunctions (_, sd, _, _) =
             ]
       )
     ) (sctors sort))
-  ) sortsWithVarAccess
+  ) sd
   where
     -- | Generate a list of expressions, that when concatenated together give
     -- the union of free variables for a given constructor (free variable
@@ -185,7 +185,7 @@ substFunctionsC (nsd, sd, _, _) =
   where
     ctxsBySname = map snameAndCtxs sd
     varAccessBySname = varAccessBySortName sd
-    sortsWithVarAccess = filter (\sort -> isJust (lookup (sname sort) varAccessBySname)) sd
+    sortsWithVarAccess = filter (\sort -> fromJust (lookup (sname sort) varAccessBySname)) sd
 
     freeVariablesCall :: ConstructorDef -> (IdenName, SortName) -> Expression
     freeVariablesCall ctor (iden, idenSort)

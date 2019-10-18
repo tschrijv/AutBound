@@ -49,9 +49,9 @@ data NamespaceDef
 -- | Sort declaration
 data SortDef
   = MkDefSort {
-    sname :: SortName,
-    sctxs :: [Context],
-    sctors :: [ConstructorDef],
+    sname    :: SortName,
+    sctxs    :: [Context],
+    sctors   :: [ConstructorDef],
     srewrite :: Bool
   }
   deriving (Show, Eq)
@@ -59,20 +59,20 @@ data SortDef
 -- | Constructor declaration
 data ConstructorDef
   = MkDefConstructor {
-    cname :: ConstructorName,
-    clists :: [(IdenName, SortName)],
-    csorts :: [(IdenName, SortName)],
-    cfolds :: [(IdenName, SortName, FoldName)],
-    cattrs :: [AttributeDef],
+    cname    :: ConstructorName,
+    clists   :: [(IdenName, SortName)],
+    csorts   :: [(IdenName, SortName)],
+    cfolds   :: [(IdenName, SortName, FoldName)],
+    cattrs   :: [AttributeDef],
     cnatives :: [HaskellTypeName]
   }
   | MkBindConstructor {
-    cname :: ConstructorName,
-    clists :: [(IdenName, SortName)],
-    csorts :: [(IdenName, SortName)],
-    cfolds :: [(IdenName, SortName, FoldName)],
+    cname    :: ConstructorName,
+    clists   :: [(IdenName, SortName)],
+    csorts   :: [(IdenName, SortName)],
+    cfolds   :: [(IdenName, SortName, FoldName)],
     _cbinder :: (IdenName, NamespaceName),
-    cattrs :: [AttributeDef],
+    cattrs   :: [AttributeDef],
     cnatives :: [HaskellTypeName]
   }
   | MkVarConstructor {
