@@ -30,10 +30,15 @@ liden _                = ""
 
 -- | The right side of an attribute definition
 data RightExpr
-  = RightLHS { rinst :: InstanceName }
-  | RightSub { riden :: IdenName, rinst :: InstanceName }
-  | RightAdd { rexp :: RightExpr, riden :: IdenName }
+  = RightLHS { _rinst :: InstanceName }
+  | RightSub { _riden :: IdenName, _rinst :: InstanceName }
+  | RightAdd { _rexp :: RightExpr, _riden :: IdenName }
   deriving (Show, Eq)
+
+riden :: RightExpr -> Maybe IdenName
+riden RightLHS{} = Nothing
+riden right@RightSub{} = return $ _riden right
+riden right@RightAdd{} = riden (_rexp right)
 
 -- | Attribute definition (e.g. t1.ctx = lhs.ctx, T)
 type AttributeDef = (LeftExpr, RightExpr)
@@ -55,6 +60,12 @@ data SortDef
     srewrite :: Bool
   }
   deriving (Show, Eq)
+
+inhCtxs :: SortDef -> [Context]
+inhCtxs sort = [INH i n | INH i n <- sctxs sort]
+
+synCtxs :: SortDef -> [Context]
+synCtxs sort = [SYN i n | SYN i n <- sctxs sort]
 
 -- | Constructor declaration
 data ConstructorDef

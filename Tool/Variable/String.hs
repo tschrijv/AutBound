@@ -94,7 +94,7 @@ _applyInhCtxsToAttrs sname ctor (iden, idenAttrs) ctxsBySname
                 then return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" (VarExpr iden : nextStep) : params))
                 else return (FnCall ("generateHnat" ++ xnamespace ctx) (FnCall "length" [VarExpr iden] : params))
               else if isJust attrsForIden
-                then return (FnCall "concat" [ListExpr (FnCall ("boundVariables" ++ fromJust (lookup iden sorts)) (VarExpr iden : nextStep) : params)])
+                then return (FnCall "concat" [ListExpr (FnCall ("boundVariables" ++ fromJust (lookup iden sorts)) (ListExpr [] : VarExpr iden : nextStep) : params)])
                 else return (FnCall ("addToEnvironment" ++ fromJust (lookup iden sorts) ++ context) (VarExpr iden : params))
           where
             newAttrs = filter (\(left, _) ->
@@ -121,22 +121,22 @@ boundVarFunctions (_, sd, _, _) =
   map (\sort ->
     Fn ("boundVariables" ++ sname sort)
     (map (\ctor ->
-      (paramForCtor ef ctor,
+      (VarParam "c" : _getCtorParams ctor,
       case ctor of
         (MkVarConstructor name _)
           -> ListExpr []
         (MkBindConstructor {})
           -> FnCall "nub" [
               FnCall "concat"
-                [ListExpr (ListExpr [VarExpr "b"] :
-                    boundVariableCallListForCtor (sname sort) ctor
+                [ListExpr (VarExpr "c" : ListExpr [VarExpr "b"] :
+                    boundVariableCallListForCtor sort ctor
                 )]
              ]
         (MkDefConstructor {})
           -> FnCall "nub" [
               FnCall "concat"
-                [ListExpr (
-                  boundVariableCallListForCtor (sname sort) ctor
+                [ListExpr (VarExpr "c" :
+                  boundVariableCallListForCtor sort ctor
                 )]
             ]
       )
@@ -146,21 +146,29 @@ boundVarFunctions (_, sd, _, _) =
     -- | Generate a list of expressions, that when concatenated together give
     -- the union of free variables for a given constructor (free variable
     -- calls for every identifier of a sort that has access to variables)
-    boundVariableCallListForCtor :: SortName -> ConstructorDef -> [Expression]
-    boundVariableCallListForCtor sname ctor
-      = let folds = dropFold $ cfolds ctor
-            lists = clists ctor
-            idensAndAttrs = attrsByIden ctor
-            callList = concatMap (
-              \(iden, iattrs) ->
-                let sortNameOfIden = sortNameForIden iden ctor
-                in if iden `elem` map fst folds
-                  then [FnCall "foldMap" [VarExpr ("boundVariables" ++ sortNameOfIden), VarExpr iden]]
-                  else if iden `elem` map fst lists
-                    then [FnCall "concatMap" [VarExpr ("boundVariables" ++ sortNameOfIden), VarExpr iden]]
-                    else [FnCall ("boundVariables" ++ sortNameOfIden) ([VarExpr iden])]
-              ) idensAndAttrs
+    boundVariableCallListForCtor :: SortDef -> ConstructorDef -> [Expression]
+    boundVariableCallListForCtor sort ctor
+      = let relevantAttrs = filter (
+                \(left, right) ->
+                  liden left == ""
+                    && isJust (riden right)
+                    && any (\ctx -> (xinst ctx) == linst left) (synCtxs sort)
+              ) (cattrs ctor)
+            callList = concatMap helper relevantAttrs
         in if null callList then [ListExpr []] else callList
+        where
+          helper :: AttributeDef -> [Expression]
+          helper (_, right)
+            = let iden = fromJust (riden right)
+                  sortNameOfIden = sortNameForIden iden ctor
+                  assignedAttrs = filter (
+                      \(left, right) ->
+                        liden left == iden
+                          && isJust (riden right)
+                          && any (\ctx -> (xinst ctx) == linst left) (inhCtxs sort)
+                    ) (cattrs ctor)
+                  attrexp = if null assignedAttrs then [ListExpr []] else (concatMap helper assignedAttrs)
+              in [concatCallForIden ctor iden ("boundVariables" ++ sortNameOfIden) attrexp]
 
 -- | Generates the following for sorts with variable access:
 -- * Substitute functions for every sort that is related to the given sort by
@@ -186,30 +194,11 @@ substFunctionsC (nsd, sd, _, _) =
 
     freeVariablesCall :: ConstructorDef -> (IdenName, SortName) -> Expression
     freeVariablesCall ctor (iden, idenSort)
-      = if iden `elem` map fst folds
-          then FnCall "concat" [FnCall "fmap" [FnCall fnName substParams, idenExpr]]
-          else if iden `elem` map fst lists
-            then FnCall "concat" [FnCall "map" [FnCall fnName substParams, idenExpr]]
-            else FnCall fnName (substParams ++ [idenExpr])
-      where
-        folds = dropFold (cfolds ctor)
-        lists = clists ctor
-        fnName = "freeVariables" ++ idenSort
-        idenExpr = VarExpr iden
-        substParams = [ListExpr []]
+      = concatCallForIden ctor iden ("freeVariables" ++ idenSort) [ListExpr []]
 
     varReplaceCall :: ConstructorDef -> [Expression] -> IdenName -> Expression
     varReplaceCall ctor params iden
-      = if iden `elem` map fst folds
-          then FnCall "fmap" [FnCall fnName params, idenExpr]
-          else if iden `elem` map fst lists
-            then FnCall "map" [FnCall fnName params, idenExpr]
-            else FnCall fnName (params ++ [idenExpr])
-      where
-        folds = dropFold (cfolds ctor)
-        lists = clists ctor
-        fnName = (sortNameForIden iden ctor ++ "VarReplace")
-        idenExpr = VarExpr iden
+      = fnCallForIden ctor iden (sortNameForIden iden ctor ++ "VarReplace") params
 
     varReplaceCallForCtor :: ConstructorDef -> Expression
     varReplaceCallForCtor (MkVarConstructor ctorName _) =

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Variable.Common (freeVarFunctions, mappingFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs, inhCtxsForSortName) where
+module Variable.Common (freeVarFunctions, mappingFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs, inhCtxsForSortName, fnCallForIden, concatCallForIden) where
 
 import Data.List
 import Data.Maybe
@@ -58,11 +58,7 @@ freeVarFunctions (_, sd, _, _) ef =
                     sortNameOfIden = sortNameForIden iden ctor
                 in
                   if fromJust (lookup sortNameOfIden varAccessBySname)
-                  then if iden `elem` map fst folds
-                    then [FnCall "foldMap" [FnCall ("freeVariables" ++ sortNameOfIden) [addedBinders], VarExpr iden]]
-                    else if iden `elem` map fst lists
-                      then [FnCall "concatMap" [FnCall ("freeVariables" ++ sortNameOfIden) [addedBinders], VarExpr iden]]
-                      else [FnCall ("freeVariables" ++ sortNameOfIden) (addedBinders : [VarExpr iden])]
+                  then [concatCallForIden ctor iden ("freeVariables" ++ sortNameOfIden) [addedBinders]]
                   else []
               ) idensAndAttrs
         in if null callList then [ListExpr []] else callList
@@ -123,11 +119,7 @@ mappingFunctions (_, sd, _, _) ef =
         mapFnCallForIden :: (IdenName, [AttributeDef]) -> Expression
         mapFnCallForIden (iden, idenAttrs)
           = if fromJust (lookup sortNameOfIden varAccessBySname)
-              then if iden `elem` map fst folds
-                then FnCall "fmap" [FnCall (mapFnForSortName sortNameOfIden) (fnCallsForCtxs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders), VarExpr iden]
-                else if iden `elem` map fst lists
-                  then FnCall "map" [FnCall (mapFnForSortName sortNameOfIden) (fnCallsForCtxs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders), VarExpr iden]
-                  else FnCall (mapFnForSortName sortNameOfIden) (fnCallsForCtxs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders ++ [VarExpr iden])
+              then fnCallForIden ctor iden (mapFnForSortName sortNameOfIden) (fnCallsForCtxs (fromJust (lookup sortNameOfIden ctxsBySname)) ++ addedBinders)
               else VarExpr iden
           where
             addedBinders = [(applyInhCtxsToAttrs ef) sortName ctor (iden, idenAttrs) ctxsBySname]
@@ -140,6 +132,28 @@ mappingFunctions (_, sd, _, _) ef =
 
 -- * Helper functions
 -- ----------------------------------------------------------------------------
+
+fnCallForIden :: ConstructorDef -> IdenName -> String -> [Expression] -> Expression
+fnCallForIden ctor iden fnName params
+  = if iden `elem` map fst folds
+    then FnCall "fmap" [FnCall fnName params, VarExpr iden]
+    else if iden `elem` map fst lists
+      then FnCall "map" [FnCall fnName params, VarExpr iden]
+      else FnCall fnName (params ++ [VarExpr iden])
+    where
+      folds = dropFold $ cfolds ctor
+      lists = clists ctor
+
+concatCallForIden :: ConstructorDef -> IdenName -> String -> [Expression] -> Expression
+concatCallForIden ctor iden fnName params
+  = if iden `elem` map fst folds
+    then FnCall "concat" [FnCall "fmap" [FnCall fnName params, VarExpr iden]]
+    else if iden `elem` map fst lists
+      then FnCall "concat" [FnCall "map" [FnCall fnName params, VarExpr iden]]
+      else FnCall fnName (params ++ [VarExpr iden])
+    where
+      folds = dropFold $ cfolds ctor
+      lists = clists ctor
 
 -- | Returns the list of inherited contexts for a given sort name
 inhCtxsForSortName :: SortName -> [(SortName, [Context])] -> [Context]
