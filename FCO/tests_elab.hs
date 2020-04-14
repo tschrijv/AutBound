@@ -1,5 +1,5 @@
 import           Elaborate
-import           Fi
+import           FiPlusBase
 import           FiImpl
 
 test1 = elaborate (TmApp (TmAbs (TmVar Z) TyTop) (TmInt 5)) Nil

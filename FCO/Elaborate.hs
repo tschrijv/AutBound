@@ -80,7 +80,7 @@ isTypeConstant _            = False
 algoSubtypingCo :: FIm.Queue -> FP.FiType -> FP.FiType -> Either String Coercion
 algoSubtypingCo q tyA FP.TyTop = do
   a <- (calcQueueTop q)
-  return (CoTrans a (CoTop))
+  return (CoTrans a (CoTopAll))
 algoSubtypingCo q tyA (FP.TyAnd ty1 ty2) = do
   a <- (algoSubtypingCo q tyA ty1)
   b <- (algoSubtypingCo q tyA ty2)
@@ -91,7 +91,7 @@ algoSubtypingCo q tyA (FP.TyArr ty1 ty2) =
 algoSubtypingCo FIm.EmptyQueue tyA tyB
   | tyA == tyB && isTypeConstant tyA = return CoId
 algoSubtypingCo q FP.TyBot c
-  | isTypeConstant c = return CoBot
+  | isTypeConstant c = return $ CoBot (convertType c)
 algoSubtypingCo q tyA (FP.TyRecord tyB str) =
   algoSubtypingCo (pushQueue q (FIm.LabelQueue str FIm.EmptyQueue)) tyA tyB
 algoSubtypingCo q tyA (FP.TyAll ty1 ty2) =
@@ -106,10 +106,10 @@ algoSubtypingCo (FIm.LabelQueue str1 q) (FP.TyRecord ty2 str2) tyB
 algoSubtypingCo q (FP.TyAnd ty1 ty2) tyB
   | isTypeConstant tyB && FIm.algoSubtyping q ty1 tyB = do
     a <- (algoSubtypingCo q ty1 tyB)
-    return (CoTrans a (CoProj1))
+    return (CoTrans a (CoProj1 (convertType ty1)))
   | isTypeConstant tyB && FIm.algoSubtyping q ty2 tyB = do
     a <- (algoSubtypingCo q ty2 tyB)
-    return (CoTrans a (CoProj2))
+    return (CoTrans a (CoProj2 (convertType ty2)))
 algoSubtypingCo (FIm.TypeStarQueue ty q) (FP.TyAll ty1 ty2) tyB
   | isTypeConstant tyB = do
     a <- (algoSubtypingCo q ty2 tyB)
@@ -117,19 +117,19 @@ algoSubtypingCo (FIm.TypeStarQueue ty q) (FP.TyAll ty1 ty2) tyB
 algoSubtypingCo _ _ _ = Left "no subtype"
 
 calcQueueTop :: FIm.Queue -> Either String Coercion
-calcQueueTop FIm.EmptyQueue = return CoTop
+calcQueueTop FIm.EmptyQueue = return CoTopAll
 calcQueueTop (FIm.LabelQueue _ q) = do
   a <- (calcQueueTop q)
   return (CoTrans a CoId)
 calcQueueTop (FIm.TypeQueue _ q) = do
   a <- (calcQueueTop q)
-  return (CoTrans (CoArrow CoTop a) CoTopArrow)
+  return (CoTrans (CoArrow CoTopAll a) CoTopArrow)
 calcQueueTop (FIm.TypeStarQueue _ q) = do
   a <- (calcQueueTop q)
   return (CoTrans (CoAll a) CoTopAll)
 
 calcQueueAnd :: FIm.Queue -> Either String Coercion
-calcQueueAnd FIm.EmptyQueue = return CoTop
+calcQueueAnd FIm.EmptyQueue = return CoTopAll
 calcQueueAnd (FIm.LabelQueue _ q) = do
   a <- (calcQueueAnd q)
   return (CoTrans a CoId)
