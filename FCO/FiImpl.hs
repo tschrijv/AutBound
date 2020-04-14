@@ -1,22 +1,17 @@
-module FiImpl
-  ( FiTerm(..)
-  , FiType(..)
-  , Queue(..)
-  , typeOf
-  , HNat(..)
-  , Env(..)
-  , fiTermshiftplus
-  , fiTermshiftminus
-  , fiTypeshiftminus
-  , fiTypeshiftplus
-  , algoSubtyping
-  , disjointness
-  ) where
+module FiImpl where
 
-import           Fi
+import           FiPlusBase
+
+data Env
+  = Nil
+  | ETypeVar FiType
+             Env
+  | ETermVar FiType
+             Env
+  deriving (Show, Eq)
 
 --end generated code
-getTypeFromEnv :: Env -> HNat -> Either String FiType
+getTypeFromEnv :: Env -> Variable -> Either String FiType
 getTypeFromEnv (ETermVar ty _) Z = return ty
 getTypeFromEnv _ Z = Left "wrong or no binding for FiTerm"
 getTypeFromEnv (ETermVar _ rest) (STermVar h) = getTypeFromEnv rest h
@@ -25,7 +20,7 @@ getTypeFromEnv (ETypeVar _ rest) (STypeVar h) = getTypeFromEnv rest h
 getTypeFromEnv _ (STypeVar h) = Left "No variable FiType"
 
 --end generated code
-getTypeFromEnvDis :: Env -> HNat -> Either String FiType
+getTypeFromEnvDis :: Env -> Variable -> Either String FiType
 getTypeFromEnvDis (ETypeVar ty _) Z = return ty
 getTypeFromEnvDis _ Z = error "wrong or no binding for typevar"
 getTypeFromEnvDis (ETermVar _ rest) (STermVar h) = getTypeFromEnvDis rest h
@@ -86,7 +81,7 @@ typeOf (TypeApp t ty) ctx =
         then return
                (fiTypeshiftminus
                   (STypeVar Z)
-                  (fiTypefiTypeSubstitute
+                  (fiTypeFiTypeSubstitute
                      (fiTypeshiftplus (STypeVar Z) ty)
                      Z
                      ty2))

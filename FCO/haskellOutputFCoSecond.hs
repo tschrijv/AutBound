@@ -1,14 +1,13 @@
-module HaskellOutputFCoSecond
-  ( Term(..)
-  , Type(..)
-  , Coercion(..)
-  , typeOf
-  , fullEval
-  , HNat(..)
-  , Env(..)
-  ) where
+module HaskellOutputFCoSecond where
 
-import           FCO
+import           FCoBase
+
+data Env
+  = Nil
+  | ETypeVar Env
+  | ETermVar Type
+             Env
+  deriving (Show, Eq)
 
 isVal :: Term -> Bool
 isVal (TmAbs x t)              = True
@@ -23,7 +22,7 @@ isVal (TmCast (CoTopArrow) e)  = isVal e
 isVal (TmCast (CoDistAll) e)   = isVal e
 isVal _                        = False
 
-getTypeFromEnv :: Env -> HNat -> Either String Type
+getTypeFromEnv :: Env -> Variable -> Either String Type
 getTypeFromEnv (ETermVar ty _) Z = return ty
 getTypeFromEnv _ Z = Left "wrong or no binding for term"
 getTypeFromEnv (ETermVar _ rest) (STermVar h) = getTypeFromEnv rest h
@@ -39,13 +38,13 @@ stepEval (TmApp (TmAbs t ty) t2)
     Just
       (termshiftminus
          (STermVar Z)
-         (termtermSubstitute (termshiftplus (STermVar Z) t2) Z t))
+         (termTermSubstitute (termshiftplus (STermVar Z) t2) Z t))
 --type application
 stepEval (TmTApp (TmTAbs t) ty) =
   Just
     (termshiftminus
        (STypeVar Z)
-       (termtypeSubstitute (typeshiftplus (STypeVar Z) ty) Z t))
+       (termTypeSubstitute (typeshiftplus (STypeVar Z) ty) Z t))
 --R-proj1
 stepEval (TmCast (CoProj1 ty) (TmTuple e1 e2))
   | not (isVal e1) = do
@@ -247,7 +246,7 @@ typeOf (TmTApp t ty) ctx =
       return
         (typeshiftminus
            (STypeVar Z)
-           (typetypeSubstitute (typeshiftplus (STypeVar Z) ty) Z ty2))
+           (typeTypeSubstitute (typeshiftplus (STypeVar Z) ty) Z ty2))
     Left a -> Left a
     _ -> Left "not a type abstraction"
 typeOf (TmTAbs t) ctx = do

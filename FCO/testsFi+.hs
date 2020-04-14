@@ -1,3 +1,4 @@
+import           FiPlusBase
 import           FiImpl
 
 test1 = typeOf (TmApp (TmAbs (TmVar Z) TyTop) TmTop) Nil
