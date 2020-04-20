@@ -1,6 +1,5 @@
 module SystemFBase where
-import Data.List
-import Debug.Trace as DT
+import Data.List 
 
 data Variable = Z | STermVar Variable | STypeVar Variable deriving(Show, Eq)
 
@@ -28,14 +27,6 @@ generateHnatTermVar n c = (STermVar (generateHnatTermVar (n - 1) c))
 generateHnatTypeVar 0 c = c
 generateHnatTypeVar n c = (STypeVar (generateHnatTypeVar (n - 1) c))
 
-keepTypeVar Z = Z
-keepTypeVar (STypeVar var) = (STypeVar (keepTypeVar var))
-keepTypeVar (STermVar var) = (keepTypeVar var)
-
-keepTermVar Z = Z
-keepTermVar (STypeVar var) = (keepTermVar var)
-keepTermVar (STermVar var) = (STermVar (keepTermVar var))
-
 termshiftHelpplus d c (TmVar var) = if (var >= c) then (TmVar (plus var d)) else (TmVar var)
 
 typeshiftHelpplus d c (TyVar var) = if (var >= c) then (TyVar (plus var d)) else (TyVar var)
@@ -52,13 +43,13 @@ termshiftminus d t = (termmap (termshiftHelpminus d) (typeshiftHelpminus d) (Z) 
 
 typeshiftminus d t = (typemap (typeshiftHelpminus d) (Z) t)
 
-termmap onTermVar onTypeVar c (TmVar var)    = (onTermVar (keepTermVar c) (TmVar var))
-termmap onTermVar onTypeVar c (TmAbs x t)    = (TmAbs (termmap onTermVar onTypeVar (STermVar c) x) (typemap onTypeVar c t))
-termmap onTermVar onTypeVar c (TmApp t1 t2)  = (TmApp (termmap onTermVar onTypeVar c t1) (termmap onTermVar onTypeVar c t2))
-termmap onTermVar onTypeVar c (TmTApp t1 t)  = (TmTApp (termmap onTermVar onTypeVar c t1) (typemap onTypeVar c t))
-termmap onTermVar onTypeVar c (TmTAbs t1)    = (TmTAbs (termmap onTermVar onTypeVar (STypeVar c) t1))
+termmap onTermVar onTypeVar c (TmVar var) = (onTermVar c (TmVar var))
+termmap onTermVar onTypeVar c (TmAbs x t) = (TmAbs (termmap onTermVar onTypeVar (STermVar c) x) (typemap onTypeVar c t))
+termmap onTermVar onTypeVar c (TmApp t1 t2) = (TmApp (termmap onTermVar onTypeVar c t1) (termmap onTermVar onTypeVar c t2))
+termmap onTermVar onTypeVar c (TmTApp t1 t) = (TmTApp (termmap onTermVar onTypeVar c t1) (typemap onTypeVar c t))
+termmap onTermVar onTypeVar c (TmTAbs t1) = (TmTAbs (termmap onTermVar onTypeVar (STypeVar c) t1))
 
-typemap onTypeVar c (TyVar var) = (onTypeVar (keepTypeVar c) (TyVar var))
+typemap onTypeVar c (TyVar var) = (onTypeVar c (TyVar var))
 typemap onTypeVar c (TyArr t1 t2) = (TyArr (typemap onTypeVar c t1) (typemap onTypeVar c t2))
 typemap onTypeVar c (TyAll t1) = (TyAll (typemap onTypeVar (STypeVar c) t1))
 typemap onTypeVar c (TyBase) = (TyBase)
