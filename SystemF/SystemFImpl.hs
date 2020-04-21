@@ -7,6 +7,11 @@ data Env
              Env
   deriving (Show, Eq)
 
+nth :: Env -> Variable -> Maybe Env
+nth env Z = Just env
+nth (ETypeVar env) (S x) = nth env x
+nth (ETermVar _ env) (S x) = nth env x
+nth _ _ = Nothing
 
 isVal :: Term -> Bool
 isVal (TmAbs x t)              = True
@@ -16,10 +21,10 @@ isVal _ = False
 getTypeFromEnv :: Env -> Variable -> Either String Type
 getTypeFromEnv (ETermVar ty _) Z = return ty
 getTypeFromEnv _ Z = Left "wrong or no binding for term"
-getTypeFromEnv (ETermVar _ rest) (STermVar h) = getTypeFromEnv rest h
-getTypeFromEnv _ (STermVar h) = Left "wrong term binding"
-getTypeFromEnv (ETypeVar rest) (STypeVar h) = getTypeFromEnv rest h
-getTypeFromEnv _ (STypeVar h) = Left "No variable type"
+getTypeFromEnv (ETermVar _ rest) (S h) = getTypeFromEnv rest h
+getTypeFromEnv (ETypeVar rest) (S h) = getTypeFromEnv rest h
+getTypeFromEnv _ (S h) = Left "No variable type"
+
 --evaluation
 stepEval :: Term -> Maybe Term
 --function application
@@ -27,14 +32,14 @@ stepEval (TmApp (TmAbs t ty) t2)
   | isVal t2 =
     Just
       (termshiftminus
-         (STermVar Z)
-         (termTermSubstitute (termshiftplus (STermVar Z) t2) Z t))
+         (S Z)
+         (termTermSubstitute (termshiftplus (S Z) t2) Z t))
 --type application
 stepEval (TmTApp (TmTAbs t) ty) =
   Just
     (termshiftminus
-       (STypeVar Z)
-       (termTypeSubstitute (typeshiftplus (STypeVar Z) ty) Z t))
+       (S Z)
+       (termTypeSubstitute (typeshiftplus (S Z) ty) Z t))
 --R-CTXT
 stepEval (TmApp t1 t2)
   | isVal t1 = do
@@ -55,12 +60,23 @@ fullEval t = maybe t (fullEval) t2
   where
     t2 = stepEval t
 
+wellFormed :: Type -> Env -> Bool
+wellFormed (TyVar i) env       = case (nth env i) of
+  Nothing -> False
+  Just (ETermVar _ _) -> False
+  Just (ETypeVar _) -> True
+  Just Nil -> False
+wellFormed (TyArr ty1 ty2) env = wellFormed ty1 env && wellFormed ty2 env
+wellFormed (TyAll ty) env      = wellFormed ty (ETypeVar env)
+wellFormed (TyBase) env        = True
 
 typeOf :: Term -> Env -> Either String Type
 typeOf (TmVar nat) ctx = getTypeFromEnv ctx nat
-typeOf (TmAbs t ty) ctx = do
-  ty2 <- typeOf t (ETermVar ty ctx)
-  return (TyArr ty ty2)
+typeOf (TmAbs t ty) ctx =
+  if (wellFormed ty ctx) then do
+    ty2 <- typeOf t (ETermVar ty ctx)
+    return (TyArr ty ty2)
+  else Left (show ty ++ " is not well-formed")
 typeOf (TmApp t1 t2) ctx =
   case (typeOf t1 ctx) of
     Right (TyArr ty1 ty2) ->
@@ -72,15 +88,13 @@ typeOf (TmApp t1 t2) ctx =
         Left a -> Left a
     Left a -> Left a
     _ -> Left "arrow type expected"
-typeOf (TmTApp t ty) ctx =
-  case (typeOf t ctx) of
-    Right (TyAll ty2) ->
-      return
-        (typeshiftminus
-           (STypeVar Z)
-           (typeTypeSubstitute (typeshiftplus (STypeVar Z) ty) Z ty2))
-    Left a -> Left a
-    _ -> Left "not a type abstraction"
+typeOf (TmTApp (TmTAbs t) ty) ctx =
+  if (wellFormed ty ctx) then
+    typeOf
+      (termshiftminus
+        (S Z)
+        (termTypeSubstitute (typeshiftplus (S Z) ty) Z t)) ctx
+  else Left (show ty ++ " is not well-formed")
 typeOf (TmTAbs t) ctx = do
   ty <- typeOf t (ETypeVar ctx)
   return (TyAll ty)
