@@ -9,8 +9,8 @@ data Env
 
 nth :: Env -> Variable -> Maybe Env
 nth env Z = Just env
-nth (ETypeVar env) (S x) = nth env x
-nth (ETermVar _ env) (S x) = nth env x
+nth (ETypeVar env) (STypeVar x) = nth env x
+nth (ETermVar _ env) (STermVar x) = nth env x
 nth _ _ = Nothing
 
 isVal :: Term -> Bool
@@ -21,9 +21,10 @@ isVal _ = False
 getTypeFromEnv :: Env -> Variable -> Either String Type
 getTypeFromEnv (ETermVar ty _) Z = return ty
 getTypeFromEnv _ Z = Left "wrong or no binding for term"
-getTypeFromEnv (ETermVar _ rest) (S h) = getTypeFromEnv rest h
-getTypeFromEnv (ETypeVar rest) (S h) = getTypeFromEnv rest h
-getTypeFromEnv _ (S h) = Left "No variable type"
+getTypeFromEnv (ETermVar _ rest) (STermVar h) = getTypeFromEnv rest h
+getTypeFromEnv (ETypeVar rest) (STypeVar h) = getTypeFromEnv rest h
+getTypeFromEnv _ (STermVar h) = Left "wrong term binding"
+getTypeFromEnv _ (STypeVar h) = Left "No variable type"
 
 --evaluation
 stepEval :: Term -> Maybe Term
@@ -32,14 +33,14 @@ stepEval (TmApp (TmAbs t ty) t2)
   | isVal t2 =
     Just
       (termshiftminus
-         (S Z)
-         (termTermSubstitute (termshiftplus (S Z) t2) Z t))
+         (STermVar Z)
+         (termTermSubstitute (termshiftplus (STermVar Z) t2) Z t))
 --type application
 stepEval (TmTApp (TmTAbs t) ty) =
   Just
     (termshiftminus
-       (S Z)
-       (termTypeSubstitute (typeshiftplus (S Z) ty) Z t))
+       (STypeVar Z)
+       (termTypeSubstitute (typeshiftplus (STypeVar Z) ty) Z t))
 --R-CTXT
 stepEval (TmApp t1 t2)
   | isVal t1 = do
@@ -92,8 +93,8 @@ typeOf (TmTApp (TmTAbs t) ty) ctx =
   if (wellFormed ty ctx) then
     typeOf
       (termshiftminus
-        (S Z)
-        (termTypeSubstitute (typeshiftplus (S Z) ty) Z t)) ctx
+        (STypeVar Z)
+        (termTypeSubstitute (typeshiftplus (STypeVar Z) ty) Z t)) ctx
   else Left (show ty ++ " is not well-formed")
 typeOf (TmTAbs t) ctx = do
   ty <- typeOf t (ETypeVar ctx)
