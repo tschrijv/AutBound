@@ -19,10 +19,19 @@ isVal (TmTAbs t1)              = True
 isVal _ = False
 
 getTypeFromEnv :: Env -> Variable -> Either String Type
+getTypeFromEnv (ETermVar (TyVar i) _) Z = return $ TyVar (STermVar i)
 getTypeFromEnv (ETermVar ty _) Z = return ty
 getTypeFromEnv _ Z = Left "wrong or no binding for term"
-getTypeFromEnv (ETermVar _ rest) (STermVar h) = getTypeFromEnv rest h
-getTypeFromEnv (ETypeVar rest) (STypeVar h) = getTypeFromEnv rest h
+getTypeFromEnv (ETermVar _ rest) (STermVar h) = do
+  t <- getTypeFromEnv rest h
+  case t of
+    (TyVar i) -> return $ TyVar (STermVar i)
+    otherwise -> return t
+getTypeFromEnv (ETypeVar rest) (STypeVar h) = do
+  t <- getTypeFromEnv rest h
+  case t of
+    (TyVar i) -> return $ TyVar (STypeVar i)
+    otherwise -> return t
 getTypeFromEnv _ (STermVar h) = Left "wrong term binding"
 getTypeFromEnv _ (STypeVar h) = Left "No variable type"
 
@@ -62,21 +71,21 @@ fullEval t = maybe t (fullEval) t2
     t2 = stepEval t
 
 wellFormed :: Type -> Env -> Bool
-wellFormed (TyVar i) env       = case (nth env i) of
+wellFormed (TyVar i) env             = case (nth env i) of
   Nothing -> False
   Just (ETermVar _ _) -> False
   Just (ETypeVar _) -> True
   Just Nil -> False
-wellFormed (TyArr ty1 ty2) env = wellFormed ty1 env && wellFormed ty2 env
-wellFormed (TyAll ty) env      = wellFormed ty (ETypeVar env)
-wellFormed (TyBase) env        = True
+wellFormed (TyArr ty1 ty2) env       = wellFormed ty1 env && wellFormed ty2 env
+wellFormed (TyAll ty) (ETypeVar env) = wellFormed ty env
+wellFormed (TyBase) env              = True
 
 typeOf :: Term -> Env -> Either String Type
 typeOf (TmVar nat) ctx = getTypeFromEnv ctx nat
 typeOf (TmAbs t ty) ctx =
   if (wellFormed ty ctx) then do
     ty2 <- typeOf t (ETermVar ty ctx)
-    return (TyArr ty ty2)
+    return $ TyArr ty (typeshiftminus (STermVar Z) ty2)
   else Left (show ty ++ " is not well-formed")
 typeOf (TmApp t1 t2) ctx =
   case (typeOf t1 ctx) of
@@ -89,12 +98,15 @@ typeOf (TmApp t1 t2) ctx =
         Left a -> Left a
     Left a -> Left a
     _ -> Left "arrow type expected"
-typeOf (TmTApp (TmTAbs t) ty) ctx =
+typeOf (TmTApp t ty) ctx =
   if (wellFormed ty ctx) then
-    typeOf
-      (termshiftminus
-        (STypeVar Z)
-        (termTypeSubstitute (typeshiftplus (STypeVar Z) ty) Z t)) ctx
+    case (typeOf t ctx) of
+      Right (TyAll ty2) -> return
+        (typeshiftminus
+           (STypeVar Z)
+           (typeTypeSubstitute (typeshiftplus (STypeVar Z) ty) Z ty2))
+      Left a -> Left a
+      Right _ -> Left "not a type abstraction"
   else Left (show ty ++ " is not well-formed")
 typeOf (TmTAbs t) ctx = do
   ty <- typeOf t (ETypeVar ctx)
