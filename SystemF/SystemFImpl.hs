@@ -71,14 +71,14 @@ fullEval t = maybe t (fullEval) t2
     t2 = stepEval t
 
 wellFormed :: Type -> Env -> Bool
-wellFormed (TyVar i) env             = case (nth env i) of
+wellFormed (TyVar i) env       = case (nth env i) of
   Nothing -> False
   Just (ETermVar _ _) -> False
   Just (ETypeVar _) -> True
   Just Nil -> False
-wellFormed (TyArr ty1 ty2) env       = wellFormed ty1 env && wellFormed ty2 env
-wellFormed (TyAll ty) (ETypeVar env) = wellFormed ty env
-wellFormed (TyBase) env              = True
+wellFormed (TyArr ty1 ty2) env = wellFormed ty1 env && wellFormed ty2 env
+wellFormed (TyAll ty) env      = wellFormed ty (ETypeVar env)
+wellFormed (TyBase) env        = True
 
 typeOf :: Term -> Env -> Either String Type
 typeOf (TmVar nat) ctx = getTypeFromEnv ctx nat
