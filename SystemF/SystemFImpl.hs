@@ -19,21 +19,14 @@ isVal (TmTAbs t1)              = True
 isVal _ = False
 
 getTypeFromEnv :: Env -> Variable -> Either String Type
-getTypeFromEnv (ETermVar (TyVar i) _) Z = return $ TyVar (STermVar i)
-getTypeFromEnv (ETermVar ty _) Z = return ty
-getTypeFromEnv _ Z = Left "wrong or no binding for term"
-getTypeFromEnv (ETermVar _ rest) (STermVar h) = do
-  t <- getTypeFromEnv rest h
-  case t of
-    (TyVar i) -> return $ TyVar (STermVar i)
-    otherwise -> return t
-getTypeFromEnv (ETypeVar rest) (STypeVar h) = do
-  t <- getTypeFromEnv rest h
-  case t of
-    (TyVar i) -> return $ TyVar (STypeVar i)
-    otherwise -> return t
-getTypeFromEnv _ (STermVar h) = Left "wrong term binding"
-getTypeFromEnv _ (STypeVar h) = Left "No variable type"
+getTypeFromEnv e v = go e v Z where
+  go :: Env -> Variable -> Variable -> Either String Type
+  go (ETermVar ty _)   Z            shift = return $ typeshiftplus (plus shift (STermVar Z)) ty
+  go _                 Z            _     = Left "wrong or no binding for term"
+  go (ETermVar _ rest) (STermVar h) shift = go rest h (plus shift (STermVar Z))
+  go (ETypeVar rest)   (STypeVar h) shift = go rest h (plus shift (STypeVar Z))
+  go _                 (STermVar h) _     = Left "wrong term binding"
+  go _                 (STypeVar h) _     = Left "No variable type"
 
 --evaluation
 stepEval :: Term -> Maybe Term

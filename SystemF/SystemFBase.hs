@@ -10,8 +10,8 @@ data Type = TyVar Variable | TyArr Type Type | TyAll Type | TyBase deriving(Show
 
 plus (Z) h = h
 plus h (Z) = h
-plus x1 (STypeVar x2) = (STypeVar (plus x1 x2))
-plus x1 (STermVar x2) = (STermVar (plus x1 x2))
+plus (STypeVar x1) x2 = (STypeVar (plus x1 x2))
+plus (STermVar x1) x2 = (STermVar (plus x1 x2))
 
 minus (Z) (Z) = (Z)
 minus (Z) _ = (error "You cannot substract zero with a positive number")
