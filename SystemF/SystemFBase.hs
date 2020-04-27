@@ -18,7 +18,8 @@ minus (Z) _ = (error "You cannot substract zero with a positive number")
 minus result (Z) = result
 minus (STypeVar h1) (STypeVar h2) = (minus h1 h2)
 minus (STermVar h1) (STermVar h2) = (minus h1 h2)
-minus _ _ = (error "differing namespace found in minus")
+minus (STermVar h1) (STypeVar h2) = STermVar (minus h1 (STypeVar h2))
+minus (STypeVar h1) (STermVar h2) = STypeVar (minus h1 (STermVar h2))
 
 generateHnatTermVar 0 c = c
 generateHnatTermVar n c = (STermVar (generateHnatTermVar (n - 1) c))
