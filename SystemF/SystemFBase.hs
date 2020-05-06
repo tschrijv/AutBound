@@ -29,14 +29,7 @@ generateHnatTypeVar n c = (STypeVar (generateHnatTypeVar (n - 1) c))
 
 termshiftHelpplus d c (TmVar var) = if (var >= c) then (TmVar (plus var d)) else (TmVar var)
 
--- typeshiftHelpplus d c (TyVar var) = if (var >= c) then (TyVar (plus d var)) else (TyVar var)
-
-typeshiftHelpplus d c (TyVar var) = TyVar (go c var) where
-  go Z            v             = plus d v
-  go (STypeVar c) Z             = Z
-  go (STermVar c) Z             = Z
-  go (STypeVar c) (STypeVar v)  = STypeVar (go c v)
-  go (STermVar c) (STermVar v)  = STermVar (go c v)
+typeshiftHelpplus d c (TyVar var) = if (var >= c) then (TyVar (plus c (plus d (minus var c)))) else (TyVar var)
 
 termshiftplus d t = (termmap (termshiftHelpplus d) (typeshiftHelpplus d) (Z) t)
 
