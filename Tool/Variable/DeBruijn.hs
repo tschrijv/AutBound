@@ -69,12 +69,14 @@ getHNatModifiers (_, hnatc) =
   ]
   where
     generatePlus :: Constructor -> ([Parameter], Expression)
-    generatePlus (Constr n _) = ([VarParam "x1", ConstrParam n [VarParam "x2"]], ConstrInst n [FnCall "plus" [VarExpr "x1", VarExpr "x2"]])
+    generatePlus (Constr n _) = ([ConstrParam n [VarParam "x1"], VarParam "x2"], ConstrInst n [FnCall "plus" [VarExpr "x1", VarExpr "x2"]])
 
     generateMinus :: (Constructor, Constructor) -> ([Parameter], Expression)
     generateMinus (Constr n1 _, Constr n2 _)
       | n1 == n2 = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "minus" [VarExpr "h1", VarExpr "h2"])
-      | otherwise = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "error" [StringExpr "differing namespace found in minus"])
+      | otherwise = (
+          [ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]],
+          ConstrInst n1 [FnCall "minus" [VarExpr "h1", ConstrInst n2 [VarExpr "h2"]]])
 
 getGenerators :: [NamespaceDef] -> [Function]
 getGenerators = map (
@@ -104,6 +106,8 @@ getShiftHelpers sd opName varAccessTable = let filtered = filter (\(MkDefSort sn
         ([VarParam "d", VarParam "c", ConstrParam consName [VarParam "var"]],
         IfExpr
           (GTEExpr (VarExpr "var") (VarExpr "c"))
+          -- (plus c (plus d (minus var c))))
+          -- if (op == "plus") then (ConstrInst consName [FnCall "plus" [VarExpr "c", FnCall "plus" [VarExpr "d", FnCall "minus" [VarExpr "var", VarExpr "c"]]]]) else
           (ConstrInst consName [FnCall op [VarExpr "var", VarExpr "d"]])
           (ConstrInst consName [VarExpr "var"])
         )
