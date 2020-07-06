@@ -107,8 +107,7 @@ getShiftHelpers sd opName varAccessTable = let filtered = filter (\(MkDefSort sn
         IfExpr
           (GTEExpr (VarExpr "var") (VarExpr "c"))
           -- (plus c (plus d (minus var c))))
-          -- if (op == "plus") then (ConstrInst consName [FnCall "plus" [VarExpr "c", FnCall "plus" [VarExpr "d", FnCall "minus" [VarExpr "var", VarExpr "c"]]]]) else
-          (ConstrInst consName [FnCall op [VarExpr "var", VarExpr "d"]])
+          (if (op == "plus") then (ConstrInst consName [FnCall "plus" [VarExpr "c", FnCall "plus" [VarExpr "d", FnCall "minus" [VarExpr "var", VarExpr "c"]]]]) else (ConstrInst consName [FnCall op [VarExpr "var", VarExpr "d"]]))
           (ConstrInst consName [VarExpr "var"])
         )
       ] | MkVarConstructor consName _ <- cdefs]

@@ -10,16 +10,16 @@ data Type = TyVar Variable | TyArr Type Type | TyAll Type | TyBase deriving(Show
 
 plus (Z) h = h
 plus h (Z) = h
-plus (STypeVar x1) x2 = (STypeVar (plus x1 x2))
 plus (STermVar x1) x2 = (STermVar (plus x1 x2))
+plus (STypeVar x1) x2 = (STypeVar (plus x1 x2))
 
 minus (Z) (Z) = (Z)
 minus (Z) _ = (error "You cannot substract zero with a positive number")
 minus result (Z) = result
-minus (STypeVar h1) (STypeVar h2) = (minus h1 h2)
 minus (STermVar h1) (STermVar h2) = (minus h1 h2)
-minus (STermVar h1) (STypeVar h2) = STermVar (minus h1 (STypeVar h2))
-minus (STypeVar h1) (STermVar h2) = STypeVar (minus h1 (STermVar h2))
+minus (STermVar h1) (STypeVar h2) = (STermVar (minus h1 (STypeVar h2)))
+minus (STypeVar h1) (STermVar h2) = (STypeVar (minus h1 (STermVar h2)))
+minus (STypeVar h1) (STypeVar h2) = (minus h1 h2)
 
 generateHnatTermVar 0 c = c
 generateHnatTermVar n c = (STermVar (generateHnatTermVar (n - 1) c))
@@ -27,7 +27,7 @@ generateHnatTermVar n c = (STermVar (generateHnatTermVar (n - 1) c))
 generateHnatTypeVar 0 c = c
 generateHnatTypeVar n c = (STypeVar (generateHnatTypeVar (n - 1) c))
 
-termshiftHelpplus d c (TmVar var) = if (var >= c) then (TmVar (plus var d)) else (TmVar var)
+termshiftHelpplus d c (TmVar var) = if (var >= c) then (TmVar (plus c (plus d (minus var c)))) else (TmVar var)
 
 typeshiftHelpplus d c (TyVar var) = if (var >= c) then (TyVar (plus c (plus d (minus var c)))) else (TyVar var)
 
@@ -41,7 +41,7 @@ typeshiftHelpminus d c (TyVar var) = if (var >= c) then (TyVar (minus var d)) el
 
 termshiftminus d t = (termmap (termshiftHelpminus d) (typeshiftHelpminus d) (Z) t)
 
-typeshiftminus d t =  (typemap (typeshiftHelpminus d) (Z) t)
+typeshiftminus d t = (typemap (typeshiftHelpminus d) (Z) t)
 
 termmap onTermVar onTypeVar c (TmVar var) = (onTermVar c (TmVar var))
 termmap onTermVar onTypeVar c (TmAbs x t) = (TmAbs (termmap onTermVar onTypeVar (STermVar c) x) (typemap onTypeVar c t))
@@ -79,4 +79,6 @@ instance Ord Variable where
   compare (Z) _ = (LT)
   compare _ (Z) = (GT)
   compare (STermVar h1) (STermVar h2) = (compare h1 h2)
+  compare (STermVar h1) (STypeVar h2) = (error "differing namespace found in compare")
+  compare (STypeVar h1) (STermVar h2) = (error "differing namespace found in compare")
   compare (STypeVar h1) (STypeVar h2) = (compare h1 h2)
