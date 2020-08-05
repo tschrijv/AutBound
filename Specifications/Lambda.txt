@@ -1,0 +1,17 @@
+
+namespace VarValue: Term
+
+sort Value
+    inh vctx VarValue
+    | Abstraction (x: Term) [z:VarValue]
+        x.ctx = lhs.vctx, z
+
+sort Term
+    inh ctx VarValue
+    | TmVariable (x@ctx)
+    | TmValue (v: Value)
+        v.vctx = lhs.ctx
+    | TmApply (f: Term) (a: Term)
+        f.ctx = lhs.ctx
+        a.ctx = lhs.ctx
+

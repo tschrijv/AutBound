@@ -1,0 +1,35 @@
+
+
+namespace VarValue: Term
+namespace VarType: Type
+
+sort Value
+  inh vctx VarValue
+  inh vtctx VarType
+  | Abstraction (t: Term) (typ: Type) [z: VarValue]
+    t.ctx = lhs.vctx, z
+    t.tctx = lhs.vtctx
+    typ.tyctx = lhs.vtctx
+  | TypeAbstraction (typeTerm: Term) (superType: Type) [z: VarType]
+    typeTerm.ctx = lhs.vctx
+    typeTerm.tctx = lhs.vtctx, z
+    superType.tyctx = lhs.vtctx
+
+sort Term
+  inh ctx VarValue
+  inh tctx VarType
+  | TmVariable (x@ctx)
+  | TmApply (t1: Term) (t2: Term)
+  | TmTypeApply (t1: Term) (t2: Type)
+  | TmValue (v: Value)
+    v.vctx = lhs.ctx
+    v.vtctx = lhs.tctx
+
+sort Type
+  inh tyctx VarType
+  | TypVariable (t@tyctx)
+  | TypFunction (from: Type) (to: Type)
+  | TypUniversal (on: Type) (superType: Type) [t: VarType]
+    on.tyctx = lhs.tyctx, t
+  | Top
+  | Typ {String}
