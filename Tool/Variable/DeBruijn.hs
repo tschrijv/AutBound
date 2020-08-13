@@ -38,7 +38,8 @@ getVariableInstances :: (Type, [Constructor]) -> [(Type, Type, [Function])]
 getVariableInstances (_, hnatc) =
   let cs = delete (Constr "Z" []) hnatc
   in [("Ord", "Variable", [
-    Fn "compare" ([
+    Fn "compare" [] ("") 
+    ([
       ([ConstrParam "Z" [], ConstrParam "Z" []], ConstrInst "EQ" []),
       ([ConstrParam "Z" [], VarParam "_"], ConstrInst "LT" []),
       ([VarParam "_", ConstrParam "Z" []], ConstrInst "GT" [])
@@ -56,12 +57,14 @@ getHNatModifiers :: (Type, [Constructor]) -> [Function]
 getHNatModifiers (_, hnatc) =
   let cs = delete (Constr "Z" []) hnatc
   in [
-    Fn "plus" ([
+    Fn "plus" [TyVar, TyVar, TyVar] ("Add two Variables.") ([
       ([ConstrParam "Z" [], VarParam "h"], VarExpr "h"),
       ([VarParam "h", ConstrParam "Z" []], VarExpr "h")
     ] ++ map generatePlus cs)
   ,
-    Fn "minus" ([
+    Fn "minus" [TyVar, TyVar, TyVar] 
+    ("Substract the second Variable from the first. The first Variable has to\n\
+    \be greater than the second one.") ([
       ([ConstrParam "Z" [], ConstrParam "Z" []], ConstrInst "Z" []),
       ([ConstrParam "Z" [], VarParam "_"], FnCall "error" [StringExpr "You cannot substract zero with a positive number"]),
       ([VarParam "result", ConstrParam "Z" []], VarExpr "result")
@@ -85,7 +88,8 @@ getGenerators = map (
           fnName = "generateHnat" ++ name
           constr = 'S' : name
       in
-      Fn fnName [
+      Fn fnName [TyBasic "Int", TyVar, TyVar]
+      ("Apply " ++ constr ++ " n times to the second argument c.") [
         ([IntParam 0, VarParam "c"], VarExpr "c"),
         ([VarParam "n", VarParam "c"], ConstrInst constr [FnCall fnName [Minus (VarExpr "n") (IntExpr 1), VarExpr "c"]])
       ]
@@ -101,7 +105,9 @@ getShiftHelpers sd opName varAccessTable = let filtered = filter (\(MkDefSort sn
   where
     constructorsToCheckShift :: [ConstructorDef] -> SortName -> String -> [Function]
     constructorsToCheckShift cdefs sname op = [
-      Fn (sname ++ "shiftHelp" ++ op)
+      Fn (sname ++ "shiftHelp" ++ op) 
+      [TyVar, TyVar, TyBasic sname, TyBasic sname] 
+      ("Perform the shift operation on one " ++ sname ++ " with the " ++ consName ++ " constructor.")
       [
         ([VarParam "d", VarParam "c", ConstrParam consName [VarParam "var"]],
         IfExpr
@@ -113,10 +119,12 @@ getShiftHelpers sd opName varAccessTable = let filtered = filter (\(MkDefSort sn
       ] | MkVarConstructor consName _ <- cdefs]
 
 getShiftFunctions :: [SortDef] -> [NamespaceDef] -> String -> [(SortName, Bool)] -> [Function]
-getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> isJust (lookup (sname s) varAccessTable)) sd
+getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> fromJust (lookup (sname s) varAccessTable)) sd
   in map (\(MkDefSort sname namespaceDecl _ _) ->
     Fn
-      (sname ++ "shift" ++ opName)
+      (sname ++ "shift" ++ opName) 
+      [TyVar, TyBasic sname, TyBasic sname] 
+      ("Perform the shift operation on a " ++ sname ++ ".")
       [
         ([VarParam "d", VarParam "t"],
         FnCall
@@ -138,16 +146,49 @@ getEnvFunctions (nsd, sd, _, _)
     in concatMap (\sort ->
       let synCtxs = [SYN x y | SYN x y <- sctxs sort]
       in if null synCtxs then [] else
-      map (\ctor ->
-        generateSortSynSystemOneConstructor (sname sort) nsd ctxsBySname ctor (head synCtxs)
-      ) (sctors sort)
+      mapAndMerge ( 
+        splitFunctions (map (\ctor ->
+          generateSortSynSystemOneConstructor (sname sort) nsd ctxsBySname ctor (head synCtxs)
+        ) (sctors sort)) (sname sort) ([],[])
+      )
     ) sd
     where
+      -- | Splits the generated functions in two such that each has the same function name
+      splitFunctions :: [Function] -> SortName -> ([Function], [Function]) -> ([Function], [Function])
+      splitFunctions [] _ f12 = f12
+      splitFunctions (x@(Fn name _ _ _):xs) sname (f1,f2) = 
+        if name == "addToEnvironment" ++ sname
+          then splitFunctions (xs) sname (f1 ++ [x], f2)
+          else splitFunctions xs sname (f1, f2 ++ [x])
+
+      -- | Merges the tuple of lists of functions to 2 functions: the first correspondends with the merged function of the first
+      -- | argument in the tuple, the second with the merged function of the second argument.
+      mapAndMerge :: ([Function], [Function]) -> [Function]
+      mapAndMerge (f1, f2) = (mergeFunctions f1) ++ (mergeFunctions f2)
+
+      -- | Merges a list of functions to another list of functions which contains a single function or the empty list if the empty
+      -- | list was given as an argument. The new merged function has the same name, type signature and description as the first
+      -- | function in the supplied list and contains all expressions as its expression.
+      mergeFunctions :: [Function] -> [Function]
+      mergeFunctions [] = []
+      mergeFunctions [x] = [x]
+      mergeFunctions (x1@(Fn name1 ts1 descr1 expr1):(x2@(Fn name2 ts2 descr2 expr2):xs)) = 
+        mergeFunctions ((Fn name1 ts1 descr1 (expr1 ++ expr2)) : xs)
+
+
       generateSortSynSystemOneConstructor :: SortName -> [NamespaceDef] -> [(SortName, [Context])] -> ConstructorDef -> Context -> Function
       generateSortSynSystemOneConstructor sname _ _ (MkVarConstructor ctorName _) _
-        = Fn ("addToEnvironment" ++ sname) [([ConstrParam ctorName [VarParam "var"], VarParam "c"], VarExpr "c")]
+        = Fn ("addToEnvironment" ++ sname) 
+        [TyBasic sname, TyVar, TyVar] 
+        ("") 
+        [([ConstrParam ctorName [VarParam "var"], VarParam "c"], VarExpr "c")]
       generateSortSynSystemOneConstructor sname nsd ctxsBySname ctor ctx
-        = Fn ("addToEnvironment" ++ sname ++ xinst ctx) [([ConstrParam ctorName (firstToVarParams sorts ++ [VarParam "_" | _ <- hTypes]), VarParam "c"], getEnvFunctionGenerate)]
+        = Fn ("addToEnvironment" ++ sname ++ xinst ctx) 
+        [TyBasic sname, TyVar, TyVar] 
+        ("Bring the variables that are bound by the given " ++ sname ++ " into scope.\n\
+        \The second argument represents the number of bound variables with respect to the top\n\
+        \level scope.") 
+        [([ConstrParam ctorName (firstToVarParams sorts ++ [VarParam "_" | _ <- hTypes]), VarParam "c"], getEnvFunctionGenerate)]
           where
             filteredSnameAndCtxs = filterCtxsByNamespace (xnamespace ctx) ctxsBySname
             ctorName = cname ctor
@@ -200,7 +241,9 @@ substFunctions (nsd, sd, _, _) =
     let inhCtxs = [INH x y | INH x y <- ctxs]
     in
       [
-        Fn (sortName ++ "SubstituteHelp")
+        Fn (sortName ++ "SubstituteHelp") 
+        [TyBasic sortName, TyVar, TyBasic sortName, TyBasic sortName] 
+        ("Perform one substitution step on a " ++ sortName ++ " with the " ++ ctorName ++ " constructor.")
         [
           (
             [VarParam "sub", VarParam "c", ConstrParam ctorName [VarParam "var"]],
@@ -222,7 +265,10 @@ substFunctions (nsd, sd, _, _) =
       = let sortOfCtxNamespace = sortNameForNamespaceName (xnamespace ctx) nsd
             mapCall = FnCall (sortName ++ "map") (paramFnCallsForCtxs ctx ctxs nsd ++ [VarExpr "orig", VarExpr "t"])
         in Fn
-          (sortName ++ sortOfCtxNamespace ++ "Substitute")
+          (sortName ++ sortOfCtxNamespace ++ "Substitute") 
+          [TyBasic sortName, TyVar, TyBasic sortName, TyBasic sortName] 
+          ("Substitute every occurence of the second argument orig with the first\n\
+          \argument sub in the given " ++ sortName ++ ".")
           [
             (
               [VarParam "sub", VarParam "orig", VarParam "t"],

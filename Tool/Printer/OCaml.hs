@@ -6,6 +6,7 @@ import Data.Text.Prettyprint.Doc
 import Program
 import Utility
 import GeneralTerms
+import Data.List (intersperse)
 
 instance Pretty Constructor where
   pretty (Constr n []) = pretty (upperFirst n)
@@ -30,15 +31,27 @@ instance Pretty Expression where
   pretty (ListExpr l) = pretty "[" <> hcat (punctuate comma (map pretty l)) <> pretty "]"
   pretty (LambdaExpr ps ex) = parens (pretty "fun" <+> hsep (map pretty ps) <+> pretty "->" <+> pretty ex)
 
+instance Pretty TsType where
+  pretty (TyBasic t) = pretty (lowerFirst t)
+  pretty (TyList t) = pretty t <+> pretty "list"
+  pretty (TyFunc t) = pretty "(" <> hsep (intersperse (pretty "->") (map pretty t)) <> pretty ")"
+  pretty (TyVar) = pretty "Variable"
+  pretty (TyGeneric s) = pretty "'" <> pretty s
+  pretty (TyPrecondition t) = mempty
+
 instance Pretty Function where
-  pretty (Fn n lns) =
+  pretty (Fn n ts descr lns) =
     let matchedParams = mapMatchedParams (map (\(ps, _) -> ps) lns)
         params = fst (head lns)
         replacedParams = replaceMatched matchedParams params
         matchedParamNames = [param | (param, b) <- zip replacedParams matchedParams, b]
-    in if or matchedParams
+    in 
+      generateDescription <> nl <>
+      (if or matchedParams
         then intoLines ((pretty "let rec" <+> pretty (lowerFirst n) <+> (hsep $ map pretty replacedParams) <+> pretty "= match" <+> hsep (punctuate comma (map pretty matchedParamNames)) <+> pretty "with") : map (oneMatchedLine matchedParams) lns)
         else pretty "let rec" <+> pretty (lowerFirst n) <+> hsep (map pretty (fst (head lns))) <+> pretty "=" <+> pretty (snd (head lns)) -- if no matched params, it should only have one line
+      ) <> nl <>
+      generateTypeSignature ts
     where
         mapMatchedParams :: [[Parameter]] -> [Bool]
         mapMatchedParams []      = []
@@ -56,6 +69,17 @@ instance Pretty Function where
 
         oneMatchedLine :: [Bool] -> ([Parameter], Expression) -> Doc a
         oneMatchedLine matched (ps, ex) = hsep $ (pretty "  |") : (punctuate comma [pretty p | (p, b) <- zip ps matched, b]) ++ [pretty "->", pretty ex]
+
+        generateDescription :: Doc a
+        generateDescription = if descr == "" then mempty
+                                else pretty "(*" <+> pretty descr <+> pretty "*)"
+
+        generateTypeSignature :: TypeSignature -> Doc a
+        generateTypeSignature [] = mempty
+        generateTypeSignature ty@(t:ts) = hsep $ 
+          [pretty "val", pretty (lowerFirst n), pretty ":"] ++ (intersperse (pretty "->") (map (pretty) ty)) ++
+          [pretty "= <fun>"]
+        
 
 nl :: Doc a
 nl = pretty "\n"
@@ -101,7 +125,7 @@ printFunctions fns = intoLines $ punctuate nl (map pretty fns)
 printInstances :: [(Type, Type, [Function])] -> Doc String
 printInstances ids = intoLines $ map (
     \(_, _, fns) -> intoLines [
-      printFunctions (map (\(Fn n lns) -> Fn n lns) fns)
+      printFunctions (map (\(Fn n ts descr lns) -> Fn n ts descr lns) fns)
     ]
   ) ids
 

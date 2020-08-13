@@ -28,6 +28,8 @@ freeVarFunctions (_, sd, _, _) ef =
       sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> fromJust (lookup sname varAccessBySname)) sd
   in map (\sort ->
     Fn ("freeVariables" ++ sname sort)
+    (getTypeSignature (sname sort))
+    (getDescription (sname sort))
     (map (\ctor ->
       (VarParam "c" : paramForCtor ef ctor,
       case ctor of
@@ -44,6 +46,23 @@ freeVarFunctions (_, sd, _, _) ef =
     ) (sctors sort))
   ) sortsWithVarAccess
   where
+    -- | Return the typesignature of the free variable functions for the given sort name
+    getTypeSignature :: SortName -> TypeSignature
+    getTypeSignature sortName
+      = if includeBinders ef
+        then [TyList TyVar, TyBasic sortName, TyList TyVar]
+        else [TyVar, TyBasic sortName, TyList TyVar]
+
+    -- | Return the description of the free variable functions for the given sort name
+    getDescription :: SortName -> Description
+    getDescription sortName
+      = "Return a list of the free variables of the given " ++ sortName ++ 
+         (if includeBinders ef
+           then ".\nThe first argument represents the bound variables that are accumulated\n\
+           \during the execution and should be initialized with the empty list."
+           else ".\nThe first argument represents the number of bound variables with respect to the top\n\
+           \level scope.")
+
     -- | Generate a list of expressions, that when concatenated together give
     -- the union of free variables for a given constructor (free variable
     -- calls for every identifier of a sort that has access to variables)
@@ -76,6 +95,8 @@ mappingFunctions (_, sd, _, _) ef =
   in map (
     \(MkDefSort sortName ctxs ctors _) ->
         Fn (mapFnForSortName sortName)
+        (getTypeSignature sortName)
+        (getDescription sortName)
         (map (\ctor ->
           (
             [VarParam ("on" ++ namespace) | INH _ namespace <- ctxs]
@@ -87,6 +108,25 @@ mappingFunctions (_, sd, _, _) ef =
         ) ctors)
   ) sortsWithVarAccess
   where
+    -- | Return the typesignature of the mapping function for the given sort name
+    getTypeSignature :: SortName -> TypeSignature
+    getTypeSignature sortName 
+        = if includeBinders ef 
+          then [TyFunc [TyList TyVar, TyBasic sortName, TyBasic sortName], TyList TyVar, TyBasic sortName, TyBasic sortName]
+          else [TyFunc [TyVar, TyBasic sortName, TyBasic sortName], TyVar, TyBasic sortName, TyBasic sortName]
+
+    -- | Return the description of the mapping function for the given sort name
+    getDescription :: SortName -> Description
+    getDescription sortName 
+        = "Return the " ++ sortName ++ " where the given function (onTermVar) is applied to each\nvariable in the given " ++ sortName ++ ".\n\
+         \" ++ 
+         (if includeBinders ef
+           then "The second argument represents the bound variables that are accumulated\n\
+           \during the execution and should be initialized with the empty list.\n\
+           \The accumulated bound variables are also passed as an argument to the supplied function."
+           else "The second argument represents the number of bound variables with respect to the top\n\
+           \level scope. It is also passed as an argument to the supplied function.")
+
     -- | Return the name of the mapping function for the given sort name
     mapFnForSortName :: SortName -> String
     mapFnForSortName sname = sname ++ "map"
