@@ -37,7 +37,7 @@ instance Pretty TsType where
   pretty (TyFunc t) = pretty "(" <> hsep (intersperse (pretty "->") (map pretty t)) <> pretty ")"
   pretty (TyVar) = pretty "Variable"
   pretty (TyGeneric s) = pretty "'" <> pretty s
-  pretty (TyPrecondition t) = mempty
+  pretty (TyConstraints t) = mempty
 
 instance Pretty Function where
   pretty (Fn n ts descr lns) =

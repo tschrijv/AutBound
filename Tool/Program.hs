@@ -22,7 +22,7 @@ data TsType
   | TyList TsType 
   | TyVar
   | TyGeneric String
-  | TyPrecondition [(Type, Type)]
+  | TyConstraints [(Type, Type)]
 
 -- | Type signatures represented as a list of TsType ([Int, Bool, String] represents the Haskell signature Int -> Bool -> String)
 type TypeSignature = [TsType]
@@ -57,9 +57,13 @@ data Expression
   | ListExpr [Expression]
   | LambdaExpr [Parameter] Expression
 
+-- | A pattern is part of a function and contains zero or more parameters and the
+-- | corresponding expression
+type Pattern = ([Parameter], Expression)
+
 -- | Functions are made up of a name, type signature and multiple head (parameter list)
 -- and body (expression) pairs
-data Function = Fn Name TypeSignature Description [([Parameter], Expression)]
+data Function = Fn Name TypeSignature Description [Pattern]
 
 -- | A complete program consists of type declarations, type class instances,
 -- and functions
@@ -70,3 +74,15 @@ data Program = P {
   functions :: [Function],
   code :: [String]
 }
+
+-- * Helper functions
+-- ----------------------------------------------------------------------------
+
+-- | Merges a list of functions to another list of functions which contains a single function or the empty list if the empty
+-- | list was given as an argument. The new merged function has the same name, type signature and description as the first
+-- | function in the supplied list and contains all patterns of all functions as its patterns.
+mergePatterns :: [Function] -> [Function]
+mergePatterns [] = []
+mergePatterns [x] = [x]
+mergePatterns ((Fn name1 ts1 descr1 expr1):((Fn _ _ _ expr2):xs)) = 
+  mergePatterns ((Fn name1 ts1 descr1 (expr1 ++ expr2)) : xs)

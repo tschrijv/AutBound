@@ -164,17 +164,7 @@ getEnvFunctions (nsd, sd, _, _)
       -- | Merges the tuple of lists of functions to 2 functions: the first correspondends with the merged function of the first
       -- | argument in the tuple, the second with the merged function of the second argument.
       mapAndMerge :: ([Function], [Function]) -> [Function]
-      mapAndMerge (f1, f2) = (mergeFunctions f1) ++ (mergeFunctions f2)
-
-      -- | Merges a list of functions to another list of functions which contains a single function or the empty list if the empty
-      -- | list was given as an argument. The new merged function has the same name, type signature and description as the first
-      -- | function in the supplied list and contains all expressions as its expression.
-      mergeFunctions :: [Function] -> [Function]
-      mergeFunctions [] = []
-      mergeFunctions [x] = [x]
-      mergeFunctions (x1@(Fn name1 ts1 descr1 expr1):(x2@(Fn name2 ts2 descr2 expr2):xs)) = 
-        mergeFunctions ((Fn name1 ts1 descr1 (expr1 ++ expr2)) : xs)
-
+      mapAndMerge (f1, f2) = (mergePatterns f1) ++ (mergePatterns f2)
 
       generateSortSynSystemOneConstructor :: SortName -> [NamespaceDef] -> [(SortName, [Context])] -> ConstructorDef -> Context -> Function
       generateSortSynSystemOneConstructor sname _ _ (MkVarConstructor ctorName _) _
@@ -266,9 +256,9 @@ substFunctions (nsd, sd, _, _) =
             mapCall = FnCall (sortName ++ "map") (paramFnCallsForCtxs ctx ctxs nsd ++ [VarExpr "orig", VarExpr "t"])
         in Fn
           (sortName ++ sortOfCtxNamespace ++ "Substitute") 
-          [TyBasic sortName, TyVar, TyBasic sortName, TyBasic sortName] 
-          ("Substitute every occurence of the second argument orig with the first\n\
-          \argument sub in the given " ++ sortName ++ ".")
+          [TyBasic sortOfCtxNamespace, TyVar, TyBasic sortName, TyBasic sortName] 
+          ("Substitute every occurence of the variable orig with the first\n\
+          \argument sub with type " ++ sortOfCtxNamespace ++ " in the given " ++ sortName ++ ".")
           [
             (
               [VarParam "sub", VarParam "orig", VarParam "t"],

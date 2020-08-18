@@ -88,15 +88,15 @@ freeVarFunctions (_, sd, _, _) ef =
 -- | Generate mapping functions for every sort that has access to variable
 -- constructors
 mappingFunctions :: Language -> ExternalFunctions -> [Function]
-mappingFunctions (_, sd, _, _) ef =
+mappingFunctions (nsd, sd, _, _) ef =
   let ctxsBySname = map snameAndCtxs sd
       varAccessBySname = varAccessBySortName sd
       sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> fromJust (lookup sname varAccessBySname)) sd
   in map (
     \(MkDefSort sortName ctxs ctors _) ->
         Fn (mapFnForSortName sortName)
-        (getTypeSignature sortName)
-        (getDescription sortName)
+        (getTypeSignature sortName ctxs nsd)
+        (getDescription sortName ctxs nsd)
         (map (\ctor ->
           (
             [VarParam ("on" ++ namespace) | INH _ namespace <- ctxs]
@@ -109,23 +109,30 @@ mappingFunctions (_, sd, _, _) ef =
   ) sortsWithVarAccess
   where
     -- | Return the typesignature of the mapping function for the given sort name
-    getTypeSignature :: SortName -> TypeSignature
-    getTypeSignature sortName 
-        = if includeBinders ef 
-          then [TyFunc [TyList TyVar, TyBasic sortName, TyBasic sortName], TyList TyVar, TyBasic sortName, TyBasic sortName]
-          else [TyFunc [TyVar, TyBasic sortName, TyBasic sortName], TyVar, TyBasic sortName, TyBasic sortName]
+    getTypeSignature :: SortName -> [Context] -> [NamespaceDef] -> TypeSignature
+    getTypeSignature sortName ctxs nsd
+        = let sorts = [nsort | INH _ nsName2 <- ctxs, MkNameSpace nsName1 nsort <- nsd, nsName1 == nsName2] in
+          (if includeBinders ef 
+          then [TyFunc [TyVar, TyBasic sort, TyBasic sort] | sort <- sorts] ++ [TyList TyVar, TyBasic sortName, TyBasic sortName]
+          else [TyFunc [TyVar, TyBasic sort, TyBasic sort] | sort <- sorts] ++ [TyVar, TyBasic sortName, TyBasic sortName]
+          )
 
     -- | Return the description of the mapping function for the given sort name
-    getDescription :: SortName -> Description
-    getDescription sortName 
-        = "Return the " ++ sortName ++ " where the given function (onTermVar) is applied to each\nvariable in the given " ++ sortName ++ ".\n\
-         \" ++ 
-         (if includeBinders ef
-           then "The second argument represents the bound variables that are accumulated\n\
+    getDescription :: SortName -> [Context] -> [NamespaceDef] -> Description
+    getDescription sortName ctxs nsd
+        = let sorts = [(nsort, nsName1) | MkNameSpace nsName1 nsort <- nsd, INH _ nsName2 <- ctxs, nsName1 == nsName2] 
+              len = length sorts
+              mulplicity = head (map snd (filter fst [(len == 1, (" is", "function")),
+                                                (len > 1, (" are", "functions"))])) in
+          "Return the " ++ sortName ++ " where " ++
+          (intercalate ", " ["on" ++ nsName | (_, nsName) <- sorts]) ++ fst mulplicity ++ " applied to each\n" ++
+          (intercalate ", " [sname | (sname, _) <- sorts]) ++ " in the given " ++ sortName ++ " respectively.\n" ++
+          (if includeBinders ef
+           then "The second last argument represents the bound variables that are accumulated\n\
            \during the execution and should be initialized with the empty list.\n\
-           \The accumulated bound variables are also passed as an argument to the supplied function."
+           \The accumulated bound variables are also passed as an argument to the supplied " ++ snd mulplicity ++ "."
            else "The second argument represents the number of bound variables with respect to the top\n\
-           \level scope. It is also passed as an argument to the supplied function.")
+           \level scope. It is also passed as an argument to the supplied " ++ snd mulplicity ++ ".")
 
     -- | Return the name of the mapping function for the given sort name
     mapFnForSortName :: SortName -> String

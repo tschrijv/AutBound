@@ -37,7 +37,7 @@ instance Pretty TsType where
   pretty (TyFunc t) = pretty "(" <> hsep (intersperse (pretty "->") (map pretty t)) <> pretty ")"
   pretty (TyVar) = pretty "Variable"
   pretty (TyGeneric s) = pretty s
-  pretty (TyPrecondition t) = 
+  pretty (TyConstraints t) = 
     pretty "(" <> hsep (intersperse (pretty ",") (map (\(x,y) -> pretty (upperFirst x) <> pretty " " <> pretty y) t)) 
     <> pretty ")"
 
@@ -56,7 +56,7 @@ instance Pretty Function where
     generateTypeSignature [] = Nothing
     generateTypeSignature ty@(t:ts) = 
       case t of
-      TyPrecondition _ -> Just (hsep $ [pretty (lowerFirst n), pretty "::", pretty t,pretty "=>"] ++ 
+      TyConstraints _ -> Just (hsep $ [pretty (lowerFirst n), pretty "::", pretty t,pretty "=>"] ++ 
                             (intersperse (pretty "->") (map (pretty) ts)))
       _ -> Just (hsep $ [pretty (lowerFirst n), pretty "::"] ++ (intersperse (pretty "->") (map (pretty) ty)))
 
