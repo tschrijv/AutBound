@@ -40,6 +40,7 @@ data Parameter
   | ConstrParam Name [Parameter]
   | StringParam String
   | IntParam Int
+  deriving (Show, Eq)
 
 -- | Expressions in function bodies can be
 -- function calls (function name + parameters)
@@ -56,6 +57,7 @@ data Expression
   | EQExpr Expression Expression
   | ListExpr [Expression]
   | LambdaExpr [Parameter] Expression
+  deriving (Show, Eq)
 
 -- | A pattern is part of a function and contains zero or more parameters and the
 -- | corresponding expression

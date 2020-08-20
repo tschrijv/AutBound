@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Variable.Common (freeVarFunctions, mappingFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs, inhCtxsForSortName, fnCallForIden, concatCallForIden) where
+module Variable.Common (freeVarFunctions, mappingFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs, inhCtxsForSortName, fnCallForIden, concatCallForIden, mapFnCall) where
 
 import Data.List
 import Data.Maybe
@@ -113,7 +113,7 @@ mappingFunctions (nsd, sd, _, _) ef =
     getTypeSignature sortName ctxs nsd
         = let sorts = [nsort | INH _ nsName2 <- ctxs, MkNameSpace nsName1 nsort <- nsd, nsName1 == nsName2] in
           (if includeBinders ef 
-          then [TyFunc [TyVar, TyBasic sort, TyBasic sort] | sort <- sorts] ++ [TyList TyVar, TyBasic sortName, TyBasic sortName]
+          then [TyFunc [TyList TyVar, TyBasic sort, TyBasic sort] | sort <- sorts] ++ [TyList TyVar, TyBasic sortName, TyBasic sortName]
           else [TyFunc [TyVar, TyBasic sort, TyBasic sort] | sort <- sorts] ++ [TyVar, TyBasic sortName, TyBasic sortName]
           )
 
@@ -201,6 +201,17 @@ concatCallForIden ctor iden fnName params
     where
       folds = dropFold $ cfolds ctor
       lists = clists ctor
+
+-- | Maps a FnCall with the given name and parameters to all arguments of the given constructor.
+-- | The last parameter of the created FnCalls are the arguments of the constructor.
+mapFnCall :: ConstructorDef -> String -> [Expression] -> [Expression]
+mapFnCall ctor fnBaseName params
+  = let folds = map fst (dropFold $ cfolds ctor)
+        lists = map fst (clists ctor)
+        sorts = map fst (csorts ctor) in
+    map (\fold -> FnCall "fmap" [FnCall (fnBaseName ++ sortNameForIden fold ctor) params, VarExpr fold]) folds ++
+    map (\list -> FnCall "map" [FnCall (fnBaseName ++ sortNameForIden list ctor) params, VarExpr list]) lists ++
+    map (\sort -> FnCall (fnBaseName ++ sortNameForIden sort ctor) (concat [params, [VarExpr sort]])) sorts
 
 -- | Returns the list of inherited contexts for a given sort name
 inhCtxsForSortName :: SortName -> [(SortName, [Context])] -> [Context]

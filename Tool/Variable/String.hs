@@ -137,22 +137,34 @@ boundVarFunctions (_, sd, _, _) =
           -> FnCall "nub" [
               FnCall "concat"
                 [ListExpr (VarExpr "c" : ListExpr [VarExpr "b"] :
-                    boundVariableCallListForCtor sort ctor
+                    (boundVariableCallListForCtor sort ctor ++
+                    boundVariablesSubTerms sort ctor)
                 )]
              ]
         (MkDefConstructor {})
           -> FnCall "nub" [
               FnCall "concat"
                 [ListExpr (VarExpr "c" :
-                  boundVariableCallListForCtor sort ctor
+                  (boundVariableCallListForCtor sort ctor ++
+                    boundVariablesSubTerms sort ctor)
                 )]
             ]
       )
     ) (sctors sort))
   ) sd
   where
+    boundVariablesSubTerms :: SortDef -> ConstructorDef -> [Expression]
+    boundVariablesSubTerms sort ctor
+      = let folds = dropFold $ cfolds ctor
+            lists = clists ctor
+            sorts = csorts ctor
+            all = folds ++ lists ++ sorts
+        in if (null all || not (null (synCtxs sort))) 
+            then [ListExpr []] 
+            else mapFnCall ctor ("boundVariables") [VarExpr "c"]
+
     -- | Generate a list of expressions, that when concatenated together give
-    -- the union of free variables for a given constructor (free variable
+    -- the union of bound variables for a given constructor (free variable
     -- calls for every identifier of a sort that has access to variables)
     boundVariableCallListForCtor :: SortDef -> ConstructorDef -> [Expression]
     boundVariableCallListForCtor sort ctor
