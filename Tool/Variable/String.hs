@@ -220,12 +220,17 @@ substFunctionsC (nsd, sd, _, _) =
     varAccessBySname = varAccessBySortName sd
     sortsWithVarAccess = filter (\sort -> fromJust (lookup (sname sort) varAccessBySname)) sd
 
-    freeVariablesCall :: ConstructorDef -> (IdenName, SortName) -> Expression
+    freeVariablesCall :: ConstructorDef -> (IdenName, SortName) -> [Expression]
     freeVariablesCall ctor (iden, idenSort)
-      = concatCallForIden ctor iden ("freeVariables" ++ idenSort) [ListExpr []]
+      = if idenSort `elem` (map sname sortsWithVarAccess)
+        then [concatCallForIden ctor iden ("freeVariables" ++ idenSort) [ListExpr []]]
+        else []
 
     varReplaceCall :: ConstructorDef -> [Expression] -> IdenName -> Expression
     varReplaceCall ctor params iden
+      -- = if fromJust (lookup (sortNameForIden iden ctor) varAccessBySname) 
+      --   then [fnCallForIden ctor iden (sortNameForIden iden ctor ++ "VarReplace") params]
+      --   else []
       = fnCallForIden ctor iden (sortNameForIden iden ctor ++ "VarReplace") params
 
     varReplaceCallForCtor :: ConstructorDef -> Expression
@@ -245,7 +250,8 @@ substFunctionsC (nsd, sd, _, _) =
         binder = if isBind ctor
           then [FnCall
             ("fresh" ++ snd (fromJust (cbinder ctor)))
-            [VarExpr "b", FnCall "concat" [ListExpr (ListExpr [VarExpr "sub"] : map (freeVariablesCall ctor) (folds ++ lists ++ csorts ctor))]]]
+            [VarExpr "b", FnCall "concat" [ListExpr (ListExpr [VarExpr "sub"] : 
+            concatMap (freeVariablesCall ctor) (folds ++ lists ++ csorts ctor))]]]
           else []
         idensAndAttrs = attrsByIden ctor
         folds = dropFold (cfolds ctor)
@@ -253,7 +259,7 @@ substFunctionsC (nsd, sd, _, _) =
 
         varReplaceCallForIden :: (IdenName, [AttributeDef]) -> Expression
         varReplaceCallForIden (iden, idenAttrs)
-          = if fromJust (lookup sortNameOfIden varAccessBySname)
+          = if varAccess
               then if iden `elem` map fst folds
                 then FnCall "fmap" [FnCall fnName substParams, idenExpr]
                 else if iden `elem` map fst lists
@@ -262,11 +268,12 @@ substFunctionsC (nsd, sd, _, _) =
               else idenExpr
           where
             fnName = sortNameForIden iden ctor ++ "VarReplace"
-            idenExpr = if null binder
+            idenExpr = if null binder || (not varAccess)
               then VarExpr iden
               else varReplaceCall ctor [VarExpr "b", head binder] iden
             substParams = [VarExpr "orig", VarExpr "sub"]
             sortNameOfIden = sortNameForIden iden ctor
+            varAccess = fromJust (lookup sortNameOfIden varAccessBySname)
 
     substExprForCtor :: SortName -> SortName -> ConstructorDef -> Expression
     substExprForCtor sortName sortOfCtxNamespace (MkVarConstructor ctorName _)
@@ -289,7 +296,7 @@ substFunctionsC (nsd, sd, _, _) =
             ("fresh" ++ snd (fromJust (cbinder ctor)))
             [VarExpr "b", FnCall "concat" [
               ListExpr (
-                map
+                concatMap
                   (freeVariablesCall ctor)
                   (("sub", sortOfCtxNamespace) : folds ++ lists ++ csorts ctor)
               )
