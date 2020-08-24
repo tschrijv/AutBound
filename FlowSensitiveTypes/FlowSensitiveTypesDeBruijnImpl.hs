@@ -52,24 +52,25 @@ shiftFuncReturn t = typeshiftminus (SVarValue Z) t
 -- Dan is TypeAbstraction typeTerm onder env type TypUniversal T2
 
 typeofHelper :: Env -> Term -> Type
-typeofHelper env (TmVariable v) = getVarValueFromEnv v env
-typeofHelper env (TmValue (Abstraction subTerm inputType)) = 
-  let outputType = typeofHelper (shiftOverVarValue inputType env) subTerm in
-    TypFunction inputType (shiftFuncReturn outputType)
-typeofHelper env (TmValue (TypeAbstraction typeTerm superType)) =
+typeofHelper env TmTrue = TypTrue -- BT-True
+typeofHelper env TmFalse = TypFalse -- BT-False
+typeofHelper env (TmVariable v) = getVarValueFromEnv v env -- BT-Var
+--typeofHelper env (TmAbstraction subTerm inputType) =    -- No BT-Abs?
+--  let outputType = typeofHelper (shiftOverVarValue inputType env) subTerm in
+--    TypFunction inputType (shiftFuncReturn outputType)
+typeofHelper env (TmTypeAbstraction typeTerm superType) = -- BT-TAbs
   let typeTermType = typeofHelper (shiftOverVarType superType env) typeTerm in
     TypUniversal typeTermType superType
-typeofHelper env (TmApply func arg) = 
+typeofHelper env (TmApply func arg) = -- BT-App
   let funcType = typeofHelper env func in
-    let argType = typeofHelper env arg in
-      case funcType of
-        TypFunction funcInputType funcOutputType -> 
-          if funcInputType == argType
-            then funcOutputType
-            else error ("func and arg type mismatch: func=" ++ show funcType ++ ", arg=" ++ show argType)
-        otherwise -> error ("Apply expects TypFunction as first arg (was " ++ show funcType ++ ")")
+    case funcType of
+      TypFunction funcInputType funcOutputType -> 
+        if isOfType env arg funcInputType
+          then funcOutputType
+          else error ("func and arg type mismatch: func=" ++ show funcType ++ ", arg=" ++ show arg)
+      otherwise -> error ("Apply expects TypFunction as first arg (was " ++ show funcType ++ ")")
 
-typeofHelper env (TmTypeApply universalFunc typeToSubstitute) = 
+typeofHelper env (TmTypeApply universalFunc typeToSubstitute) = -- BT-TApp
   case typeofHelper env universalFunc of
     TypUniversal typTerm superType -> 
       if isSubType typeToSubstitute superType env
@@ -77,8 +78,32 @@ typeofHelper env (TmTypeApply universalFunc typeToSubstitute) =
       else error ("Attempting to apply a type to a universal type that does not accept it: universalFunc=" ++ show universalFunc ++ ", typeToSubstitute=" ++ show typeToSubstitute)
     otherwise -> error "type should be universal, since we are doing a type application"
 
+typeofHelper env (TmIsEq t1 t2) = -- BT-Eq
+  let typ1 = typeofHelper env t1 in -- unused, but can throw error if invalid
+    let typ2 = typeofHelper env t2 in -- unused, but can throw error if invalid
+      TypBool
+
+typeofHelper env (TmAnd t1 t2) = -- BT-And
+  case (typeofHelper env t1, typeofHelper env t2) of
+    (TypBool, TypBool) -> TypBool
+    otherwise -> error ("Non-Bool args to &&: (" ++ show t1 ++ ") && (" ++ show t2 ++ ")")
+
+typeofHelper env (TmOr t1 t2) = -- BT-Or
+  case (typeofHelper env t1, typeofHelper env t2) of
+    (TypBool, TypBool) -> TypBool
+    otherwise -> error ("Non-Bool args to ||: (" ++ show t1 ++ ") || (" ++ show t2 ++ ")")
+
+-- others not defined
+
+
 typeof :: Term -> Type
 typeof = typeofHelper []
+
+
+isOfTypeHelper :: Env -> Term -> Type -> Bool
+isOfTypeHelper = undefined
+
+
 
 
 
@@ -132,6 +157,8 @@ isSubType :: Type -> Type -> Env -> Bool
 isSubType sub Top env = True -- SA-Top
 isSubType TypTrue TypTrue env = True -- SA-RelfTrue
 isSubType TypFalse TypFalse env = True -- SA-ReflFalse
+isSubType TypTrue TypBool env = True -- SA-TrueIsBool  ------ CUSTOM TBS
+isSubType TypFalse TypBool env = True -- SA-FalseIsBool  ------ CUSTOM TBS
 isSubType (TypVariable v1) (TypVariable v2) env = -- SA-ReflTVar
   v1 == v2 && containsVar v1 env
 isSubType (TypRecord tru1 fls1 select1) (TypRecord tru2 fls2 select2) env = -- SA-ReflMap

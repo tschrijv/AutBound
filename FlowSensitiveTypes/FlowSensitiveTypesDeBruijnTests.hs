@@ -19,10 +19,10 @@ double = Top /<:-> ((t_ --> t_) /-> (t_v /-> (v_v <+ (v_v <+ v_))))
 
 
 tru :: Term
-tru = TmValue VTrue
+tru = TmTrue
 
 fls :: Term
-fls = TmValue VFalse
+fls = TmFalse
 
 superType :: Type
 superType = Typ "TestSuperTyp"

@@ -17,16 +17,14 @@ prettyTerm :: Term -> String
 prettyTerm (TmVariable var) = "v_" ++ prettyVar var
 prettyTerm (TmApply t1 t2) = "(" ++ prettyTerm t1 ++ " <+ " ++ prettyTerm t2 ++ ")"
 prettyTerm (TmTypeApply term typ) = "(" ++ prettyTerm term ++ " <++ " ++ prettyType typ ++ ")"
-prettyTerm (TmValue v) = prettyValue v
 prettyTerm (TmIf cond thn els) = "(if " ++ prettyTerm cond ++ " then " ++ prettyTerm thn ++ " else " ++ prettyTerm els ++ ")"
 prettyTerm (TmIsEq a b) = "(" ++ prettyTerm a ++ " == " ++ prettyTerm b ++ ")"
 prettyTerm (TmAnd a b) = "(" ++ prettyTerm a ++ " && " ++ prettyTerm b ++ ")"
-
-prettyValue :: Value -> String
-prettyValue (Abstraction term typ) = "(" ++ prettyType typ ++ " /-> " ++ prettyTerm term ++ ")"
-prettyValue (TypeAbstraction term superType) = "(" ++ prettyType superType ++ " /<:-> " ++ prettyTerm term ++ ")"
-prettyValue VTrue = "vtrue"
-prettyValue VFalse = "vfalse"
+prettyTerm (TmOr a b) = "(" ++ prettyTerm a ++ " || " ++ prettyTerm b ++ ")"
+prettyTerm (TmAbstraction term typ) = "(" ++ prettyType typ ++ " /-> " ++ prettyTerm term ++ ")"
+prettyTerm (TmTypeAbstraction term superType) = "(" ++ prettyType superType ++ " /<:-> " ++ prettyTerm term ++ ")"
+prettyTerm TmTrue = "TmTrue"
+prettyTerm TmFalse = "TmFalse"
 
 prettyType :: Type -> String
 prettyType (TypVariable v) = "t_" ++ prettyVar v
@@ -45,8 +43,6 @@ instance Show Term where
   show = prettyTerm
 instance Show Type where
   show = prettyType
-instance Show Value where
-  show = prettyValue
 
 
 -- operators to construct terms and types
@@ -83,7 +79,7 @@ v_tv = TmVariable (SVarType (SVarValue Z))
 
 -- create an Abstraction
 (/->) :: Type -> Term -> Term
-typ /-> term = TmValue (Abstraction term typ)
+typ /-> term = TmAbstraction term typ
 
 -- create a function type
 (-->) :: Type -> Type -> Type
@@ -91,7 +87,7 @@ from --> to = TypFunction from to
 
 -- create a Type Abstraction
 (/<:->) :: Type -> Term -> Term
-superType /<:-> t = TmValue (TypeAbstraction t superType)
+superType /<:-> t = TmTypeAbstraction t superType
 
 -- create a universal type
 (<:->) :: Type -> Type -> Type

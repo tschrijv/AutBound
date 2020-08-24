@@ -3,20 +3,6 @@
 namespace VarValue: Term
 namespace VarType: Type
 
-sort Value
-  inh vctx VarValue
-  inh vtctx VarType
-  | Abstraction (t: Term) (typ: Type) [z: VarValue]
-    t.ctx = lhs.vctx, z
-    t.tctx = lhs.vtctx
-    typ.tyctx = lhs.vtctx
-  | TypeAbstraction (typeTerm: Term) (superType: Type) [z: VarType]
-    typeTerm.ctx = lhs.vctx
-    typeTerm.tctx = lhs.vtctx, z
-    superType.tyctx = lhs.vtctx
-  | VTrue
-  | VFalse
-
 sort Term
   inh ctx VarValue
   inh tctx VarType
@@ -26,9 +12,17 @@ sort Term
   | TmIf (cond: Term) (thn: Term) (els: Term)
   | TmIsEq (a: Term) (b: Term)
   | TmAnd (a: Term) (b: Term)
-  | TmValue (v: Value)
-    v.vctx = lhs.ctx
-    v.vtctx = lhs.tctx
+  | TmOr (a: Term) (b: Term)
+  | TmAbstraction (t: Term) (typ: Type) [z: VarValue]
+    t.ctx = lhs.ctx, z
+    t.tctx = lhs.tctx
+    typ.tyctx = lhs.tctx
+  | TmTypeAbstraction (typeTerm: Term) (superType: Type) [z: VarType]
+    typeTerm.ctx = lhs.ctx
+    typeTerm.tctx = lhs.tctx, z
+    superType.tyctx = lhs.tctx
+  | TmTrue
+  | TmFalse
 
 sort Type
   inh tyctx VarType
@@ -41,6 +35,7 @@ sort Type
   | TypRecord (tru: Type) (fls: Type) (selector: Type)
   | TypTrue
   | TypFalse
+  | TypBool
   | Top
   | Typ {String}
   
