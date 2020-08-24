@@ -7,10 +7,7 @@ idFunc :: Term
 idFunc = Top /<:-> (t_ /-> v_)
 
 idType :: Type
-idType = removeMaybe (typeof idFunc) where 
-  removeMaybe :: Maybe Type -> Type
-  removeMaybe Nothing = error ""
-  removeMaybe (Just t) = t
+idType = typeof idFunc
 
 -- apply takes two arguments, a function, and an argument to the function, and then runs the function on the argument
 apply :: Term
@@ -21,14 +18,58 @@ double :: Term
 double = Top /<:-> ((t_ --> t_) /-> (t_v /-> (v_v <+ (v_v <+ v_))))
 
 
+tru :: Term
+tru = TmValue VTrue
+
+fls :: Term
+fls = TmValue VFalse
+
 superType :: Type
 superType = Typ "TestSuperTyp"
 subType :: Type
 subType = Typ "TestSubTyp"
 
+a :: Type
+a = Typ "a"
+
+b :: Type
+b = Typ "b"
+
+c :: Type
+c = Typ "c"
+
+d :: Type
+d = Typ "d"
+
+u :: Type -> Type -> Type
+u t1 t2 = TypUnion t1 t2
+
+-- commutativity
+-- >>> isSubType (TypUnion a b) (TypUnion b a) emptyEnv
+-- True
+--
+
+-- associativity
+-- >>> isSubType (TypUnion (TypUnion a b) c) (TypUnion a (TypUnion b c)) emptyEnv
+-- True
+--
+
+-- associativity 2
+-- >>> isSubType (TypUnion (TypUnion a b) (TypUnion c d)) (TypUnion (TypUnion (TypUnion a b) c) d) emptyEnv
+-- True
+--
+
+
+
+-- old tests
+
 
 -- >>> isSubType Top Top emptyEnv
--- Just True
+-- True
+--
+
+-- >>> True
+-- True
 --
 
 -- >>> isSubType superType subType emptyEnv
@@ -39,8 +80,8 @@ subType = Typ "TestSubTyp"
 -- Just True
 --
 
-typeOfTestTerm :: Term
-typeOfTestTerm = (subType --> superType) /-> (v_)
+--typeOfTestTerm :: Term
+--typeOfTestTerm = (subType --> superType) /-> (v_)
 
 
 -- >>> typeof (((subType --> superType) /<:-> (t_ /-> v_)) <++ (superType --> subType))

@@ -149,15 +149,15 @@ isSubType (TypUniversal s ua) (TypUniversal t ub) env = -- SA-All
   if typesAreEqual env ua ub
   then isSubType s t (shiftOverVarType ua env)
   else False -- For S-ALL, if the supertypes of the Universals are not equal, then one cannot be a subtype of the other
-isSubType t (TypUnion l r) env = -- SA-UnionLR
-  isSubType t l env || isSubType t r env
 isSubType (TypUnion l r) t env = -- SA-UnionN
   isSubType l t env && isSubType r t env
+isSubType t (TypUnion l r) env = -- SA-UnionLR
+  isSubType t l env || isSubType t r env
 
-
-
-
+ -- Custom rules for testing
 isSubType (Typ "TestSubTyp") (Typ "TestSuperTyp") env = True
+isSubType (Typ a) (Typ b) env =
+  a == b
 
 
 
