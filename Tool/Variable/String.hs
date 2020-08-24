@@ -228,9 +228,6 @@ substFunctionsC (nsd, sd, _, _) =
 
     varReplaceCall :: ConstructorDef -> [Expression] -> IdenName -> Expression
     varReplaceCall ctor params iden
-      -- = if fromJust (lookup (sortNameForIden iden ctor) varAccessBySname) 
-      --   then [fnCallForIden ctor iden (sortNameForIden iden ctor ++ "VarReplace") params]
-      --   else []
       = fnCallForIden ctor iden (sortNameForIden iden ctor ++ "VarReplace") params
 
     varReplaceCallForCtor :: ConstructorDef -> Expression
