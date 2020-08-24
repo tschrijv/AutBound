@@ -10,7 +10,7 @@ module ExEffImpl
   , CoercionType(..)
   , Dirt(..)
   , ComputationType(..)
-  , HNat(..)
+  , Variable(..)
   , Env(..)
   , fullEval
   , fullEvalComputation
@@ -23,6 +23,18 @@ import           ExEff
 import           Operations
 
 --end of generated code
+data Env
+  = Nil
+  | ECoVar SimpleCoercionType
+           Env
+  | ETypeVar SkeletonType
+             Env
+  | EDirtVar Env
+  | ESkelTypeVar Env
+  | ETermVar ValueType
+             Env
+  deriving (Show, Eq)
+
 isTerminalVal :: Value -> Bool
 isTerminalVal TmUnit               = True
 isTerminalVal (TmFun _ _)          = True
@@ -79,7 +91,7 @@ stepEval (TmTSkelApp (TmCast val (CoskeletonAll co)) skel) =
     newco =
       coercionshiftminus
         (SSkelTypeVar Z)
-        (coercionskeletonTypeSubstitute
+        (coercionSkeletonTypeSubstitute
            (skeletonTypeshiftplus (SSkelTypeVar Z) skel)
            Z
            co)
@@ -89,31 +101,31 @@ stepEval (TmValueTypeApp (TmCast val (CoTypeAll co skel)) ty) =
     newco =
       coercionshiftminus
         (STypeVar Z)
-        (coercionvalueTypeSubstitute (valueTypeshiftplus (STypeVar Z) ty) Z co)
+        (coercionValueTypeSubstitute (valueTypeshiftplus (STypeVar Z) ty) Z co)
 stepEval (TmDirtApp (TmCast val (CodirtAll co)) dirt) =
   return (TmCast (TmDirtApp val dirt) newco)
   where
     newco =
       coercionshiftminus
         (SDirtVar Z)
-        (coerciondirtSubstitute (dirtshiftplus (SDirtVar Z) dirt) Z co)
+        (coercionDirtSubstitute (dirtshiftplus (SDirtVar Z) dirt) Z co)
 stepEval (TmCoApp (TmCast val (CoCoArrow pi co1)) co2) =
   return (TmCast (TmCoApp val co2) co1)
 stepEval (TmCoApp (TmCoAbs val pi) co) =
   return
     (valueshiftminus
        (SCoVar Z)
-       (valuecoercionSubstitute (coercionshiftplus (SCoVar Z) co) Z val))
+       (valueCoercionSubstitute (coercionshiftplus (SCoVar Z) co) Z val))
 stepEval (TmDirtApp (TmDirtAbs val) dirt) =
   return
     (valueshiftminus
        (SDirtVar Z)
-       (valuedirtSubstitute (dirtshiftplus (SDirtVar Z) dirt) Z val))
+       (valueDirtSubstitute (dirtshiftplus (SDirtVar Z) dirt) Z val))
 stepEval (TmTSkelApp (TmTSkellAbs val) skel) =
   return
     (valueshiftminus
        (SSkelTypeVar Z)
-       (valueskeletonTypeSubstitute
+       (valueSkeletonTypeSubstitute
           (skeletonTypeshiftplus (SSkelTypeVar Z) skel)
           Z
           val))
@@ -121,7 +133,7 @@ stepEval (TmValueTypeApp (TmValueTypeAbs val skel) ty) =
   return
     (valueshiftminus
        (STypeVar Z)
-       (valuevalueTypeSubstitute (valueTypeshiftplus (STypeVar Z) ty) Z val))
+       (valueValueTypeSubstitute (valueTypeshiftplus (STypeVar Z) ty) Z val))
 stepEval _ = Nothing
 
 isReturnCast :: Computation -> Bool
@@ -166,7 +178,7 @@ stepEvalComp (ComputationApp (TmFun c ty) val) =
   return
     (computationshiftminus
        (STermVar Z)
-       (computationvalueSubstitute (valueshiftplus (STermVar Z) val) Z c))
+       (computationValueSubstitute (valueshiftplus (STermVar Z) val) Z c))
 stepEvalComp (ComputationApp (TmCast val1 (CoArrow co1 co2)) val2) =
   return (CastComp (ComputationApp val1 (TmCast val2 co1)) co2)
 stepEvalComp (LetComp val c)
@@ -177,7 +189,7 @@ stepEvalComp (LetComp val c)
     return
       (computationshiftminus
          (STermVar Z)
-         (computationvalueSubstitute (valueshiftplus (STermVar Z) val) Z c))
+         (computationValueSubstitute (valueshiftplus (STermVar Z) val) Z c))
 stepEvalComp (ReturnComp val)
   | not (isResultVal val) = do
     newval <- stepEval val
@@ -212,7 +224,7 @@ stepEvalComp (DoComp c c2)
     return
       (computationshiftminus
          (STermVar Z)
-         (computationvalueSubstitute
+         (computationValueSubstitute
             (valueshiftplus (STermVar Z) (eraseComputationsCoercions c))
             Z
             c2))
@@ -221,7 +233,7 @@ stepEvalComp (HandleComp c (TmHandler (ReturnHandler ops ty cr)))
     return
       (computationshiftminus
          (STermVar Z)
-         (computationvalueSubstitute
+         (computationValueSubstitute
             (valueshiftplus (STermVar Z) (eraseComputationsCoercions c))
             Z
             cr))
@@ -239,7 +251,7 @@ stepEvalComp (HandleComp (OpComp val1 ty1 comp op) (TmHandler (ReturnHandler ops
     intermediate =
       (computationshiftminus
          (STermVar Z)
-         (computationvalueSubstitute
+         (computationValueSubstitute
             (valueshiftplus
                (STermVar Z)
                (TmFun
@@ -250,7 +262,7 @@ stepEvalComp (HandleComp (OpComp val1 ty1 comp op) (TmHandler (ReturnHandler ops
     final =
       (computationshiftminus
          (STermVar Z)
-         (computationvalueSubstitute
+         (computationValueSubstitute
             (valueshiftplus (STermVar Z) val1)
             Z
             intermediate))
@@ -261,43 +273,10 @@ fullEvalComputation c = maybe c (fullEvalComputation) c2
   where
     c2 = stepEvalComp c
 
-rewriteTypeToCoercion :: ValueType -> Coercion
-rewriteTypeToCoercion (ValTyVar hnat) = CoTypeVar (ValTyVar hnat)
-rewriteTypeToCoercion (ValTUnit) = CoUnit
-rewriteTypeToCoercion (ValTyArr ty1 (ComputationTy ty2 dirt)) =
-  CoArrow
-    (rewriteTypeToCoercion ty1)
-    (CoComputation (rewriteTypeToCoercion ty2) (CoDirt dirt))
-rewriteTypeToCoercion (ValTyHandler (ComputationTy ty1 dirt1) (ComputationTy ty2 dirt2)) =
-  CoHandler
-    (CoComputation (rewriteTypeToCoercion ty1) (CoDirt dirt1))
-    (CoComputation (rewriteTypeToCoercion ty2) (CoDirt dirt2))
-rewriteTypeToCoercion (ValTyAllSkel ty) =
-  CoskeletonAll (rewriteTypeToCoercion ty)
-rewriteTypeToCoercion (ValTyAll valty skel) =
-  CoTypeAll (rewriteTypeToCoercion valty) skel
-rewriteTypeToCoercion (ValTyAllDirt valty) =
-  CodirtAll (rewriteTypeToCoercion valty)
-rewriteTypeToCoercion (ValTyCoArr pi ty) =
-  CoCoArrow pi (rewriteTypeToCoercion ty)
-
-rewriteCoercion :: Coercion -> Coercion
-rewriteCoercion (CoTypeVar ty) = rewriteTypeToCoercion ty
-rewriteCoercion (CoArrow co1 co2) =
-  CoArrow (rewriteCoercion co1) (rewriteCoercion co2)
-rewriteCoercion (CoHandler co1 co2) =
-  CoHandler (rewriteCoercion co1) (rewriteCoercion co2)
-rewriteCoercion (UnionOp co1 op) = UnionOp (rewriteCoercion co1) op
-rewriteCoercion (CoskeletonAll co) = CoskeletonAll (rewriteCoercion co)
-rewriteCoercion (CoTypeAll co skel) = CoTypeAll (rewriteCoercion co) skel
-rewriteCoercion (CoCoArrow pi co) = CoCoArrow pi (rewriteCoercion co)
-rewriteCoercion (CoComputation co1 co2) =
-  CoComputation (rewriteCoercion co1) (rewriteCoercion co2)
-rewriteCoercion co = co
-
 test4 =
   freeVariablesComputation
     Z
     (ComputationApp
        (TmFun (ReturnComp (TmVar (STermVar (STypeVar Z)))) ValTUnit)
        TmUnit)
+-- [STypeVar Z]

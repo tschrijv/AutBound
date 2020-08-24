@@ -23,7 +23,11 @@ freshVarFunctions :: Language -> (Type, [Constructor]) -> [String]
 freshVarFunctions _ varType
   = let ctors = snd varType
         names = map (\(Constr name _) -> tail name) ctors
-    in ["fresh" ++ name ++ " x b = if not (x `elem` b) then x else head [S" ++ name ++ " ('v' : show n) | n <- [0..], not (S" ++ name ++ " ('v' : show n) `elem` b)]"
+    in ["-- Return a fresh name for the given Variable x, if possible, it keeps the same name.\n\
+    \-- The first argument represents the Variable for which a fresh name is sought.\n\
+    \-- The second argument represents a Foldable of Variables whose names are not allowed.\n" ++
+    "fresh" ++ name ++ " :: Foldable t => Variable -> t Variable -> Variable\n" ++
+    "fresh" ++ name ++ " x b = if not (x `elem` b) then x else head [S" ++ name ++ " ('v' : show n) | n <- [0..], not (S" ++ name ++ " ('v' : show n) `elem` b)]"
     | name <- names]
 
 getVariableType :: Language -> (Type, [Constructor])
@@ -119,7 +123,11 @@ ef = EF {
 boundVarFunctions :: Language -> [Function]
 boundVarFunctions (_, sd, _, _) =
   map (\sort ->
-    Fn ("boundVariables" ++ sname sort)
+    Fn ("boundVariables" ++ sname sort) 
+    [TyList TyVar, TyBasic (sname sort), TyList TyVar] 
+    ("Return a list of the bound variables of the given " ++ sname sort ++ ".\n\
+    \The first argument represents the bound variables that are accumulated\n\
+    \during the execution and should be initialized with the empty list.")
     (map (\ctor ->
       (VarParam "c" : _getCtorParams ctor,
       case ctor of
@@ -129,22 +137,34 @@ boundVarFunctions (_, sd, _, _) =
           -> FnCall "nub" [
               FnCall "concat"
                 [ListExpr (VarExpr "c" : ListExpr [VarExpr "b"] :
-                    boundVariableCallListForCtor sort ctor
+                    (boundVariableCallListForCtor sort ctor ++
+                    boundVariablesSubTerms sort ctor)
                 )]
              ]
         (MkDefConstructor {})
           -> FnCall "nub" [
               FnCall "concat"
                 [ListExpr (VarExpr "c" :
-                  boundVariableCallListForCtor sort ctor
+                  (boundVariableCallListForCtor sort ctor ++
+                    boundVariablesSubTerms sort ctor)
                 )]
             ]
       )
     ) (sctors sort))
   ) sd
   where
+    boundVariablesSubTerms :: SortDef -> ConstructorDef -> [Expression]
+    boundVariablesSubTerms sort ctor
+      = let folds = dropFold $ cfolds ctor
+            lists = clists ctor
+            sorts = csorts ctor
+            all = folds ++ lists ++ sorts
+        in if (null all || not (null (synCtxs sort))) 
+            then [ListExpr []] 
+            else mapFnCall ctor ("boundVariables") [VarExpr "c"]
+
     -- | Generate a list of expressions, that when concatenated together give
-    -- the union of free variables for a given constructor (free variable
+    -- the union of bound variables for a given constructor (free variable
     -- calls for every identifier of a sort that has access to variables)
     boundVariableCallListForCtor :: SortDef -> ConstructorDef -> [Expression]
     boundVariableCallListForCtor sort ctor
@@ -177,12 +197,20 @@ substFunctionsC :: Language -> [Function]
 substFunctionsC (nsd, sd, _, _) =
   concatMap (\(MkDefSort sortName ctxs ctors rewrite) ->
     let inhCtxs = [INH x y | INH x y <- ctxs]
-    in Fn (sortName ++ "VarReplace") (map (\ctor ->
+    in Fn (sortName ++ "VarReplace") 
+       [TyVar, TyVar, TyBasic sortName, TyBasic sortName] 
+       ("Return a " ++ sortName ++ " where every occurence of the first given Variable (orig)\n\
+       \in the given " ++ sortName ++ " is replaced with the second given Variable (sub).") 
+       (map (\ctor ->
       ([VarParam "orig", VarParam "sub"] ++ _getCtorParams ctor, varReplaceCallForCtor ctor)
     ) ctors)
     : map (\ctx ->
       let sortOfCtxNamespace = sortNameForNamespaceName (xnamespace ctx) nsd
-      in Fn (sortName ++ sortOfCtxNamespace ++ "Substitute") (map (\ctor ->
+      in Fn (sortName ++ sortOfCtxNamespace ++ "Substitute") 
+         [TyVar, TyBasic sortName, TyBasic sortName, TyBasic sortName] 
+         ("Return a " ++ sortName ++ " where every occurence of the given variable (orig)\n\
+         \in the given " ++ sortName ++ " is substituted with the given " ++ sortName ++ " (sub).") 
+         (map (\ctor ->
           ([VarParam "orig", VarParam "sub"] ++ _getCtorParams ctor, substExprForCtor sortName sortOfCtxNamespace ctor)
         ) ctors)
     ) inhCtxs
@@ -192,12 +220,17 @@ substFunctionsC (nsd, sd, _, _) =
     varAccessBySname = varAccessBySortName sd
     sortsWithVarAccess = filter (\sort -> fromJust (lookup (sname sort) varAccessBySname)) sd
 
-    freeVariablesCall :: ConstructorDef -> (IdenName, SortName) -> Expression
+    freeVariablesCall :: ConstructorDef -> (IdenName, SortName) -> [Expression]
     freeVariablesCall ctor (iden, idenSort)
-      = concatCallForIden ctor iden ("freeVariables" ++ idenSort) [ListExpr []]
+      = if idenSort `elem` (map sname sortsWithVarAccess)
+        then [concatCallForIden ctor iden ("freeVariables" ++ idenSort) [ListExpr []]]
+        else []
 
     varReplaceCall :: ConstructorDef -> [Expression] -> IdenName -> Expression
     varReplaceCall ctor params iden
+      -- = if fromJust (lookup (sortNameForIden iden ctor) varAccessBySname) 
+      --   then [fnCallForIden ctor iden (sortNameForIden iden ctor ++ "VarReplace") params]
+      --   else []
       = fnCallForIden ctor iden (sortNameForIden iden ctor ++ "VarReplace") params
 
     varReplaceCallForCtor :: ConstructorDef -> Expression
@@ -217,7 +250,8 @@ substFunctionsC (nsd, sd, _, _) =
         binder = if isBind ctor
           then [FnCall
             ("fresh" ++ snd (fromJust (cbinder ctor)))
-            [VarExpr "b", FnCall "concat" [ListExpr (ListExpr [VarExpr "sub"] : map (freeVariablesCall ctor) (folds ++ lists ++ csorts ctor))]]]
+            [VarExpr "b", FnCall "concat" [ListExpr (ListExpr [VarExpr "sub"] : 
+            concatMap (freeVariablesCall ctor) (folds ++ lists ++ csorts ctor))]]]
           else []
         idensAndAttrs = attrsByIden ctor
         folds = dropFold (cfolds ctor)
@@ -225,7 +259,7 @@ substFunctionsC (nsd, sd, _, _) =
 
         varReplaceCallForIden :: (IdenName, [AttributeDef]) -> Expression
         varReplaceCallForIden (iden, idenAttrs)
-          = if fromJust (lookup sortNameOfIden varAccessBySname)
+          = if varAccess
               then if iden `elem` map fst folds
                 then FnCall "fmap" [FnCall fnName substParams, idenExpr]
                 else if iden `elem` map fst lists
@@ -234,11 +268,12 @@ substFunctionsC (nsd, sd, _, _) =
               else idenExpr
           where
             fnName = sortNameForIden iden ctor ++ "VarReplace"
-            idenExpr = if null binder
+            idenExpr = if null binder || (not varAccess)
               then VarExpr iden
               else varReplaceCall ctor [VarExpr "b", head binder] iden
             substParams = [VarExpr "orig", VarExpr "sub"]
             sortNameOfIden = sortNameForIden iden ctor
+            varAccess = fromJust (lookup sortNameOfIden varAccessBySname)
 
     substExprForCtor :: SortName -> SortName -> ConstructorDef -> Expression
     substExprForCtor sortName sortOfCtxNamespace (MkVarConstructor ctorName _)
@@ -261,7 +296,7 @@ substFunctionsC (nsd, sd, _, _) =
             ("fresh" ++ snd (fromJust (cbinder ctor)))
             [VarExpr "b", FnCall "concat" [
               ListExpr (
-                map
+                concatMap
                   (freeVariablesCall ctor)
                   (("sub", sortOfCtxNamespace) : folds ++ lists ++ csorts ctor)
               )

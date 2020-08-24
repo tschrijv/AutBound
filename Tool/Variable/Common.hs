@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wall #-}
 
-module Variable.Common (freeVarFunctions, mappingFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs, inhCtxsForSortName, fnCallForIden, concatCallForIden) where
+module Variable.Common (freeVarFunctions, mappingFunctions, sortNameForIden, firstToVarParams, dropFold, ExternalFunctions(..), applyInhCtxsToAttrs, inhCtxsForSortName, fnCallForIden, concatCallForIden, mapFnCall) where
 
 import Data.List
 import Data.Maybe
@@ -28,6 +28,8 @@ freeVarFunctions (_, sd, _, _) ef =
       sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> fromJust (lookup sname varAccessBySname)) sd
   in map (\sort ->
     Fn ("freeVariables" ++ sname sort)
+    (getTypeSignature (sname sort))
+    (getDescription (sname sort))
     (map (\ctor ->
       (VarParam "c" : paramForCtor ef ctor,
       case ctor of
@@ -44,6 +46,23 @@ freeVarFunctions (_, sd, _, _) ef =
     ) (sctors sort))
   ) sortsWithVarAccess
   where
+    -- | Return the typesignature of the free variable functions for the given sort name
+    getTypeSignature :: SortName -> TypeSignature
+    getTypeSignature sortName
+      = if includeBinders ef
+        then [TyList TyVar, TyBasic sortName, TyList TyVar]
+        else [TyVar, TyBasic sortName, TyList TyVar]
+
+    -- | Return the description of the free variable functions for the given sort name
+    getDescription :: SortName -> Description
+    getDescription sortName
+      = "Return a list of the free variables of the given " ++ sortName ++ 
+         (if includeBinders ef
+           then ".\nThe first argument represents the bound variables that are accumulated\n\
+           \during the execution and should be initialized with the empty list."
+           else ".\nThe first argument represents the number of bound variables with respect to the top\n\
+           \level scope.")
+
     -- | Generate a list of expressions, that when concatenated together give
     -- the union of free variables for a given constructor (free variable
     -- calls for every identifier of a sort that has access to variables)
@@ -69,13 +88,15 @@ freeVarFunctions (_, sd, _, _) ef =
 -- | Generate mapping functions for every sort that has access to variable
 -- constructors
 mappingFunctions :: Language -> ExternalFunctions -> [Function]
-mappingFunctions (_, sd, _, _) ef =
+mappingFunctions (nsd, sd, _, _) ef =
   let ctxsBySname = map snameAndCtxs sd
       varAccessBySname = varAccessBySortName sd
       sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> fromJust (lookup sname varAccessBySname)) sd
   in map (
     \(MkDefSort sortName ctxs ctors _) ->
         Fn (mapFnForSortName sortName)
+        (getTypeSignature sortName ctxs nsd)
+        (getDescription sortName ctxs nsd)
         (map (\ctor ->
           (
             [VarParam ("on" ++ namespace) | INH _ namespace <- ctxs]
@@ -87,6 +108,32 @@ mappingFunctions (_, sd, _, _) ef =
         ) ctors)
   ) sortsWithVarAccess
   where
+    -- | Return the typesignature of the mapping function for the given sort name
+    getTypeSignature :: SortName -> [Context] -> [NamespaceDef] -> TypeSignature
+    getTypeSignature sortName ctxs nsd
+        = let sorts = [nsort | INH _ nsName2 <- ctxs, MkNameSpace nsName1 nsort <- nsd, nsName1 == nsName2] in
+          (if includeBinders ef 
+          then [TyFunc [TyList TyVar, TyBasic sort, TyBasic sort] | sort <- sorts] ++ [TyList TyVar, TyBasic sortName, TyBasic sortName]
+          else [TyFunc [TyVar, TyBasic sort, TyBasic sort] | sort <- sorts] ++ [TyVar, TyBasic sortName, TyBasic sortName]
+          )
+
+    -- | Return the description of the mapping function for the given sort name
+    getDescription :: SortName -> [Context] -> [NamespaceDef] -> Description
+    getDescription sortName ctxs nsd
+        = let sorts = [(nsort, nsName1) | MkNameSpace nsName1 nsort <- nsd, INH _ nsName2 <- ctxs, nsName1 == nsName2] 
+              len = length sorts
+              mulplicity = head (map snd (filter fst [(len == 1, (" is", "function")),
+                                                (len > 1, (" are", "functions"))])) in
+          "Return the " ++ sortName ++ " where " ++
+          (intercalate ", " ["on" ++ nsName | (_, nsName) <- sorts]) ++ fst mulplicity ++ " applied to each\n" ++
+          (intercalate ", " [sname | (sname, _) <- sorts]) ++ " in the given " ++ sortName ++ " respectively.\n" ++
+          (if includeBinders ef
+           then "The second last argument represents the bound variables that are accumulated\n\
+           \during the execution and should be initialized with the empty list.\n\
+           \The accumulated bound variables are also passed as an argument to the supplied " ++ snd mulplicity ++ "."
+           else "The second argument represents the number of bound variables with respect to the top\n\
+           \level scope. It is also passed as an argument to the supplied " ++ snd mulplicity ++ ".")
+
     -- | Return the name of the mapping function for the given sort name
     mapFnForSortName :: SortName -> String
     mapFnForSortName sname = sname ++ "map"
@@ -154,6 +201,17 @@ concatCallForIden ctor iden fnName params
     where
       folds = dropFold $ cfolds ctor
       lists = clists ctor
+
+-- | Maps a FnCall with the given name and parameters to all arguments of the given constructor.
+-- | The last parameter of the created FnCalls are the arguments of the constructor.
+mapFnCall :: ConstructorDef -> String -> [Expression] -> [Expression]
+mapFnCall ctor fnBaseName params
+  = let folds = map fst (dropFold $ cfolds ctor)
+        lists = map fst (clists ctor)
+        sorts = map fst (csorts ctor) in
+    map (\fold -> FnCall "fmap" [FnCall (fnBaseName ++ sortNameForIden fold ctor) params, VarExpr fold]) folds ++
+    map (\list -> FnCall "map" [FnCall (fnBaseName ++ sortNameForIden list ctor) params, VarExpr list]) lists ++
+    map (\sort -> FnCall (fnBaseName ++ sortNameForIden sort ctor) (concat [params, [VarExpr sort]])) sorts
 
 -- | Returns the list of inherited contexts for a given sort name
 inhCtxsForSortName :: SortName -> [(SortName, [Context])] -> [Context]
