@@ -13,14 +13,14 @@ sort Term
   | TmIsEq (a: Term) (b: Term)
   | TmAnd (a: Term) (b: Term)
   | TmOr (a: Term) (b: Term)
-  | TmAbstraction (t: Term) (typ: Type) [z: VarValue]
+  | TmAbstraction (t: Term) [z: VarValue]
     t.ctx = lhs.ctx, z
     t.tctx = lhs.tctx
-    typ.tyctx = lhs.tctx
   | TmTypeAbstraction (typeTerm: Term) (superType: Type) [z: VarType]
     typeTerm.ctx = lhs.ctx
     typeTerm.tctx = lhs.tctx, z
     superType.tyctx = lhs.tctx
+  | TmAnnotation (term: Term) (termType: Type)
   | TmTrue
   | TmFalse
 

@@ -21,7 +21,7 @@ prettyTerm (TmIf cond thn els) = "(if " ++ prettyTerm cond ++ " then " ++ pretty
 prettyTerm (TmIsEq a b) = "(" ++ prettyTerm a ++ " == " ++ prettyTerm b ++ ")"
 prettyTerm (TmAnd a b) = "(" ++ prettyTerm a ++ " && " ++ prettyTerm b ++ ")"
 prettyTerm (TmOr a b) = "(" ++ prettyTerm a ++ " || " ++ prettyTerm b ++ ")"
-prettyTerm (TmAbstraction term typ) = "(" ++ prettyType typ ++ " /-> " ++ prettyTerm term ++ ")"
+prettyTerm (TmAbstraction term) = "(lambda " ++ prettyTerm term ++ ")"
 prettyTerm (TmTypeAbstraction term superType) = "(" ++ prettyType superType ++ " /<:-> " ++ prettyTerm term ++ ")"
 prettyTerm TmTrue = "TmTrue"
 prettyTerm TmFalse = "TmFalse"
@@ -78,8 +78,8 @@ v_tv :: Term
 v_tv = TmVariable (SVarType (SVarValue Z))
 
 -- create an Abstraction
-(/->) :: Type -> Term -> Term
-typ /-> term = TmAbstraction term typ
+lambda :: Term -> Term
+lambda term = TmAbstraction term
 
 -- create a function type
 (-->) :: Type -> Type -> Type

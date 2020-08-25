@@ -3,7 +3,7 @@ import Data.List
 
 data Variable = Z | SVarValue Variable | SVarType Variable deriving(Eq)
 
-data Term = TmVariable Variable | TmApply Term Term | TmTypeApply Term Type | TmIf Term Term Term | TmIsEq Term Term | TmAnd Term Term | TmOr Term Term | TmAbstraction Term Type | TmTypeAbstraction Term Type | TmTrue | TmFalse deriving(Eq)
+data Term = TmVariable Variable | TmApply Term Term | TmTypeApply Term Type | TmIf Term Term Term | TmIsEq Term Term | TmAnd Term Term | TmOr Term Term | TmAbstraction Term | TmTypeAbstraction Term Type | TmAnnotation Term Type | TmTrue | TmFalse deriving(Eq)
 
 data Type = TypVariable Variable | TypFunction Type Type | TypUniversal Type Type | TypUnion Type Type | TypRecord Type Type Type | TypTrue | TypFalse | TypBool | Top | Typ String deriving(Eq)
 
@@ -80,8 +80,9 @@ termmap onVarValue onVarType c (TmIf cond thn els) = (TmIf (termmap onVarValue o
 termmap onVarValue onVarType c (TmIsEq a b) = (TmIsEq (termmap onVarValue onVarType c a) (termmap onVarValue onVarType c b))
 termmap onVarValue onVarType c (TmAnd a b) = (TmAnd (termmap onVarValue onVarType c a) (termmap onVarValue onVarType c b))
 termmap onVarValue onVarType c (TmOr a b) = (TmOr (termmap onVarValue onVarType c a) (termmap onVarValue onVarType c b))
-termmap onVarValue onVarType c (TmAbstraction t typ) = (TmAbstraction (termmap onVarValue onVarType (SVarValue c) t) (typemap onVarType c typ))
+termmap onVarValue onVarType c (TmAbstraction t) = (TmAbstraction (termmap onVarValue onVarType (SVarValue c) t))
 termmap onVarValue onVarType c (TmTypeAbstraction typeTerm superType) = (TmTypeAbstraction (termmap onVarValue onVarType (SVarType c) typeTerm) (typemap onVarType c superType))
+termmap onVarValue onVarType c (TmAnnotation term termType) = (TmAnnotation (termmap onVarValue onVarType c term) (typemap onVarType c termType))
 termmap onVarValue onVarType c (TmTrue) = (TmTrue)
 termmap onVarValue onVarType c (TmFalse) = (TmFalse)
 
@@ -135,8 +136,9 @@ freeVariablesTerm c (TmIf cond thn els) = (nub (concat [(freeVariablesTerm c con
 freeVariablesTerm c (TmIsEq a b) = (nub (concat [(freeVariablesTerm c a),(freeVariablesTerm c b)]))
 freeVariablesTerm c (TmAnd a b) = (nub (concat [(freeVariablesTerm c a),(freeVariablesTerm c b)]))
 freeVariablesTerm c (TmOr a b) = (nub (concat [(freeVariablesTerm c a),(freeVariablesTerm c b)]))
-freeVariablesTerm c (TmAbstraction t typ) = (nub (concat [(freeVariablesTerm (SVarValue c) t),(freeVariablesType c typ)]))
+freeVariablesTerm c (TmAbstraction t) = (nub (concat [(freeVariablesTerm (SVarValue c) t)]))
 freeVariablesTerm c (TmTypeAbstraction typeTerm superType) = (nub (concat [(freeVariablesTerm (SVarType c) typeTerm),(freeVariablesType c superType)]))
+freeVariablesTerm c (TmAnnotation term termType) = (nub (concat [(freeVariablesTerm c term),(freeVariablesType c termType)]))
 freeVariablesTerm c (TmTrue) = (nub (concat [[]]))
 freeVariablesTerm c (TmFalse) = (nub (concat [[]]))
 
