@@ -2,45 +2,55 @@ module FlowSensitiveTypesDeBruijnImpl where
 import FlowSensitiveTypesDeBruijnBase
 import FlowSensitiveTypesDeBruijnShow
 
+import qualified Data.Map
+
 -- by variable index we index the variables, new variables are pushed to the front
 data EnvItem = EnvVarValue Type | EnvVarType Type deriving (Eq, Show)
-type Env = [EnvItem]
+type TypingEnv = [EnvItem]
+
+-- the pair denotes the possibility of cases (False, True)
+type InformationEnv = Data.Map.Map Variable (Bool, Bool)
+
+data Env = Env TypingEnv InformationEnv
 
 emptyEnv :: Env
-emptyEnv = []
+emptyEnv = Env [] Data.Map.empty
 
-getItemFromEnv :: Variable -> Env -> EnvItem
+getItemFromEnv :: Variable -> TypingEnv -> EnvItem
 getItemFromEnv Z (item:_) = item
 getItemFromEnv (SVarValue v) (EnvVarValue _:rest) = getItemFromEnv v rest
 getItemFromEnv (SVarType v) (EnvVarType _:rest) = getItemFromEnv v rest
 getItemFromEnv _ _ = error "wrong or no binding for var, or DeBruijn index structure does not match path in term"
 
 getVarValueFromEnv :: Variable -> Env -> Type
-getVarValueFromEnv v env = case getItemFromEnv v env of
+getVarValueFromEnv v (Env typEnv _) = case getItemFromEnv v typEnv of
   EnvVarValue v -> v
   otherwise -> error "requested EnvVarValue but found something else"
 
 getVarTypeFromEnv :: Variable -> Env -> Type
-getVarTypeFromEnv v env = case getItemFromEnv v env of
+getVarTypeFromEnv v (Env typEnv _) = case getItemFromEnv v typEnv of
   EnvVarType v -> v
   otherwise -> error "requested EnvVarType but found something else"
 
+containsVarInEnv :: Variable -> TypingEnv -> Bool
+containsVarInEnv Z (item:_) = True
+containsVarInEnv _ [] = False
+containsVarInEnv (SVarValue v) (EnvVarValue _:rest) = containsVarInEnv v rest
+containsVarInEnv (SVarType v) (EnvVarType _:rest) = containsVarInEnv v rest
+containsVarInEnv _ _ = error "containsVar given var and env paths do not match"
+
 containsVar :: Variable -> Env -> Bool
-containsVar Z (item:_) = True
-containsVar _ [] = False
-containsVar (SVarValue v) (EnvVarValue _:rest) = containsVar v rest
-containsVar (SVarType v) (EnvVarType _:rest) = containsVar v rest
-containsVar _ _ = error "containsVar given var and env paths do not match"
+containsVar v (Env typEnv infoEnv) = containsVarInEnv v typEnv
 
 shiftEnvItem :: Variable -> EnvItem -> EnvItem
 shiftEnvItem v (EnvVarValue t) = EnvVarValue (typeshiftplus v t)
 shiftEnvItem v (EnvVarType superType) = EnvVarType (typeshiftplus v superType)
 
 shiftOverVarType :: Type -> Env -> Env
-shiftOverVarType superType = map (shiftEnvItem (SVarType Z)) . (EnvVarType superType:)
+shiftOverVarType superType (Env typEnv infoEnv) = Env (map (shiftEnvItem (SVarType Z)) ((EnvVarType superType:) typEnv)) infoEnv
 
 shiftOverVarValue :: Type -> Env -> Env
-shiftOverVarValue t = map (shiftEnvItem (SVarValue Z)) . (EnvVarValue t:)
+shiftOverVarValue t (Env typEnv infoEnv) = Env (map (shiftEnvItem (SVarValue Z)) ((EnvVarValue t:) typEnv)) infoEnv
 
 
 
@@ -48,76 +58,7 @@ shiftOverVarValue t = map (shiftEnvItem (SVarValue Z)) . (EnvVarValue t:)
 shiftFuncReturn :: Type -> Type
 shiftFuncReturn t = typeshiftminus (SVarValue Z) t
 
--- onder env+X is typeTerm type T2, 
--- Dan is TypeAbstraction typeTerm onder env type TypUniversal T2
 
-typeofHelper :: Env -> Term -> Type
-typeofHelper env TmTrue = TypTrue -- BT-True
-typeofHelper env TmFalse = TypFalse -- BT-False
-typeofHelper env (TmVariable v) = getVarValueFromEnv v env -- BT-Var
---typeofHelper env (TmAbstraction subTerm inputType) =    -- No BT-Abs?
---  let outputType = typeofHelper (shiftOverVarValue inputType env) subTerm in
---    TypFunction inputType (shiftFuncReturn outputType)
-typeofHelper env (TmAnnotation term typ) = -- BT-Ann
-  if isOfTypeHelper env term typ
-  then typ
-  else error ("term: " ++ show term ++ " is not of type " ++ show typ)
-typeofHelper env (TmTypeAbstraction typeTerm superType) = -- BT-TAbs
-  let typeTermType = typeofHelper (shiftOverVarType superType env) typeTerm in
-    TypUniversal typeTermType superType
-typeofHelper env (TmApply func arg) = -- BT-App
-  let funcType = typeofHelper env func in
-    case funcType of
-      TypFunction funcInputType funcOutputType -> 
-        if isOfTypeHelper env arg funcInputType
-          then funcOutputType
-          else error ("func and arg type mismatch: func=" ++ show funcType ++ ", arg=" ++ show arg)
-      otherwise -> error ("Apply expects TypFunction as first arg (was " ++ show funcType ++ ")")
-
-typeofHelper env (TmTypeApply universalFunc typeToSubstitute) = -- BT-TApp
-  case typeofHelper env universalFunc of
-    TypUniversal typTerm superType -> 
-      if isSubType env typeToSubstitute superType
-      then typeTypeSubstitute typeToSubstitute Z typTerm
-      else error ("Attempting to apply a type to a universal type that does not accept it: universalFunc=" ++ show universalFunc ++ ", typeToSubstitute=" ++ show typeToSubstitute)
-    otherwise -> error "type should be universal, since we are doing a type application"
-
-typeofHelper env (TmIsEq t1 t2) = -- BT-Eq
-  let typ1 = typeofHelper env t1 in -- unused, but can throw error if invalid
-    let typ2 = typeofHelper env t2 in -- unused, but can throw error if invalid
-      TypBool
-
-typeofHelper env (TmAnd t1 t2) = -- BT-And
-  case (typeofHelper env t1, typeofHelper env t2) of
-    (TypBool, TypBool) -> TypBool
-    otherwise -> error ("Non-Bool args to &&: (" ++ show t1 ++ ") && (" ++ show t2 ++ ")")
-
-typeofHelper env (TmOr t1 t2) = -- BT-Or
-  case (typeofHelper env t1, typeofHelper env t2) of
-    (TypBool, TypBool) -> TypBool
-    otherwise -> error ("Non-Bool args to ||: (" ++ show t1 ++ ") || (" ++ show t2 ++ ")")
-
-typeofHelper env (TmIf cond thn els) = -- BT-If
-  undefined -- TODO
-
--- others not defined
-
-
-typeof :: Term -> Type
-typeof = typeofHelper []
-
-
-isOfTypeHelper :: Env -> Term -> Type -> Bool
-isOfTypeHelper env (TmAbstraction tm) (TypFunction from to) = -- BT-Abs
-  let envInAbstraction = shiftOverVarValue from env in
-    isOfTypeHelper envInAbstraction tm to
-
-isOfTypeHelper env term typ = -- BT-Sub
-  let typOfTerm = typeofHelper env term in
-    isSubType env typOfTerm typ
-
-
---isOfTypeHelper env term typ = 
 
 
 
@@ -205,7 +146,6 @@ isSubType env (Typ a) (Typ b) =
 
 
 
--- TODO typeEval extending with 6.4, also add TypIntersection? 
 -- TODO add new context, the learned information context
 -- 
 
@@ -227,3 +167,98 @@ typeEval (TypUnion l r) m env = -- TE-Union
 typeEval t m env = t -- transitive closure, allow applying 0 rules
 
 -- TODO variables?
+
+-- onder env+X is typeTerm type T2, 
+-- Dan is TypeAbstraction typeTerm onder env type TypUniversal T2
+
+typeofHelper :: Env -> Term -> Type
+typeofHelper env TmTrue = TypTrue -- BT-True
+typeofHelper env TmFalse = TypFalse -- BT-False
+typeofHelper env (TmVariable v) = getVarValueFromEnv v env -- BT-Var
+--typeofHelper env (TmAbstraction subTerm inputType) =    -- No BT-Abs?
+--  let outputType = typeofHelper (shiftOverVarValue inputType env) subTerm in
+--    TypFunction inputType (shiftFuncReturn outputType)
+typeofHelper env (TmAnnotation term typ) = -- BT-Ann
+  if isOfTypeHelper env term typ
+  then typ
+  else error ("term: " ++ show term ++ " is not of type " ++ show typ)
+typeofHelper env (TmTypeAbstraction typeTerm superType) = -- BT-TAbs
+  let typeTermType = typeofHelper (shiftOverVarType superType env) typeTerm in
+    TypUniversal typeTermType superType
+typeofHelper env (TmApply func arg) = -- BT-App
+  let funcType = typeofHelper env func in
+    case funcType of
+      TypFunction funcInputType funcOutputType -> 
+        if isOfTypeHelper env arg funcInputType
+          then funcOutputType
+          else error ("func and arg type mismatch: func=" ++ show funcType ++ ", arg=" ++ show arg)
+      otherwise -> error ("Apply expects TypFunction as first arg (was " ++ show funcType ++ ")")
+
+typeofHelper env (TmTypeApply universalFunc typeToSubstitute) = -- BT-TApp
+  case typeofHelper env universalFunc of
+    TypUniversal typTerm superType -> 
+      if isSubType env typeToSubstitute superType
+      then typeTypeSubstitute typeToSubstitute Z typTerm
+      else error ("Attempting to apply a type to a universal type that does not accept it: universalFunc=" ++ show universalFunc ++ ", typeToSubstitute=" ++ show typeToSubstitute)
+    otherwise -> error "type should be universal, since we are doing a type application"
+
+typeofHelper env (TmIsEq t1 t2) = -- BT-Eq
+  let typ1 = typeofHelper env t1 in -- unused, but can throw error if invalid
+    let typ2 = typeofHelper env t2 in -- unused, but can throw error if invalid
+      TypBool
+
+typeofHelper env (TmAnd t1 t2) = -- BT-And
+  case (typeofHelper env t1, typeofHelper env t2) of
+    (TypBool, TypBool) -> TypBool
+    otherwise -> error ("Non-Bool args to &&: (" ++ show t1 ++ ") && (" ++ show t2 ++ ")")
+
+typeofHelper env (TmOr t1 t2) = -- BT-Or
+  case (typeofHelper env t1, typeofHelper env t2) of
+    (TypBool, TypBool) -> TypBool
+    otherwise -> error ("Non-Bool args to ||: (" ++ show t1 ++ ") || (" ++ show t2 ++ ")")
+
+typeofHelper env (TmIf cond thn els) = -- BT-If
+  let infoOfCond = informationOf env cond in
+    undefined
+
+-- others not defined
+
+
+typeof :: Term -> Type
+typeof = typeofHelper emptyEnv
+
+
+isOfTypeHelper :: Env -> Term -> Type -> Bool
+isOfTypeHelper env (TmAbstraction tm) (TypFunction from to) = -- BT-Abs
+  let envInAbstraction = shiftOverVarValue from env in
+    isOfTypeHelper envInAbstraction tm to
+
+isOfTypeHelper env term typ = -- BT-Sub
+  let typOfTerm = typeofHelper env term in
+    isSubType env typOfTerm typ
+
+
+informationOf :: Env -> Term -> InformationEnv
+informationOf env TmTrue = Data.Map.empty -- CI-True
+informationOf env TmFalse = Data.Map.empty -- CI-False
+informationOf env (TmIsEq (TmVariable v) TmTrue) = Data.Map.insert v (False, True) Data.Map.empty -- CI-EqTrueR
+informationOf env (TmIsEq TmTrue (TmVariable v)) = Data.Map.insert v (False, True) Data.Map.empty -- CI-EqTrueL
+informationOf env (TmIsEq (TmVariable v) TmFalse) = Data.Map.insert v (True, False) Data.Map.empty -- CI-EqFalseR
+informationOf env (TmIsEq TmFalse (TmVariable v)) = Data.Map.insert v (True, False) Data.Map.empty -- CI-EqFalseL
+informationOf env (TmAnd t1 t2) = intersect (informationOf env t1) (informationOf env t2) -- CI-EqAnd
+informationOf env _ = Data.Map.empty -- CI-EqOtherwise
+
+
+intersect :: InformationEnv -> InformationEnv -> InformationEnv
+intersect = Data.Map.unionWith combine where -- CO-Intersect
+  combine :: (Bool, Bool) -> (Bool, Bool) -> (Bool, Bool)
+  combine (f1, t1) (f2, t2) = (f1 && f2, t1 && t2)
+
+addInfoToEnv :: Env -> InformationEnv -> Env
+addInfoToEnv (Env typEnv infoEnv) newInfo = Env typEnv (intersect infoEnv newInfo)
+
+invert :: InformationEnv -> InformationEnv
+invert = Data.Map.map inv where -- CO-Union?
+  inv :: (Bool, Bool) -> (Bool, Bool)
+  inv (f, t) = (not f, not t)
+
