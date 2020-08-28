@@ -17,7 +17,6 @@ apply = Top /<:-> (lambda (lambda (v_v <+ v_)))
 double :: Term
 double = Top /<:-> (lambda (lambda (v_v <+ (v_v <+ v_))))
 
-
 tru :: Term
 tru = TmTrue
 
@@ -84,13 +83,40 @@ u t1 t2 = TypUnion t1 t2
 --typeOfTestTerm = (subType --> superType) /-> (v_)
 
 
--- >>> typeof (((subType --> superType) /<:-> (t_ /-> v_)) <++ (superType --> subType))
--- Just (({TestSuperTyp} --> {TestSubTyp}) --> ({TestSuperTyp} --> {TestSubTyp}))
+-- >>> typeof (((subType --> superType) /<:-> (lambda v_)) <++ (superType --> subType))
+-- *** Exception: inferType of Abstractions is not supported
+-- CallStack (from HasCallStack):
+--   error, called at /home/lennart/Desktop/AutBound/FlowSensitiveTypes/FlowSensitiveTypesDeBruijnImpl.hs:221:3 in main:FlowSensitiveTypesDeBruijnImpl
 --
 
--- >>> typeof (double <++ Typ "Int")
--- Just (({Int} --> {Int}) --> ({Int} --> {Int}))
+-- >>> Top /<:-> v_
+-- (Top /<:-> v_)
 --
+
+-- >>> (double <++ Typ "Int")
+-- ((Top /<:-> (lambda (lambda (v_v <+ (v_v <+ v_))))) <++ Int)
+--
+
+annot :: Type
+annot = ((Typ "Int" --> Typ "Int") --> Typ "Int" --> Typ "Int")
+
+annotTermNoType :: Term
+annotTermNoType = (double <++ Typ "Int")
+
+annotTerm :: Term
+annotTerm = TmAnnotation annotTermNoType annot
+
+-- >>> annotTerm
+-- (((Top /<:-> (lambda (lambda (v_v <+ (v_v <+ v_))))) <++ Int):(((Int --> Int) --> Int) --> Int))
+--
+
+-- >>> isOfType emptyEnv annotTerm annot
+-- *** Exception: inferType of Abstractions is not supported
+-- CallStack (from HasCallStack):
+--   error, called at /home/lennart/Desktop/AutBound/FlowSensitiveTypes/FlowSensitiveTypesDeBruijnImpl.hs:221:3 in main:FlowSensitiveTypesDeBruijnImpl
+--
+
+
 
 -- >>> apply <++ Typ "Double"
 -- ((Top /<:-> ((t_ --> t_) /-> (t_v /-> (v_v <+ v_)))) <++ {Double})

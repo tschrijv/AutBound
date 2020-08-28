@@ -5,7 +5,7 @@ data Variable = Z | SVarValue Variable | SVarType Variable deriving(Eq)
 
 data Term = TmVariable Variable | TmApply Term Term | TmTypeApply Term Type | TmIf Term Term Term | TmIsEq Term Term | TmAnd Term Term | TmOr Term Term | TmAbstraction Term | TmTypeAbstraction Term Type | TmAnnotation Term Type | TmTrue | TmFalse deriving(Eq)
 
-data Type = TypVariable Variable | TypFunction Type Type | TypUniversal Type Type | TypUnion Type Type | TypRecord Type Type Type | TypTrue | TypFalse | TypBool | Top | Typ String deriving(Eq)
+data Type = TypVariable Variable | TypFunction Type Type | TypUniversal Type Type | TypUnion Type Type | TypRecord Type Type Type | TypTrue | TypFalse | Top | Typ String deriving(Eq)
 
 
 -- Add two Variables.
@@ -98,7 +98,6 @@ typemap onVarType c (TypUnion a b) = (TypUnion (typemap onVarType c a) (typemap 
 typemap onVarType c (TypRecord tru fls selector) = (TypRecord (typemap onVarType c tru) (typemap onVarType c fls) (typemap onVarType c selector))
 typemap onVarType c (TypTrue) = (TypTrue)
 typemap onVarType c (TypFalse) = (TypFalse)
-typemap onVarType c (TypBool) = (TypBool)
 typemap onVarType c (Top) = (Top)
 typemap onVarType c (Typ string1) = (Typ string1)
 
@@ -153,7 +152,6 @@ freeVariablesType c (TypUnion a b) = (nub (concat [(freeVariablesType c a),(free
 freeVariablesType c (TypRecord tru fls selector) = (nub (concat [(freeVariablesType c tru),(freeVariablesType c fls),(freeVariablesType c selector)]))
 freeVariablesType c (TypTrue) = (nub (concat [[]]))
 freeVariablesType c (TypFalse) = (nub (concat [[]]))
-freeVariablesType c (TypBool) = (nub (concat [[]]))
 freeVariablesType c (Top) = (nub (concat [[]]))
 freeVariablesType c (Typ string1) = (nub (concat [[]]))
 instance Ord Variable where

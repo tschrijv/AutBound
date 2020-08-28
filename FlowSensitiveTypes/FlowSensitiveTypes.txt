@@ -35,7 +35,6 @@ sort Type
   | TypRecord (tru: Type) (fls: Type) (selector: Type)
   | TypTrue
   | TypFalse
-  | TypBool
   | Top
   | Typ {String}
   

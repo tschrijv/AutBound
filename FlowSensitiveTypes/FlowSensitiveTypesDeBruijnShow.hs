@@ -23,6 +23,7 @@ prettyTerm (TmAnd a b) = "(" ++ prettyTerm a ++ " && " ++ prettyTerm b ++ ")"
 prettyTerm (TmOr a b) = "(" ++ prettyTerm a ++ " || " ++ prettyTerm b ++ ")"
 prettyTerm (TmAbstraction term) = "(lambda " ++ prettyTerm term ++ ")"
 prettyTerm (TmTypeAbstraction term superType) = "(" ++ prettyType superType ++ " /<:-> " ++ prettyTerm term ++ ")"
+prettyTerm (TmAnnotation term typ) = "(" ++ prettyTerm term ++ ":" ++ prettyType typ ++ ")"
 prettyTerm TmTrue = "TmTrue"
 prettyTerm TmFalse = "TmFalse"
 
