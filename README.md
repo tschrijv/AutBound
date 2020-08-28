@@ -65,6 +65,7 @@ parts:
 - Import declarations
 - Namespace declarations
 - Sort declarations
+- Relation declarations
 - Native code
 
 None of these sections are mandatory, but their order is fixed.
@@ -192,9 +193,55 @@ sort Term
         x.ctx = lhs.ctx, z
 ```
 
+### Relation declarations
+
+The relation section starts with the `Relations` keyword.
+A relation complies with the following syntax:
+ ```
+Relation ::= 												relations:
+		TypeSignature RelationBody+					typesignature and one or more relation bodies
+
+TypeSignature ::= 									typesignatures:
+		N : Type -> RelationType						name, types of input parameters and kind of relation
+	
+Type ::=														types:
+		Empty													 	    empty type
+		S -> Type													  sort followed by more types
+		
+RelationType ::=										types of relations:
+		o															      clause type
+
+RelationBody ::= 										body of the relation:
+		Judgement.													judgement without conditions
+		Judgement :- Judgement+.						judgement with one or more conditions
+		
+Judgement ::=												judgements:
+		N Argument*													relation with its parameters
+
+Argument ::=												arguments:
+		A															      metavariable
+		C Argument*													constructor sort with its parameters
+		Judgement													  relation with its parameters
+		A[x -> Argument]										substitution
+ ```
+ where `N` is the name of a relation, `S` is the name of an existing sort, `C` is a constructor of a sort, `x` is a variable name and `A` is a metavariable.
+
+ Example for the STLCProd specification: 
+ ```
+ value : Term -> o
+ value (Abs x t).
+
+ opsem : Term -> Term -> o
+ opsem (App T1 T2) (App T1' T2) :- opsem T1 T1'.
+ opsem (App V T) (App V T') :- value V, opsem T T'.
+ opsem (App (Abs x T1) V2) (T1[x -> V2]).
+ ```
+ The example above declares two relations: `value` and `opsem`. `value` is a simple relation with one argument and no conditions. `opsem` is more complicated: its consists of three clauses inside the relation, two of them have one or more conditions and the third contains a substitution.
+
+
 ### Native code
 
-After the sort declarations you can include code written in the target language.
+After the relation declarations you can include code written in the target language.
 This needs to be preceded by the `NativeCode` keyword. Everything after this
 keyword will be copied verbatim to the output module.
 
