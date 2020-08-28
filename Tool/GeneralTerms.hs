@@ -9,6 +9,7 @@ type NamespaceName    = String
 type IdenName         = String
 type HaskellTypeName  = String
 type InstanceName     = String
+type RelationName     = String
 
 -- | Definition of an inherited or a synthesized context
 data Context
@@ -111,5 +112,46 @@ cidenSorts :: ConstructorDef -> [SortName]
 cidenSorts MkVarConstructor{} = []
 cidenSorts ctor               = map snd (clists ctor ++ csorts ctor) ++ map (\(_, s, _) -> s) (cfolds ctor)
 
+-- | Relation declaration
+data Relation 
+  = MkRelation {
+    rname           :: RelationName,
+    rtypesignature  :: TypeSignatureDef,
+    rbody           :: [RelationBodyDef]
+  }
+  deriving (Show, Eq)
+
+data TypeSignatureDef
+  = MkTypeSignature {
+    tstypes         :: [SortName],
+    tsrelationtype  :: RelationType
+  }
+  deriving (Show, Eq)
+
+data RelationType
+  = MkClauseRelation deriving (Show, Eq)
+
+data RelationBodyDef
+  = MkRelationBody {
+    rargs       :: [ArgumentDef],
+    rconditions :: [Judgement]
+  }
+  deriving (Show, Eq)
+
+data Judgement
+  = MkJudgement {
+    jname  :: RelationName,
+    jargs  :: [ArgumentDef] 
+  }
+  deriving (Show, Eq)
+
+data ArgumentDef
+  = MkMetaVarArgument IdenName
+  | MkSortArgument ConstructorName [ArgumentDef]
+  | MkJudgementArgument Judgement
+  | MkSubstArgument ArgumentDef IdenName ArgumentDef
+  deriving (Show, Eq)
+
+
 -- | Complete definition of a language
-type Language = ([NamespaceDef], [SortDef], [(String, [String])], [String])
+type Language = ([NamespaceDef], [SortDef], [Relation], [(String, [String])], [String])

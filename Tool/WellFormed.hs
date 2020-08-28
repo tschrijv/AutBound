@@ -12,7 +12,7 @@ import Data.List
 --then looks up if all sortnames,namespacenames and contructornames are unique, if all sorts in the constructors exist,
 --and whether sorts and constructors and namespaces have distinct names. Also namespacenames used in sorts should exist and constructors can only use variablebindings of namespaces they can access in the sort
 wellFormed :: Language -> Either String ()
-wellFormed (namespaces, sorts, _, _)
+wellFormed (namespaces, sorts, _, _, _)
   = let sortnames = map sname sorts
         consnames = concatMap (\sort -> map cname (sctors sort)) sorts
         sortconsnames = concatMap getSortsUsedByConstructors sorts

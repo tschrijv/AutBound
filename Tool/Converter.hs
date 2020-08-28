@@ -15,7 +15,7 @@ data ConvertFunctions = VF {
 
 -- | Convert a language into a program using the specified variable functions
 convert :: Language -> ConvertFunctions -> Program
-convert lan@(nsd, sd, imp, cd) vf =
+convert lan@(nsd, sd, _, imp, cd) vf =
   let var = (variableType vf) lan
   in P {
     imports = imp,

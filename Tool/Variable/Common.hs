@@ -22,7 +22,7 @@ data ExternalFunctions = EF {
 -- | Generate free variable functions for every sort that has access to variable
 -- constructors
 freeVarFunctions :: Language -> ExternalFunctions -> [Function]
-freeVarFunctions (_, sd, _, _) ef =
+freeVarFunctions (_, sd, _, _, _) ef =
   let ctxsBySname = map snameAndCtxs sd
       varAccessBySname = varAccessBySortName sd
       sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> fromJust (lookup sname varAccessBySname)) sd
@@ -88,7 +88,7 @@ freeVarFunctions (_, sd, _, _) ef =
 -- | Generate mapping functions for every sort that has access to variable
 -- constructors
 mappingFunctions :: Language -> ExternalFunctions -> [Function]
-mappingFunctions (nsd, sd, _, _) ef =
+mappingFunctions (nsd, sd, _, _, _) ef =
   let ctxsBySname = map snameAndCtxs sd
       varAccessBySname = varAccessBySortName sd
       sortsWithVarAccess = filter (\(MkDefSort sname _ _ _) -> fromJust (lookup sname varAccessBySname)) sd

@@ -20,10 +20,10 @@ getFunctions
   }
 
 getVariableType :: Language -> (Type, [Constructor])
-getVariableType (nsd, _, _, _) = ("Variable", Constr "Z" [] : map (\ns -> Constr ('S' : nname ns) ["Variable"]) nsd)
+getVariableType (nsd, _, _, _, _) = ("Variable", Constr "Z" [] : map (\ns -> Constr ('S' : nname ns) ["Variable"]) nsd)
 
 getTypes :: Language -> [(Type, [Constructor])]
-getTypes (_, sd, _, _) = map (
+getTypes (_, sd, _, _, _) = map (
     \(MkDefSort name _ cds _) -> (name, map getConstr cds)
   ) sd where
     getConstr :: ConstructorDef -> Constructor
@@ -51,7 +51,7 @@ getVariableInstances (_, hnatc) =
       | otherwise = ([ConstrParam n1 [VarParam "h1"], ConstrParam n2 [VarParam "h2"]], FnCall "error" [StringExpr "differing namespace found in compare"])
 
 getVariableFunctions :: Language -> (Type, [Constructor]) -> [Function]
-getVariableFunctions lan@(nsd, _, _, _) varT = getHNatModifiers varT ++ getGenerators nsd ++ getShift lan ++ mappingFunctions lan ef ++ substFunctions lan ++ freeVarFunctions lan ef ++ getEnvFunctions lan
+getVariableFunctions lan@(nsd, _, _, _, _) varT = getHNatModifiers varT ++ getGenerators nsd ++ getShift lan ++ mappingFunctions lan ef ++ substFunctions lan ++ freeVarFunctions lan ef ++ getEnvFunctions lan
 
 getHNatModifiers :: (Type, [Constructor]) -> [Function]
 getHNatModifiers (_, hnatc) =
@@ -96,7 +96,7 @@ getGenerators = map (
   )
 
 getShift :: Language -> [Function]
-getShift (nsd, sd, _, _) = let accessVarTable = varAccessBySortName sd
+getShift (nsd, sd, _, _, _) = let accessVarTable = varAccessBySortName sd
   in concat [getShiftHelpers sd op accessVarTable ++ getShiftFunctions sd nsd op accessVarTable | op <- ["plus", "minus"]]
 
 getShiftHelpers :: [SortDef] -> String -> [(SortName, Bool)] -> [Function]
@@ -141,7 +141,7 @@ getShiftFunctions sd defs opName varAccessTable = let filtered = filter (\s -> f
       ) filtered
 
 getEnvFunctions :: Language -> [Function]
-getEnvFunctions (nsd, sd, _, _)
+getEnvFunctions (nsd, sd, _, _, _)
   = let ctxsBySname = map snameAndCtxs sd
     in concatMap (\sort ->
       let synCtxs = [SYN x y | SYN x y <- sctxs sort]
@@ -224,7 +224,7 @@ getEnvFunctions (nsd, sd, _, _)
 -- * Substitute functions for every sort that is related to the given sort by
 -- the first sort having a context with a variable of the type of the second sort
 substFunctions :: Language -> [Function]
-substFunctions (nsd, sd, _, _) =
+substFunctions (nsd, sd, _, _, _) =
   let varAccessBySname = varAccessBySortName sd
       sortsWithVarAccess = filter (\sort -> fromJust (lookup (sname sort) varAccessBySname)) sd
   in concatMap (\(MkDefSort sortName ctxs ctors rewrite) ->

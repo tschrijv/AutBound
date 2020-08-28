@@ -4,6 +4,7 @@
 module Parser (pLanguage) where
 
 import Data.List
+import Data.Char
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Language
 import Text.ParserCombinators.Parsec.Token
@@ -25,8 +26,9 @@ myDef =
         , "rewrite"
         , "import"
         , "NativeCode"
+        , "Relations"
         ]
-    , reservedOpNames = ["@", "=", ",", ".", ";", ":", "|"]
+    , reservedOpNames = ["@", "=", ",", ".", ";", ":", "|", ":-","->"]
     }
 
 inboundTokenParser :: TokenParser st
@@ -59,8 +61,9 @@ pLanguage = do
   idecls <- many pImports
   ndecls <- many pNameSpaceDecl
   sdecls <- many pSortDecl
+  rdecl <- pRelationDecl
   hsCode <- pHaskellCode
-  return (ndecls, sdecls, idecls, hsCode)
+  return (ndecls, sdecls, rdecl, idecls, hsCode)
 
 -- * Imports
 -- ----------------------------------------------------------------------------
@@ -311,6 +314,126 @@ pSubExpr = do
   pReservedOp "."
   b <- pIdentifier
   return (a, b)
+
+-- * Relations
+-- ----------------------------------------------------------------------------
+-- | Parse all the relations in the relation section if present
+pRelationDecl :: Parser [Relation]
+pRelationDecl = try pAllRelations <|> return []
+
+-- | Parse all the relations and the Relations keyword
+pAllRelations :: Parser [Relation]
+pAllRelations = do
+  pReserved "Relations"
+  many (try pRelation)
+
+-- | Parse one relation
+pRelation :: Parser Relation
+pRelation = do
+  name <- pIdentifier
+  ts <- pTypeSignature
+  b <- many (try pRelationBody)
+  if null b then (error (name ++ " misses a body"))
+  else return (MkRelation name ts b)
+
+-- | Parse the type signature of a relation
+pTypeSignature :: Parser TypeSignatureDef
+pTypeSignature = do
+  pReservedOp ":"
+  types <- many (try pType)
+  reltype <- pRelationType
+  return (MkTypeSignature types reltype)
+
+-- | Parse one type and the following "->"
+pType :: Parser SortName
+pType = do
+  t <- pIdentifier
+  pReservedOp "->"
+  return t
+
+-- | Parse the relation type
+pRelationType :: Parser RelationType
+pRelationType = do
+  t <- pIdentifier
+  case t of
+      "o" -> return MkClauseRelation
+      _ -> error "Invalid relation type"
+
+-- | Parse the body of the relation
+pRelationBody :: Parser RelationBodyDef
+pRelationBody = do
+  pIdentifier
+  args <- many (try pRelationArgument)
+  conds <- pConditionDecl
+  pReservedOp "."
+  return (MkRelationBody args conds)
+
+-- | Parse one argument of the relation body
+pRelationArgument :: Parser ArgumentDef
+pRelationArgument =
+  try pSubstArgument <|>
+    try pSortArgument <|>
+      try pJudgmentArgument <|>
+        pMetaVarArgument
+
+-- | Parse a substitution argument
+pSubstArgument :: Parser ArgumentDef
+pSubstArgument =
+  pParens $ do
+    orig <- pRelationArgument
+    pBrackets $ do
+      var <- pIdentifier
+      pReservedOp "->"
+      sub <- pRelationArgument
+      return (MkSubstArgument orig var sub)
+
+-- | Parse a sort argument
+pSortArgument :: Parser ArgumentDef
+pSortArgument = 
+  pParens $ do
+    ctorName <- pIdentifier
+    if isUpper (head ctorName)
+      then do
+            args <- many (try pRelationArgument)
+            return (MkSortArgument ctorName args)
+      else error "Sort constructor must begin with uppercase"
+
+-- | Parse a judgement argument  
+pJudgmentArgument :: Parser ArgumentDef
+pJudgmentArgument =
+  pParens $ do
+    j <- pJudgement
+    return (MkJudgementArgument j)
+
+-- | Parse a judgement
+pJudgement :: Parser Judgement
+pJudgement = do
+  jName <- pIdentifier
+  args <- many (try pRelationArgument)
+  return (MkJudgement jName args)
+
+-- | Parse a meta variable argument
+pMetaVarArgument :: Parser ArgumentDef
+pMetaVarArgument = do
+  v <- pIdentifier
+  return (MkMetaVarArgument v)
+
+-- | Parse all the conditions in the condition section of the
+-- | relation if present
+pConditionDecl :: Parser [Judgement]
+pConditionDecl = try pAllConditions <|> return []
+
+-- | Parse all the conditions
+pAllConditions :: Parser [Judgement]
+pAllConditions = do
+  pReservedOp ":-"
+  many (try pCondition)
+
+-- | Parse one condition
+pCondition :: Parser Judgement
+pCondition = do
+  j <- pJudgement
+  try (return j <* (pReservedOp ",")) <|> return j
 
 -- * Native code
 -- ----------------------------------------------------------------------------

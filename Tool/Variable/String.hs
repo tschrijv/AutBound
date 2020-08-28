@@ -31,10 +31,10 @@ freshVarFunctions _ varType
     | name <- names]
 
 getVariableType :: Language -> (Type, [Constructor])
-getVariableType (nsd, _, _, _) = ("Variable", map (\ns -> Constr ('S' : nname ns) ["String"]) nsd)
+getVariableType (nsd, _, _, _, _) = ("Variable", map (\ns -> Constr ('S' : nname ns) ["String"]) nsd)
 
 getTypes :: Language -> [(Type, [Constructor])]
-getTypes (_, sd, _, _) = map (
+getTypes (_, sd, _, _, _) = map (
     \(MkDefSort name _ cds _) -> (name, map getConstr cds)
   ) sd where
     getConstr :: ConstructorDef -> Constructor
@@ -121,7 +121,7 @@ ef = EF {
 }
 
 boundVarFunctions :: Language -> [Function]
-boundVarFunctions (_, sd, _, _) =
+boundVarFunctions (_, sd, _, _, _) =
   map (\sort ->
     Fn ("boundVariables" ++ sname sort) 
     [TyList TyVar, TyBasic (sname sort), TyList TyVar] 
@@ -194,7 +194,7 @@ boundVarFunctions (_, sd, _, _) =
 -- * Substitute functions for every sort that is related to the given sort by
 -- the first sort having a context with a variable of the type of the second sort
 substFunctionsC :: Language -> [Function]
-substFunctionsC (nsd, sd, _, _) =
+substFunctionsC (nsd, sd, _, _, _) =
   concatMap (\(MkDefSort sortName ctxs ctors rewrite) ->
     let inhCtxs = [INH x y | INH x y <- ctxs]
     in Fn (sortName ++ "VarReplace") 
