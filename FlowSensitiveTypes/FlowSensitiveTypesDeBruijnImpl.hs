@@ -228,9 +228,12 @@ typeof = inferType emptyEnv
 
 
 isOfType :: Env -> Term -> Type -> Bool
-isOfType env (TmAbstraction tm) (TypFunction from to) = -- BT-Abs
-  let envInAbstraction = shiftOverVarValue from env in
-    isOfType envInAbstraction tm to
+isOfType env (TmAbstraction tm) funcTyp = -- BT-Abs
+  case funcTyp of
+    TypFunction from to -> 
+      let envInAbstraction = shiftOverVarValue from env in
+        isOfType envInAbstraction tm to
+    otherwise -> error ("isOfType of an abstraction must attempt to check with a function type! Actual type: " ++ show funcTyp)
 
 isOfType env term typ = -- BT-Sub
   let typOfTerm = inferType env term in

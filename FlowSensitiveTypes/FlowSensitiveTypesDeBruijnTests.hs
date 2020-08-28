@@ -98,7 +98,7 @@ u t1 t2 = TypUnion t1 t2
 --
 
 annot :: Type
-annot = ((Typ "Int" --> Typ "Int") --> Typ "Int" --> Typ "Int")
+annot = ((Typ "Int" --> Typ "Int") --> (Typ "Int" --> Typ "Int"))
 
 annotTermNoType :: Term
 annotTermNoType = (double <++ Typ "Int")
@@ -106,14 +106,21 @@ annotTermNoType = (double <++ Typ "Int")
 annotTerm :: Term
 annotTerm = TmAnnotation annotTermNoType annot
 
+annotTermSimpler :: Term
+annotTermSimpler = lambda (lambda (v_v <+ (v_v <+ v_)))
+
 -- >>> annotTerm
 -- (((Top /<:-> (lambda (lambda (v_v <+ (v_v <+ v_))))) <++ Int):(((Int --> Int) --> Int) --> Int))
 --
 
--- >>> isOfType emptyEnv annotTerm annot
--- *** Exception: inferType of Abstractions is not supported
+-- >>> annotTermSimpler
+-- (lambda (lambda (v_v <+ (v_v <+ v_))))
+--
+
+-- >>> isOfType emptyEnv annotTermSimpler annot
+-- *** Exception: isOfType of an abstraction must attempt to check with a function type! Actual type: Int
 -- CallStack (from HasCallStack):
---   error, called at /home/lennart/Desktop/AutBound/FlowSensitiveTypes/FlowSensitiveTypesDeBruijnImpl.hs:221:3 in main:FlowSensitiveTypesDeBruijnImpl
+--   error, called at /home/lennart/Desktop/AutBound/FlowSensitiveTypes/FlowSensitiveTypesDeBruijnImpl.hs:236:18 in main:FlowSensitiveTypesDeBruijnImpl
 --
 
 
