@@ -83,15 +83,20 @@ isSubType env (TypVariable v1) (TypVariable v2) = -- SA-ReflTVar
   case containsVar v1 env of
     Right b -> Right (v1 == v2 && b)
     Left s -> Left s
-isSubType env (TypRecord tru1 fls1 select1) (TypRecord tru2 fls2 select2) = -- SA-ReflMap
-  Right (tru1 == tru2 && fls1 == fls2 && select1 == select2)
-isSubType env r@(TypRecord tru fls select) a = -- SA-TEvalRead
-  case typeEval r EvalRead env of
-    Right teR -> isSubType env teR a
+isSubType env a@(TypRecord tru1 fls1 select1) b@(TypRecord tru2 fls2 select2) = -- SA-ReflMap
+  if (tru1 == tru2 && fls1 == fls2 && select1 == select2)
+  then Right True
+  else -- Default to SA-TEvalRead
+    case typeEval a EvalRead env of
+    Right teA -> isSubType env teA b
     Left s -> Left s
-isSubType env a r@(TypRecord tru fls select) = -- SA-TEvalWrite
-  case typeEval r EvalWrite env of
-    Right teR -> isSubType env a teR
+isSubType env a@(TypRecord tru fls select) b = -- SA-TEvalRead
+  case typeEval a EvalRead env of
+    Right teA -> isSubType env teA b
+    Left s -> Left s
+isSubType env a b@(TypRecord tru fls select) = -- SA-TEvalWrite
+  case typeEval b EvalWrite env of
+    Right teB -> isSubType env a teB
     Left s -> Left s
 isSubType env (TypVariable v) superType = -- SA-TransTVar
   case getVarTypeFromEnv v env of

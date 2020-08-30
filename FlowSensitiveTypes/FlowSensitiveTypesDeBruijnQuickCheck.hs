@@ -80,6 +80,11 @@ instance Arbitrary Type
 --
 
 
+quickCheckAllTypesSubTypeTop :: Type -> Bool
+quickCheckAllTypesSubTypeTop t = isSubTypeErrable emptyEnv t Top
+-- >>> quickCheck quickCheckAllTypesSubTypeTop
+-- +++ OK, passed 100 tests.
+--
 
 checkTransitiveTypeYes :: (Type, Type, Type) -> Property
 checkTransitiveTypeYes (t1, t2, t3) = 
@@ -96,24 +101,16 @@ checkTransitiveTypeYes (t1, t2, t3) =
 -- *** Failed! Falsified (after 26 tests):
 -- ({true:ttrue, false:ttrue}[ttrue],Top,{true:{true:Top, false:ttrue}[ttrue], false:Top}[tfalse])
 --
+-- This error has been fixed
 
--- >>> isSubType emptyEnv TypTrue Top
--- Right True
---
+-- >>> quickCheck checkTransitiveTypeYes
+-- *** Failed! (after 49 tests):                            
+-- Exception:
+--   invalid result from TypeEval? Input:{true:(ttrue U tfalse), false:tfalse}[{true:tfalse, false:ttrue}[(ttrue U ttrue)]]
+--   CallStack (from HasCallStack):
+--     error, called at FlowSensitiveTypesDeBruijnQuickCheck.hs:16:13 in main:FlowSensitiveTypesDeBruijnQuickCheck
+-- (ttrue,{true:(ttrue U tfalse), false:tfalse}[{true:tfalse, false:ttrue}[(ttrue U ttrue)]],Top)
 
--- >>> isSubType emptyEnv Top (TypRecord TypTrue Top TypFalse)
--- Right True
---
-
--- >>> isSubType emptyEnv TypTrue (TypRecord TypTrue Top TypFalse)
--- Right True
---
-
-quickCheckAllTypesSubTypeTop :: Type -> Bool
-quickCheckAllTypesSubTypeTop t = isSubTypeErrable emptyEnv t Top
--- >>> quickCheck quickCheckAllTypesSubTypeTop
--- +++ OK, passed 100 tests.
---
 
 
 
