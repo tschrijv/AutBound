@@ -116,7 +116,7 @@ isSubType env (Typ "TestSubTyp") (Typ "TestSuperTyp") = Right True
 isSubType env (Typ a) (Typ b) =
   Right (a == b)
 
-
+isSubType env a b = Right False
 
 
 -- TODO add new context, the learned information context
