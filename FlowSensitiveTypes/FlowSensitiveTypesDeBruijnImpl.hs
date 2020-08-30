@@ -87,15 +87,11 @@ isSubType env (TypRecord tru1 fls1 select1) (TypRecord tru2 fls2 select2) = -- S
   Right (tru1 == tru2 && fls1 == fls2 && select1 == select2)
 isSubType env r@(TypRecord tru fls select) a = -- SA-TEvalRead
   case typeEval r EvalRead env of
-    Right teR -> case typeEval a EvalRead env of
-      Right teA -> typesAreEqual env (teR) (teA)
-      Left s -> Left s
+    Right teR -> isSubType env teR a
     Left s -> Left s
 isSubType env a r@(TypRecord tru fls select) = -- SA-TEvalWrite
   case typeEval r EvalWrite env of
-    Right teR -> case typeEval a EvalWrite env of
-      Right teA -> typesAreEqual env (teR) (teA)
-      Left s -> Left s
+    Right teR -> isSubType env a teR
     Left s -> Left s
 isSubType env (TypVariable v) superType = -- SA-TransTVar
   case getVarTypeFromEnv v env of

@@ -15,14 +15,8 @@ isSubTypeErrable env t1 t2 = case isSubType env t1 t2 of
   Right v -> v
   Left s -> error s -- convert to an error, as this should only be called on valid types
 
-checkTransitiveTypeYes :: (Type, Type, Type) -> Property
-checkTransitiveTypeYes (t1, t2, t3) = 
-  isSubTypeErrable emptyEnv t1 t2 && isSubTypeErrable emptyEnv t2 t3 ==>
-  isSubTypeErrable emptyEnv t1 t3
 
-quickCheckTest :: Int -> Property
-quickCheckTest i = i < 500 ==> i < 500
-
+-- Type generation
 genFunction :: Gen Type
 genFunction = do
   t1 <- genType;
@@ -71,15 +65,6 @@ instance Arbitrary Type
   where
     arbitrary = genType
 
--- >>> quickCheck quickCheckTest
--- +++ OK, passed 100 tests.
---
-
--- >>> quickCheck checkTransitiveTypeYes
--- *** Failed! Falsified (after 14 tests):
--- (ttrue,Top,{true:ttrue, false:Top}[tfalse])
---
-
 -- >>> sample genType
 -- Top
 -- Top
@@ -93,3 +78,42 @@ instance Arbitrary Type
 -- tfalse
 -- {true:tfalse, false:Top}[ttrue]
 --
+
+
+
+checkTransitiveTypeYes :: (Type, Type, Type) -> Property
+checkTransitiveTypeYes (t1, t2, t3) = 
+  isSubTypeErrable emptyEnv t1 t2 && isSubTypeErrable emptyEnv t2 t3 ==>
+  isSubTypeErrable emptyEnv t1 t3
+
+-- >>> quickCheck checkTransitiveTypeYes
+-- *** Failed! Falsified (after 14 tests):
+-- (ttrue,Top,{true:ttrue, false:Top}[tfalse])
+--
+-- This error has been fixed
+
+-- >>> quickCheck checkTransitiveTypeYes
+-- *** Failed! Falsified (after 26 tests):
+-- ({true:ttrue, false:ttrue}[ttrue],Top,{true:{true:Top, false:ttrue}[ttrue], false:Top}[tfalse])
+--
+
+-- >>> isSubType emptyEnv TypTrue Top
+-- Right True
+--
+
+-- >>> isSubType emptyEnv Top (TypRecord TypTrue Top TypFalse)
+-- Right True
+--
+
+-- >>> isSubType emptyEnv TypTrue (TypRecord TypTrue Top TypFalse)
+-- Right True
+--
+
+quickCheckAllTypesSubTypeTop :: Type -> Bool
+quickCheckAllTypesSubTypeTop t = isSubTypeErrable emptyEnv t Top
+-- >>> quickCheck quickCheckAllTypesSubTypeTop
+-- +++ OK, passed 100 tests.
+--
+
+
+
