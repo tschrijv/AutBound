@@ -4,6 +4,48 @@ import FlowSensitiveTypesDeBruijnShow
 
 import qualified Data.Map
 
+
+eval :: Term -> Either String Term
+eval (TmApply func arg) = case eval func of -- E-AppAbs E-App1 E-App2
+  Right (TmAbstraction f) -> case eval arg of
+    Right aa -> eval (termTermSubstitute aa Z f)
+    Left s -> Left s
+  Right other -> Left ("Applying to something that is not an abstraction: func=" ++ show other ++ ", arg=" ++ show arg)
+  Left s -> Left s
+eval (TmTypeApply tm typ) = case eval tm of -- E-TappTabs E-Tapp
+  Right (TmTypeAbstraction t superTyp) -> eval (termTypeSubstitute typ Z t)
+  Right other -> Left ("Type applying to something that is not a type abstraction: tm=" ++ show tm ++ ", typ=" ++ show typ)
+  Left s -> Left s
+eval (TmIf cond thn els) = case eval cond of -- E-If E-IfTrue E-IfFalse
+  Right TmTrue -> eval thn
+  Right TmFalse -> eval els
+  Right other -> Left ("If statement with non-boolean condition: cond=" ++ show cond)
+  Left s -> Left s
+eval (TmIsEq l r) = case eval l of -- E-EqL E-EqR E-EqTrue E-EqFalse
+  Right ll -> case eval r of
+    Right rr -> if ll == rr then Right TmTrue else Right TmFalse
+    Left s -> Left s
+  Left s -> Left s
+eval (TmAnd a b) = case eval a of -- E-AndL E-AndR E-AndFalseL E-AndFalseR E-AndTrue
+  Right TmFalse -> Right TmFalse
+  Right TmTrue -> case eval b of
+    Right TmFalse -> Right TmFalse
+    Right TmTrue -> Right TmTrue
+    Right other -> Left ("right-hand side of && is non-bool: " ++ show other)
+    Left s -> Left s
+  Right other -> Left ("left-hand side of && is non-bool: " ++ show other)
+  Left s -> Left s
+eval (TmOr a b) = case eval a of
+  Right TmTrue -> Right TmTrue
+  Right TmFalse -> case eval b of
+    Right TmTrue -> Right TmTrue
+    Right TmFalse -> Right TmFalse
+    Right other -> Left ("right-hand side of || is non-bool: " ++ show other)
+    Left s -> Left s
+  Right other -> Left ("left-hand side of || is non-bool: " ++ show other)
+  Left s -> Left s
+
+
 -- by variable index we index the variables, new variables are pushed to the front
 data EnvItem = EnvVarValue Type | EnvVarType Type deriving (Eq, Show)
 type TypingEnv = [EnvItem]
@@ -142,14 +184,16 @@ typeEval (TypRecord tru fls select) m env =
       if m == EvalRead 
       then typeEval (TypUnion (TypRecord tru fls l) (TypRecord tru fls r)) EvalRead env
       else Right (TypRecord tru fls select)
+    Right other -> Right other
     Left s -> Left s
-    Right other -> Left ("invalid result from TypeEval? Input:" ++ show (TypRecord tru fls select))
 typeEval (TypUnion l r) m env = -- TE-Union
   case typeEval l m env of
     Right ll -> case typeEval r m env of
       Right rr -> Right (TypUnion ll rr)
       Left s -> Left s
     Left s -> Left s
+typeEval (TypVariable v) EvalRead env = getVarTypeFromEnv v env
+typeEval (TypVariable v) EvalWrite env = undefined
 typeEval t m env = Right t -- transitive closure, allow applying 0 rules
 
 -- TODO variables?

@@ -4,6 +4,7 @@ import FlowSensitiveTypesDeBruijnImpl
 import FlowSensitiveTypesDeBruijnShow
 import Test.QuickCheck
 
+import Debug.Trace
 
 isValidTypedTerm :: Env -> Term -> Bool
 isValidTypedTerm env t = case inferType env t of
@@ -88,7 +89,7 @@ quickCheckAllTypesSubTypeTop t = isSubTypeErrable emptyEnv t Top
 
 checkTransitiveTypeYes :: (Type, Type, Type) -> Property
 checkTransitiveTypeYes (t1, t2, t3) = 
-  isSubTypeErrable emptyEnv t1 t2 && isSubTypeErrable emptyEnv t2 t3 ==>
+  isSubTypeErrable emptyEnv (traceShowId t1) (traceShowId t2) && isSubTypeErrable emptyEnv t2 (traceShowId t3) ==>
   isSubTypeErrable emptyEnv t1 t3
 
 -- >>> quickCheck checkTransitiveTypeYes
@@ -112,5 +113,40 @@ checkTransitiveTypeYes (t1, t2, t3) =
 -- (ttrue,{true:(ttrue U tfalse), false:tfalse}[{true:tfalse, false:ttrue}[(ttrue U ttrue)]],Top)
 
 
+-- >>> quickCheck checkTransitiveTypeYes
 
+testTyp :: Type
+testTyp = TypRecord (TypUnion TypTrue TypFalse) TypFalse (TypRecord TypFalse TypTrue (TypUnion TypTrue TypTrue))
+
+
+bad_t1p :: Type
+bad_t1p = TypFalse
+
+bad_t1 :: Type
+bad_t1 = TypUnion TypTrue (TypFunction TypFalse TypFalse)
+
+-- {true:({true:Top, false:((Top <:-> tfalse) --> (Top U Top))}[tfalse] <:-> Top), false:Top}[{true:ttrue, false:tfalse}[(tfalse U ttrue)]]
+bad_t2 :: Type
+bad_t2 = TypRecord (TypUniversal Top (TypRecord Top (TypFunction (TypUniversal TypFalse Top) (TypUnion Top Top)) TypFalse)) Top (TypRecord TypTrue TypFalse (TypUnion TypFalse TypTrue))
+
+bad_t2p :: Type
+bad_t2p = TypRecord TypFalse TypFalse (TypUnion TypFalse TypFalse)
+
+
+--bad_t2 :: Type
+--bad_t2 = TypRecord (TypUniversal Top (TypRecord Top (TypFunction (TypUniversal TypFalse Top) (TypUnion Top Top)) TypFalse)) Top (TypRecord TypTrue TypFalse (TypUnion TypFalse TypTrue))
+
+
+-- CRASH
+-- bad_t1 = ttrue U (tfalse --> tfalse)
+-- bad_t2 = {true:({true:Top, false:((Top <:-> tfalse) --> (Top U Top))}[tfalse] <:-> Top), false:Top}[{true:ttrue, false:tfalse}[(tfalse U ttrue)]]
+-- isSubType emptyEnv bad_t1 bad_t2
+
+-- Minimal crash:
+-- isSubType emptyEnv tfalse {true:tfalse, false:tfalse}[tfalse U tfalse]
+
+
+-- >>> typeEval testTyp EvalWrite emptyEnv
+-- Right {true:tfalse, false:ttrue}[(ttrue U ttrue)]
+--
 
