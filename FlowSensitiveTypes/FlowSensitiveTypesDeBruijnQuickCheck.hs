@@ -18,36 +18,36 @@ isSubTypeErrable env t1 t2 = case isSubType env t1 t2 of
 
 
 -- Type generation
-genFunction :: Gen Type
-genFunction = do
-  t1 <- genType;
-  t2 <- genType;
+genFunction :: Env -> Gen Type
+genFunction env = do
+  t1 <- genType env;
+  t2 <- genType env;
   return $ TypFunction t1 t2
 
-genUniversal :: Gen Type
-genUniversal = do
-  super <- genType;
-  expr <- genType;
+genUniversal :: Env -> Gen Type
+genUniversal env = do
+  super <- genType env;
+  expr <- genType (shiftOverVarType super env);
   return $ TypUniversal expr super
 
-genUnion :: Gen Type
-genUnion = do
-  a <- genType;
-  b <- genType;
+genUnion :: Env -> Gen Type
+genUnion env = do
+  a <- genType env;
+  b <- genType env;
   return $ TypUnion a b
 
-genBoolType :: Gen Type
-genBoolType = suchThat genType (isBool) where
+genBoolType :: Env -> Gen Type
+genBoolType env = suchThat (genType env) (isBool) where
   isBool :: Type -> Bool
   isBool t = case isSubType emptyEnv t typBool of
     Right b -> b
     Left s -> error s
 
-genRecord :: Gen Type
-genRecord = do
-  tru <- genType;
-  fls <- genType;
-  sel <- genBoolType;
+genRecord :: Env -> Gen Type
+genRecord env = do
+  tru <- genType env;
+  fls <- genType env;
+  sel <- genBoolType env;
   return $ TypRecord tru fls sel
 
 genBool :: Gen Type
@@ -56,15 +56,24 @@ genBool = elements [TypTrue, TypFalse]
 genTop :: Gen Type
 genTop = return Top
 
-genOperator :: Gen Type
-genOperator = oneof [genFunction, genUniversal, genUnion, genRecord]
+--genTypeVarFromEnv :: TypingEnv -> Gen Variable
+--genTypeVarFromEnv env 
 
-genType :: Gen Type
-genType = oneof [genOperator, genBool, genTop]
+--genVariable :: Env -> Gen Type
+--genVariable (Env [] infoEnv) = Nothing
+--genVariable (Env (EnvVarType t:r) infoEnv) = choose []
+
+genOperator :: Env -> Gen Type
+genOperator env = oneof [genFunction env, genUniversal env, genUnion env, genRecord env]
+
+genType :: Env -> Gen Type
+genType env = oneof [genOperator env, genBool, genTop]
+
+
 
 instance Arbitrary Type
   where
-    arbitrary = genType
+    arbitrary = genType emptyEnv
 
 -- >>> sample genType
 -- Top

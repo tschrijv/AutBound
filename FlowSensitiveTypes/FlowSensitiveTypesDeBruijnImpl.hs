@@ -130,8 +130,8 @@ isSubType env a@(TypRecord tru1 fls1 select1) b@(TypRecord tru2 fls2 select2) = 
   then Right True
   else -- Default to SA-TEvalRead
     case typeEval a EvalRead env of
-    Right teA -> isSubType env teA b
-    Left s -> Left s
+      Right teA -> isSubType env teA b
+      Left s -> Left s
 isSubType env a@(TypRecord tru fls select) b = -- SA-TEvalRead
   case typeEval a EvalRead env of
     Right teA -> isSubType env teA b
