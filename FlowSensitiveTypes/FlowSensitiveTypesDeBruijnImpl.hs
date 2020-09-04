@@ -65,16 +65,18 @@ getItemFromEnv (SVarType v) (EnvVarType _:rest) = getItemFromEnv v rest
 getItemFromEnv _ _ = Left "wrong or no binding for var, or DeBruijn index structure does not match path in term"
 
 getVarValueFromEnv :: Variable -> Env -> Either String Type
-getVarValueFromEnv v (Env typEnv _) = case getItemFromEnv v typEnv of
-  Right (EnvVarValue v) -> Right v
-  Left s -> Left s
-  otherwise -> Left "requested EnvVarValue but found something else"
+getVarValueFromEnv v (Env typEnv _) = do
+  foundItem <- getItemFromEnv v typEnv;
+  case foundItem of
+    EnvVarValue v -> Right v
+    other -> Left ("requested EnvVarValue but found: " ++ show other)
 
 getVarTypeFromEnv :: Variable -> Env -> Either String Type
-getVarTypeFromEnv v (Env typEnv _) = case getItemFromEnv v typEnv of
-  Right (EnvVarType v) -> Right v
-  Left s -> Left s
-  otherwise -> Left "requested EnvVarType but found something else"
+getVarTypeFromEnv v (Env typEnv _) = do
+  foundItem <- getItemFromEnv v typEnv;
+  case foundItem of
+    EnvVarType v -> Right v
+    other -> Left ("requested EnvVarType but found: " ++ show other)
 
 containsVarInEnv :: Variable -> TypingEnv -> Either String Bool
 containsVarInEnv Z (item:_) = Right True
@@ -101,59 +103,56 @@ shiftFuncReturn t = typeshiftminus (SVarValue Z) t
 
 typesAreEqual :: Env -> Type -> Type -> Either String Bool
 typesAreEqual env t1 t2 = do
-  case isSubType env t1 t2 of
-    Right True -> isSubType env t2 t1
-    Right False -> Right False
-    Left s -> Left s
-
-errorSafeAnd :: Either String Bool -> Either String Bool -> Either String Bool
-errorSafeAnd (Right a) (Right b) = Right (a && b)
-errorSafeAnd (Right a) (Left s) = Left s
-errorSafeAnd (Left s) _ = Left s
-
-errorSafeOr :: Either String Bool -> Either String Bool -> Either String Bool
-errorSafeOr (Right a) (Right b) = Right (a || b)
-errorSafeOr (Right a) (Left s) = Left s
-errorSafeOr (Left s) _ = Left s
+  isSubT <- isSubType env t1 t2
+  if isSubT
+  then isSubType env t2 t1
+  else Right False
 
 -- Returns true if the first argument is a subtype of the second
 isSubType :: Env -> Type -> Type -> Either String Bool
 isSubType env sub Top = Right True -- SA-Top
 isSubType env TypTrue TypTrue = Right True -- SA-RelfTrue
 isSubType env TypFalse TypFalse = Right True -- SA-ReflFalse
-isSubType env (TypVariable v1) (TypVariable v2) = -- SA-ReflTVar
-  case containsVar v1 env of
-    Right b -> Right (v1 == v2 && b)
-    Left s -> Left s
+isSubType env (TypVariable v1) (TypVariable v2) = do -- SA-ReflTVar
+  envContainsV <- containsVar v1 env;
+  Right (v1 == v2 && envContainsV)
 isSubType env a@(TypRecord tru1 fls1 select1) b@(TypRecord tru2 fls2 select2) = -- SA-ReflMap
   if (tru1 == tru2 && fls1 == fls2 && select1 == select2)
   then Right True
-  else -- Default to SA-TEvalRead
-    case typeEval a EvalRead env of
-      Right teA -> isSubType env teA b
-      Left s -> Left s
-isSubType env a@(TypRecord tru fls select) b = -- SA-TEvalRead
-  case typeEval a EvalRead env of
-    Right teA -> isSubType env teA b
-    Left s -> Left s
-isSubType env a b@(TypRecord tru fls select) = -- SA-TEvalWrite
-  case typeEval b EvalWrite env of
-    Right teB -> isSubType env a teB
-    Left s -> Left s
-isSubType env (TypVariable v) superType = -- SA-TransTVar
-  case getVarTypeFromEnv v env of
-    Right vType -> isSubType env vType superType
-    Left s -> Left s
-isSubType env (TypFunction s1 s2) (TypFunction t1 t2) = -- SA-Arrow
-  errorSafeAnd (isSubType env t1 s1) (isSubType env s2 t2)
-isSubType env (TypUniversal s ua) (TypUniversal t ub) = -- SA-All
-  errorSafeAnd (typesAreEqual env ua ub) (isSubType (shiftOverVarType ua env) s t)
-    -- For S-ALL, if the supertypes of the Universals are not equal, then one cannot be a subtype of the other
-isSubType env (TypUnion l r) t = -- SA-UnionN
-  errorSafeAnd (isSubType env l t) (isSubType env r t)
-isSubType env t (TypUnion l r) = -- SA-UnionLR
-  errorSafeOr (isSubType env t l) (isSubType env t r)
-
+  else do -- Default to SA-TEvalRead
+    (hasSimplified, teA) <- typeEval a EvalRead env;
+    if hasSimplified
+    then isSubType env teA b
+    else Right False
+isSubType env a@(TypRecord tru fls select) b = do -- SA-TEvalRead
+  (hasSimplified, teA) <- typeEval a EvalRead env;
+  if hasSimplified
+  then isSubType env teA b
+  else Right False
+isSubType env a b@(TypRecord tru fls select) = do -- SA-TEvalWrite
+  (hasSimplified, teB) <- typeEval b EvalWrite env
+  if hasSimplified
+  then isSubType env a teB
+  else Right False
+isSubType env (TypVariable v) superType = do -- SA-TransTVar
+  vType <- getVarTypeFromEnv v env;
+  isSubType env vType superType
+isSubType env (TypFunction s1 s2) (TypFunction t1 t2) = do -- SA-Arrow
+  t1Subs1 <- isSubType env t1 s1;
+  t2Subs2 <- isSubType env t2 s2;
+  Right (t1Subs1 && t2Subs2)
+isSubType env (TypUniversal s ua) (TypUniversal t ub) = do -- SA-All
+  abEqual <- typesAreEqual env ua ub;
+  sSubT <- isSubType (shiftOverVarType ua env) s t;
+  Right (abEqual && sSubT)-- For S-ALL, if the supertypes of the Universals are not equal, then one cannot be a subtype of the other
+isSubType env (TypUnion l r) t = do -- SA-UnionN
+  lSubT <- isSubType env l t;
+  rSubT <- isSubType env r t;
+  Right (lSubT && rSubT)
+isSubType env t (TypUnion l r) = do -- SA-UnionLR
+  tSubL <- isSubType env t l;
+  tSubR <- isSubType env t r;
+  Right (tSubL || tSubR)
  -- Custom rules for testing
 isSubType env (Typ "TestSubTyp") (Typ "TestSuperTyp") = Right True
 isSubType env (Typ a) (Typ b) =
@@ -175,26 +174,33 @@ infersToBool env t = case inferType env t of
   Left s -> Left s
 
 data EvalMode = EvalRead | EvalWrite deriving(Eq, Show)
-typeEval :: Type -> EvalMode -> Env -> Either String Type
-typeEval (TypRecord tru fls select) m env = 
-  case (typeEval select m env) of -- TE-Map
-    Right TypTrue -> typeEval tru m env -- TE-MapTrue
-    Right TypFalse -> typeEval fls m env -- TE-MapFalse
-    Right (TypUnion l r) -> -- TE-MapUnion
+
+eitherOR :: Bool -> Either String (Bool, Type) -> Either String (Bool, Type)
+eitherOR b (Right (b2, typ)) = Right (b || b2, typ)
+eitherOR b (Left s) = Left s
+
+typeEval :: Type -> EvalMode -> Env -> Either String (Bool, Type)
+typeEval (TypRecord tru fls select) m env = do
+  evalOfSelect <- typeEval select m env;
+  case evalOfSelect of -- TE-Map
+    (b, TypTrue) -> eitherOR True (typeEval tru m env) -- TE-MapTrue
+    (b, TypFalse) -> eitherOR True (typeEval fls m env) -- TE-MapFalse
+    (b, TypUnion l r) -> -- TE-MapUnion
       if m == EvalRead 
-      then typeEval (TypUnion (TypRecord tru fls l) (TypRecord tru fls r)) EvalRead env
-      else Right (TypRecord tru fls select)
-    Right other -> Right other
-    Left s -> Left s
-typeEval (TypUnion l r) m env = -- TE-Union
-  case typeEval l m env of
-    Right ll -> case typeEval r m env of
-      Right rr -> Right (TypUnion ll rr)
-      Left s -> Left s
-    Left s -> Left s
-typeEval (TypVariable v) EvalRead env = getVarTypeFromEnv v env
+      then eitherOR True (typeEval (TypUnion (TypRecord tru fls l) (TypRecord tru fls r)) EvalRead env)
+      else Right (b, TypRecord tru fls (TypUnion l r))
+    (b, other) -> Right (b, other)
+
+typeEval (TypUnion l r) m env = do -- TE-Union
+  (bl, ll) <- typeEval l m env;
+  (br, rr) <- typeEval r m env;
+  Right (bl || br, TypUnion ll rr)
+
+typeEval (TypVariable v) EvalRead env = do
+  var <- getVarTypeFromEnv v env;
+  Right (True, var)
 typeEval (TypVariable v) EvalWrite env = undefined
-typeEval t m env = Right t -- transitive closure, allow applying 0 rules
+typeEval t m env = Right (False, t) -- typeEval on non evaluatable type, returns that it has not changed it's input
 
 -- TODO variables?
 
@@ -208,64 +214,63 @@ inferType env (TmVariable v) = getVarValueFromEnv v env -- BT-Var
 --inferType env (TmAbstraction subTerm inputType) =    -- No BT-Abs?
 --  let outputType = inferType (shiftOverVarValue inputType env) subTerm in
 --    TypFunction inputType (shiftFuncReturn outputType)
-inferType env (TmAnnotation term typ) = -- BT-Ann
-  case isOfType env term typ of
-    Right True -> Right typ
-    Right False -> Left ("term: " ++ show term ++ " is not of type " ++ show typ)
-    Left s -> Left s
-inferType env (TmTypeAbstraction typeTerm superType) = -- BT-TAbs
-  case inferType (shiftOverVarType superType env) typeTerm of
-    Right typeTermType -> Right (TypUniversal typeTermType superType)
-    Left s -> Left s
-inferType env (TmApply func arg) = -- BT-App
-  case inferType env func of
-    Right (TypFunction funcInputType funcOutputType) -> 
-      case isOfType env arg funcInputType of
-        Right True -> Right funcOutputType
-        Right False -> Left ("func and arg type mismatch: func=" ++ show (TypFunction funcInputType funcOutputType) ++ ", arg=" ++ show arg)
-        Left s -> Left s
-    Right other -> Left ("Apply expects TypFunction as first arg (was " ++ show other ++ ")")
-    Left s -> Left s
+inferType env (TmAnnotation term typ) = do -- BT-Ann
+  typIsCorrect <- isOfType env term typ;
+  if typIsCorrect
+  then Right typ
+  else Left ("term: " ++ show term ++ " is not of type " ++ show typ)
 
-inferType env (TmTypeApply universalFunc typeToSubstitute) = -- BT-TApp
-  case inferType env universalFunc of
-    Right (TypUniversal typTerm superType) -> 
-      case isSubType env typeToSubstitute superType of
-        Right True -> Right (typeTypeSubstitute typeToSubstitute Z typTerm)
-        Right False -> Left ("AtRightting to apply a type to a universal type that does not accept it: universalFunc=" ++ show universalFunc ++ ", typeToSubstitute=" ++ show typeToSubstitute)
-        Left s -> Left s
-    Right other -> Left "type should be universal, since we are doing a type application"
-    Left s -> Left s
+inferType env (TmTypeAbstraction typeTerm superType) = do -- BT-TAbs
+  typeTermType <- inferType (shiftOverVarType superType env) typeTerm;
+  Right (TypUniversal typeTermType superType)
 
-inferType env (TmIsEq t1 t2) = -- BT-Eq
-  case inferType env t1 of
-    Right r1 -> case inferType env t2 of
-      Right r2 -> Right typBool
-      Left s -> Left s
-    Left s -> Left s
+inferType env (TmApply func arg) = do -- BT-App
+  funcType <- inferType env func;
+  case funcType of
+    (TypFunction funcInputType funcOutputType) -> do
+      argTypIsCorrect <- isOfType env arg funcInputType;
+      if argTypIsCorrect
+      then Right funcOutputType
+      else Left ("func and arg type mismatch: func=" ++ show (TypFunction funcInputType funcOutputType) ++ ", arg=" ++ show arg)
+    other -> Left ("Apply expects TypFunction as first arg (was " ++ show other ++ ")")
 
-inferType env (TmAnd t1 t2) = -- BT-And
-  case errorSafeAnd (infersToBool env t1) (infersToBool env t2) of
-    Right True -> Right typBool
-    Right False -> Left ("Non-Bool args to &&: (" ++ show t1 ++ ") && (" ++ show t2 ++ ")")
-    Left s -> Left s
+inferType env (TmTypeApply universalFunc typeToSubstitute) = do -- BT-TApp
+  universalFuncType <- inferType env universalFunc;
+  case universalFuncType of
+    (TypUniversal typTerm superType) -> do
+      subsTypeIsCorrect <- isSubType env typeToSubstitute superType;
+      if subsTypeIsCorrect
+      then Right (typeTypeSubstitute typeToSubstitute Z typTerm)
+      else Left ("AtRightting to apply a type to a universal type that does not accept it: universalFunc=" ++ show universalFunc ++ ", typeToSubstitute=" ++ show typeToSubstitute)
+    other -> Left "type should be universal, since we are doing a type application"
 
-inferType env (TmOr t1 t2) = -- BT-Or
-  case errorSafeAnd (infersToBool env t1) (infersToBool env t2) of
-    Right True -> Right typBool
-    Right False -> Left ("Non-Bool args to ||: (" ++ show t1 ++ ") || (" ++ show t2 ++ ")")
-    Left s -> Left s
+inferType env (TmIsEq t1 t2) = do -- BT-Eq
+  t1Typ <- inferType env t1;
+  t2Typ <- inferType env t2;
+  Right typBool
 
-inferType env (TmIf cond thn els) = -- BT-If
-  case isOfType env cond typBool of
-    Right True -> let infoOfCond = informationOf env cond in
-      case inferType (addInfoToEnv env infoOfCond) thn of
-        Right thnTyp -> case inferType (addInfoToEnv env (invert infoOfCond)) els of
-          Right elsTyp -> Right (TypUnion thnTyp elsTyp)
-          Left s -> Left s
-        Left s -> Left s
-    Right False -> Left "Condition is not of type Bool!"
-    Left s -> Left s
+inferType env (TmAnd t1 t2) = do -- BT-And
+  t1IsBool <- infersToBool env t1;
+  t2IsBool <- infersToBool env t2;
+  if t1IsBool && t2IsBool
+  then Right typBool
+  else Left ("Non-Bool args to &&: (" ++ show t1 ++ ") && (" ++ show t2 ++ ")")
+  
+inferType env (TmOr t1 t2) = do -- BT-Or
+  t1IsBool <- infersToBool env t1;
+  t2IsBool <- infersToBool env t2;
+  if t1IsBool && t2IsBool
+  then Right typBool
+  else Left ("Non-Bool args to ||: (" ++ show t1 ++ ") || (" ++ show t2 ++ ")")
+
+inferType env (TmIf cond thn els) = do -- BT-If
+  condIsBool <- isOfType env cond typBool
+  if condIsBool
+  then let infoOfCond = informationOf env cond in do
+    thnTyp <- inferType (addInfoToEnv env infoOfCond) thn;
+    elsTyp <- inferType (addInfoToEnv env (invert infoOfCond)) els;
+    Right (TypUnion thnTyp elsTyp)
+  else Left "Condition is not of type Bool!"
 
 inferType env (TmAbstraction _) = 
   Left "inferType of Abstractions is not supported"
@@ -285,10 +290,9 @@ isOfType env (TmAbstraction tm) funcTyp = -- BT-Abs
         isOfType envInAbstraction tm to
     otherwise -> Left ("isOfType of an abstraction must atRightt to check with a function type! Actual type: " ++ show funcTyp)
 
-isOfType env term typ = -- BT-Sub
-  case inferType env term of
-    Right typOfTerm -> isSubType env typOfTerm typ
-    Left s -> Left s
+isOfType env term typ = do -- BT-Sub
+  typOfTerm <- inferType env term;
+  isSubType env typOfTerm typ
 
 
 informationOf :: Env -> Term -> InformationEnv
