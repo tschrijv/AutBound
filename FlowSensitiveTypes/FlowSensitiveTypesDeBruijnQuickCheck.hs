@@ -39,9 +39,9 @@ genUnion env = do
 genBoolType :: Env -> Gen Type
 genBoolType env = suchThat (genType env) (isBool) where
   isBool :: Type -> Bool
-  isBool t = case isSubType emptyEnv t typBool of
+  isBool t = case isSubType env t typBool of
     Right b -> b
-    Left s -> error s
+    Left s -> error (s ++ " occured when calling isSubType .. typBool with " ++ show t)
 
 genRecord :: Env -> Gen Type
 genRecord env = do
@@ -49,6 +49,26 @@ genRecord env = do
   fls <- genType env;
   sel <- genBoolType env;
   return $ TypRecord tru fls sel
+
+getVarAtIndex :: TypingEnv -> Int -> Variable
+getVarAtIndex t 0 = Z
+getVarAtIndex (EnvVarType t : typEnv) i = SVarType (getVarAtIndex typEnv (i-1))
+getVarAtIndex (EnvVarValue t : typEnv) i = SVarValue (getVarAtIndex typEnv (i-1))
+getVarAtIndex [] i = error "getVarAtIndex: Index out of range"
+
+genTypeVarFromEnv :: TypingEnv -> Gen Variable
+genTypeVarFromEnv typEnv = do
+  index <- chooseInt (0, length typEnv - 1);
+  return (getVarAtIndex typEnv index)
+
+genVariable :: Env -> Gen Type
+genVariable (Env typEnv infoEnv) = 
+  if typEnv == []
+  then genType (Env [] infoEnv) -- generate something else
+  else do
+    v <- genTypeVarFromEnv typEnv;
+    return (TypVariable v)
+
 
 genBool :: Gen Type
 genBool = elements [TypTrue, TypFalse]
@@ -67,28 +87,39 @@ genOperator :: Env -> Gen Type
 genOperator env = oneof [genFunction env, genUniversal env, genUnion env, genRecord env]
 
 genType :: Env -> Gen Type
-genType env = oneof [genOperator env, genBool, genTop]
-
-
+genType env = oneof [genOperator env, genBool, genTop, genVariable env]
 
 instance Arbitrary Type
   where
     arbitrary = genType emptyEnv
 
--- >>> sample genType
+-- >>> sample (genType emptyEnv)
+-- TypTrue
+-- TypTrue
+-- Top
+-- TypFunction Top Top
 -- Top
 -- Top
--- ttrue
--- (ttrue U (Top U ttrue))
+-- TypRecord (TypUnion (TypUnion (TypUnion Top (TypRecord Top Top TypFalse)) (TypUniversal (TypUnion Top (TypVariable Z)) (TypFunction Top TypFalse))) Top) (TypRecord (TypUniversal (TypUniversal Top Top) (TypFunction TypFalse Top)) Top TypTrue) TypTrue
 -- Top
--- {true:{true:ttrue, false:({true:{true:Top, false:{true:(Top <:-> Top), false:ttrue}[tfalse]}[tfalse], false:(ttrue --> Top)}[ttrue] U ttrue)}[tfalse], false:ttrue}[tfalse]
--- ttrue
--- tfalse
--- tfalse
--- tfalse
--- {true:tfalse, false:Top}[ttrue]
+-- TypUniversal Top (TypFunction TypTrue Top)
+-- TypFunction Top (TypUnion Top TypFalse)
+-- TypUniversal (TypUniversal Top (TypUniversal TypTrue TypFalse)) (TypFunction Top Top)
 --
 
+-- >>> sample (genBoolType (Env []))
+-- TypFalse
+-- TypTrue
+-- TypTrue
+-- TypTrue
+-- TypTrue
+-- TypFalse
+-- TypFalse
+-- TypTrue
+-- TypRecord (TypUnion Top (TypFunction Top (TypRecord Top (TypUnion TypFalse TypTrue) TypTrue))) TypFalse TypFalse
+-- TypTrue
+-- TypFalse
+--
 
 quickCheckAllTypesSubTypeTop :: Type -> Bool
 quickCheckAllTypesSubTypeTop t = isSubTypeErrable emptyEnv t Top
@@ -98,7 +129,8 @@ quickCheckAllTypesSubTypeTop t = isSubTypeErrable emptyEnv t Top
 
 checkTransitiveTypeYes :: (Type, Type, Type) -> Property
 checkTransitiveTypeYes (t1, t2, t3) = 
-  isSubTypeErrable emptyEnv (traceShowId t1) (traceShowId t2) && isSubTypeErrable emptyEnv t2 (traceShowId t3) ==>
+  isSubTypeErrable emptyEnv t1 t2 && 
+  isSubTypeErrable emptyEnv t2 t3 ==>
   isSubTypeErrable emptyEnv t1 t3
 
 -- >>> quickCheck checkTransitiveTypeYes
@@ -123,6 +155,8 @@ checkTransitiveTypeYes (t1, t2, t3) =
 
 
 -- >>> quickCheck checkTransitiveTypeYes
+-- +++ OK, passed 100 tests; 381 discarded.
+--
 
 testTyp :: Type
 testTyp = TypRecord (TypUnion TypTrue TypFalse) TypFalse (TypRecord TypFalse TypTrue (TypUnion TypTrue TypTrue))
