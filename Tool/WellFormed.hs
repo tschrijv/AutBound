@@ -6,13 +6,14 @@ import GeneralTerms
 import Utility
 import Data.Maybe
 import Data.List
+import Debug.Trace
 
 --when is this syntax wellFormed : 1. when there are no duplicate constructors in the language i.e. there are no duplicate names among constructors or sorts and every sort has at the least one constructor
 --accumulates the sortnames, constructornames, and the sortnames contained in the constructors,
 --then looks up if all sortnames,namespacenames and contructornames are unique, if all sorts in the constructors exist,
 --and whether sorts and constructors and namespaces have distinct names. Also namespacenames used in sorts should exist and constructors can only use variablebindings of namespaces they can access in the sort
 wellFormed :: Language -> Either String ()
-wellFormed (namespaces, sorts, _, _, _)
+wellFormed (namespaces, sorts, rel, _, _)
   = let sortnames = map sname sorts
         consnames = concatMap (\sort -> map cname (sctors sort)) sorts
         sortconsnames = concatMap getSortsUsedByConstructors sorts
@@ -44,6 +45,7 @@ wellFormed (namespaces, sorts, _, _, _)
       helpWellFormedRulesInstances sorts instTable
       isWellFormedBindToContext sorts instTable
       helpWellFormedRulesLHSExpressions sorts instTable
+      mapM_ (\r -> wf_relation r sorts rel) rel
   where
     checkVarCtors :: SortDef -> Either String ()
     checkVarCtors (MkDefSort name ctxs ctors _) = mapM_ (
@@ -298,3 +300,238 @@ subsetOfOrError (str:strs) sorts err =
   if str `elem` sorts
     then subsetOfOrError strs sorts err
     else Left (show str ++ err)
+
+-- Environment for accumulating the types of metavariables
+data EnvItem = EnvItemSort { itemname :: SortName }
+              | EnvItemNamespace { itemname :: NamespaceName }  
+              | EnvItemVar { itemname :: SortName }
+              deriving (Show, Eq)
+type Env = [(IdenName, EnvItem)]
+
+-- Checks whether a relation is well formed. It is well formed if both the type signature and
+-- all the relation bodies are well formed.
+wf_relation :: Relation -> [SortDef] -> [Relation] -> Either String ()
+wf_relation rel sorts relations 
+  = let ts = rtypesignature rel
+        tsrelations = map (\r -> (rname r, rtypesignature r)) relations
+        name = rname rel
+    in do
+      wf_sig ts sorts tsrelations
+      mapM_ (
+        \body -> wf_relbody body ts sorts tsrelations
+        ) (rbody rel)
+
+-- Checks whether a type signature of a relation is well formed.
+-- It is well formed if:
+--     1. the given type signature corresponds (and corresponding relation name)
+--        with an element of the third argument (relations)
+--     2. all the types of the type signature are valid sorts
+wf_sig :: TypeSignatureDef -> [SortDef] -> [(RelationName, TypeSignatureDef)] -> Either String ()
+wf_sig ts sorts relations
+  = let name = tsname ts in
+      case lookup (tsname ts) relations of
+        Nothing -> Left (show name ++ "is not parsed correctly")
+        Just ts -> wf_types (tstypes ts) (snameAndCtorsList sorts)
+        Just x -> Left (show name ++ " has type signature " ++ show x ++ " while "
+                        ++ show ts ++ " was expected")
+  where
+    -- Check that the types in the type signature are valid sorts
+    wf_types :: [SortName] -> [(SortName, [ConstructorDef])] -> Either String ()
+    wf_types [] _ = return ()
+    wf_types (t:ts) sorts
+      = if (isJust (lookup t sorts))
+        then wf_types ts sorts
+        else Left (show t ++ "is not a valid type")
+
+-- Checks whether a relation body is well formed.
+-- It is well formed if:
+--    1. The judgement is well formed
+--    2. All judgements in the conditions are well formed
+wf_relbody :: RelationBodyDef -> TypeSignatureDef -> [SortDef] -> [(RelationName, TypeSignatureDef)] -> Either String ()
+wf_relbody body ts sorts relations
+  = case (wf_judgement (rjudg body) ts [] sorts relations) of
+          Left s -> Left s
+          Right env -> wf_conditions (rconditions body) env sorts relations
+
+-- Checks whether the judgements in the conditions are well formed
+wf_conditions :: [Judgement] -> Env -> [SortDef] -> [(RelationName, TypeSignatureDef)] -> Either String ()
+wf_conditions [] env _ _ = return ()
+wf_conditions (j:js) env sorts relations
+  = let name = jname j
+        ts = fromJust (lookup name relations)
+    in case (wf_judgement j ts [] sorts relations) of
+          Left s -> Left s
+          Right env' -> wf_conditions js env' sorts relations
+
+-- Checks whether a judgement is well formed.
+-- It is well formed if:
+--    1. The relation name of the judgement is the same as the relation name of the type signature
+--    2. The number of arguments is correct
+--    3. All arguments are well formed
+wf_judgement :: Judgement -> TypeSignatureDef -> Env -> [SortDef] -> [(RelationName, TypeSignatureDef)] -> Either String Env
+wf_judgement j ts env sorts relations
+  = if (jname j) == (tsname ts)
+    then check_arguments (jargs j) (tstypes ts) env sorts (tsname ts)
+    else Left ("A relation body of " ++ show (tsname ts) ++ " was expected, instead a body of " ++ show (jname j)
+          ++ "was given")
+  where
+    -- Checks whether the number of arguments are correct and whether the arguments are well formed.
+    check_arguments :: [ArgumentDef] -> [SortName] -> Env -> [SortDef] -> RelationName -> Either String Env
+    check_arguments [] [] env _ _ = Right env
+    check_arguments [] (t:ts) _ _ name = Left ("Too few arguments are supplied to " ++ show name)
+    check_arguments (x:xs) [] _ _ name = Left ("Too many arguments are supplied to " ++ show name)
+    check_arguments (x:xs) (t:ts) env sorts name 
+      = case (wf_argument x t env sorts) of
+          Left s -> Left s
+          Right env' -> check_arguments xs ts env' sorts name
+
+-- Check whether an argument is well formed.
+wf_argument :: ArgumentDef -> SortName -> Env -> [SortDef] -> Either String Env
+wf_argument (MkMetaVarArgument name) t env sorts 
+  = case lookup name env of
+      Nothing -> case (lookup t (snameAndCtorsList sorts)) of
+                    Nothing -> Right ((name, (EnvItemNamespace t)) : env)
+                    Just x -> Right ((name, (EnvItemSort t)) : env)
+      Just x -> checkSortAndNamespace t (itemname x)
+  where
+    -- Check whether actual and expected types match
+    checkSortAndNamespace :: String -> String -> Either String Env
+    checkSortAndNamespace t x = if x == t
+                                then Right env
+                                else Left (show name ++ " has conflicting types: " ++ show t ++ " and " ++ show x)
+wf_argument (MkSortArgument ctorName args) t env sorts 
+  = case (lookup t (snameAndCtorsList sorts)) of
+    Nothing -> Left (show t ++ " is not a valid sort")
+    Just ctorlist -> case (filter (\ctor -> (cname ctor) == ctorName) ctorlist) of
+                        [] -> Left (show ctorName ++ " is not a valid constructor for " ++ show t)
+                        [ctor] -> wf_sortCtor ctor t args env sorts
+                        otherwise -> Left (show ctorName ++ " is not a unique constructor for " ++ show t)
+wf_argument (MkSubstArgument a1 name a2) t env sorts = do
+  env1 <- wf_subst a1 name a2 t env sorts
+  return (removeVarItems env1)
+  where 
+    -- Remove all EnvItemVar from the environment
+    removeVarItems :: Env -> Env
+    removeVarItems [] = []
+    removeVarItems ((_, EnvItemVar{}) : xs) = removeVarItems xs
+    removeVarItems (x : xs) = x : removeVarItems xs
+
+-- Check that the construction of a sort is well formed.
+-- It is well formed if:
+--      1. The number of arguments is correct
+--      2. All the arguments of the constructor of the sort are well formed
+wf_sortCtor :: ConstructorDef -> SortName -> [ArgumentDef] -> Env -> [SortDef] -> Either String Env
+wf_sortCtor ctor@(MkDefConstructor{}) _ args env sorts = check_ctorArguments ctor args env sorts wf_argument
+wf_sortCtor ctor@(MkBindConstructor{}) _ args env sorts
+  = let id = head args
+        ns = snd (_cbinder ctor) in
+      case wf_argument id ns env sorts of
+        Left s -> Left s
+        Right env' -> check_ctorArguments ctor (tail args) env' sorts wf_argument
+wf_sortCtor ctor@(MkVarConstructor{}) sname args env sorts
+  = case args of
+      [] -> Left (show (cname ctor) ++ " has no argument while it expects one")
+      [x] -> let list = (instanceAndNamespaceList (snameAndCtxsList sorts) sname)
+                 ns = fromJust (lookup (cinst ctor) list) in
+                   wf_argument x ns env sorts
+      _ -> Left (show (cname ctor) ++ " has more than one argument while it expects one")
+
+-- Check the wellformedness of the list, foldable, regular sort and native arguments of the constructor of a sort
+check_ctorArguments :: ConstructorDef -> [ArgumentDef] -> Env -> [SortDef] -> 
+                      (ArgumentDef -> SortName -> Env -> [SortDef] -> Either String Env) -> 
+                      Either String Env
+check_ctorArguments ctor args env sorts func
+  = let listctor =  clists ctor
+        foldctor = cfolds ctor
+        sortctor = csorts ctor
+        natctor = cnatives ctor
+        lenl = length listctor
+        lenf = length foldctor
+        lens = length sortctor
+        lenn = length natctor
+        totalLength = lenl + lenf + lens + lenn
+        lenArgs = length args
+        (listargs, rest1) = splitAt lenl args
+        (foldargs, rest2) = splitAt (lenl + lenf) rest1
+        (sortargs, natargs) = splitAt (lenl + lenf + lens) rest2
+    in if totalLength == lenArgs
+        then do
+            env1 <- check_lists listctor listargs env sorts
+            env2 <- check_folds foldctor foldargs env1 sorts
+            env3 <- check_sorts sortctor sortargs env2 sorts
+            check_natives natctor natargs env3 sorts
+        else Left (show (cname ctor) ++ " has " ++ show totalLength ++ " arguments while " ++
+                    show lenArgs ++ " arguments were given")
+  where
+    -- Check the wellformedness of the list arguments of the constructor of a sort
+    check_lists :: [(IdenName, SortName)] -> [ArgumentDef] -> Env -> [SortDef] -> Either String Env
+    check_lists [] [] env _ = Right env
+    check_lists _ _ _ _ = Left ("List arguments are not supported in relations")
+
+    -- Check the wellformedness of the foldable arguments of the constructor of a sort
+    check_folds :: [(IdenName, SortName, FoldName)] -> [ArgumentDef] -> Env -> [SortDef] -> Either String Env
+    check_folds [] [] env _ = Right env
+    check_folds _ _ _ _ = Left ("Foldable arguments are not supported in relations")
+
+    -- Check the wellformedness of the regular sort arguments of the constructor of a sort
+    check_sorts :: [(IdenName, SortName)] -> [ArgumentDef] -> Env -> [SortDef] -> Either String Env
+    check_sorts [] [] env _ = Right env
+    check_sorts ((_,x):xs) (y:ys) env sorts 
+      = case func y x env sorts of
+          Left s -> Left s
+          Right env' -> check_sorts xs ys env' sorts
+    check_sorts [] _ _ _ = Left "" -- This case cannot occur, but ghc doesn't know that
+    
+    -- Check the wellformedness of the native arguments of the constructor of a sort
+    check_natives :: [HaskellTypeName] -> [ArgumentDef] -> Env -> [SortDef] -> Either String Env
+    check_natives [] [] env _ = Right env
+    check_natives _ _ _ _ = Left ("Native types in arguments are not supported in relations")
+
+-- Check whether a substitution argument is well formed.
+wf_subst :: ArgumentDef -> IdenName -> ArgumentDef -> SortName -> Env -> [SortDef] -> Either String Env
+wf_subst a1@(MkMetaVarArgument name) x a2 t env sorts = wf_argument a1 t env sorts
+wf_subst a1@(MkSortArgument ctorName args) x a2 t env sorts 
+  = let ctorlist = fromJust (lookup t (snameAndCtorsList sorts)) in
+      case (filter (\ctor -> (cname ctor) == ctorName) ctorlist) of
+          [] -> Left (show ctorName ++ " is not a valid constructor for " ++ show t)
+          [ctor] -> wf_substCtor ctor x a2 t args env sorts
+          otherwise -> Left (show ctorName ++ " is not a unique constructor for " ++ show t)
+wf_subst a1@(MkSubstArgument a11 y a12) x a2 t1 env sorts = do
+  env1 <- wf_subst a11 y a12 t1 env sorts
+  case lookup y env1 of
+    Nothing -> wf_subst a11 x a2 t1 env1 sorts
+    Just (EnvItemVar t2) -> do env2 <- wf_subst a12 x a2 t2 env1 sorts
+                               wf_subst a11 x a2 t1 env2 sorts
+    Just _ -> Left ("Ambiguous occurence of " ++ show y)
+
+-- Check that the construction of a sort is well formed within a substitution
+-- It is well formed if:
+--      1. The number of arguments is correct
+--      2. All the arguments of the constructor of the sort are well formed within the substitution
+wf_substCtor :: ConstructorDef -> IdenName -> ArgumentDef -> SortName -> [ArgumentDef] -> Env -> [SortDef] -> Either String Env
+wf_substCtor ctor@(MkDefConstructor{}) x a2 _ args env sorts = check_ctorArguments ctor args env sorts (\a1 t env' sorts' -> wf_subst a1 x a2 t env' sorts')
+wf_substCtor ctor@(MkBindConstructor{}) x a2 _ args env sorts
+  = let id = head args
+        ns = snd (_cbinder ctor) in
+      do env1 <- wf_subst id x a2 ns env sorts
+         check_ctorArguments ctor (tail args) env1 sorts (\a1 t env2 sorts' -> wf_subst a1 x a2 t env2 sorts')
+wf_substCtor ctor@(MkVarConstructor{}) x a2 t args env sorts
+  = case args of
+      [] -> Left (show (cname ctor) ++ " has no argument while it expects one")
+      [(MkMetaVarArgument y)] -> if y == x
+                                  then case lookup x env of
+                                          Nothing -> do env' <- wf_argument a2 t env sorts
+                                                        return ((x, EnvItemVar t) : env')
+                                          Just (EnvItemVar t') -> if t == t'
+                                                    then do env' <- wf_argument a2 t env sorts
+                                                            return ((x, EnvItemVar t) : env')
+                                                    else Left ("Variable " ++ show x ++ " has conflicting types: " ++ 
+                                                                  show t ++ " and " ++ show t')
+                                          Just _ -> Left ("Ambiguous occurence of " ++ show x)
+                                  else Right env
+      [(MkSortArgument{})] -> Left (show (cname ctor) ++ " cannot have a sort argument")
+      [(MkSubstArgument{})] -> Left (show (cname ctor) ++ " cannot have a substitution argument")
+      _ -> Left (show (cname ctor) ++ " has more than one argument while it expects one")
+
+
+        

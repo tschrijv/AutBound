@@ -3,7 +3,7 @@ namespace TermVar: Term
 sort Term
     inh ctx TermVar
     | Var (x@ctx)
-    | Lam (t: Term) [x: TermVar]
+    | Abs (t: Term) [x: TermVar]
         t.ctx = lhs.ctx, x
     | App (t1: Term) (t2: Term)
     | Prod (t1: Term) (t2: Term)

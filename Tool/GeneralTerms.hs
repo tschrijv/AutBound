@@ -123,6 +123,7 @@ data Relation
 
 data TypeSignatureDef
   = MkTypeSignature {
+    tsname          :: RelationName,
     tstypes         :: [SortName],
     tsrelationtype  :: RelationType
   }
@@ -133,7 +134,7 @@ data RelationType
 
 data RelationBodyDef
   = MkRelationBody {
-    rargs       :: [ArgumentDef],
+    rjudg       :: Judgement,
     rconditions :: [Judgement]
   }
   deriving (Show, Eq)
@@ -148,7 +149,6 @@ data Judgement
 data ArgumentDef
   = MkMetaVarArgument IdenName
   | MkSortArgument ConstructorName [ArgumentDef]
-  | MkJudgementArgument Judgement
   | MkSubstArgument ArgumentDef IdenName ArgumentDef
   deriving (Show, Eq)
 

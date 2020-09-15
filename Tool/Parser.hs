@@ -331,18 +331,18 @@ pAllRelations = do
 pRelation :: Parser Relation
 pRelation = do
   name <- pIdentifier
-  ts <- pTypeSignature
+  ts <- pTypeSignature name
   b <- many (try pRelationBody)
   if null b then (error (name ++ " misses a body"))
   else return (MkRelation name ts b)
 
 -- | Parse the type signature of a relation
-pTypeSignature :: Parser TypeSignatureDef
-pTypeSignature = do
+pTypeSignature :: RelationName -> Parser TypeSignatureDef
+pTypeSignature name = do
   pReservedOp ":"
   types <- many (try pType)
   reltype <- pRelationType
-  return (MkTypeSignature types reltype)
+  return (MkTypeSignature name types reltype)
 
 -- | Parse one type and the following "->"
 pType :: Parser SortName
@@ -362,19 +362,18 @@ pRelationType = do
 -- | Parse the body of the relation
 pRelationBody :: Parser RelationBodyDef
 pRelationBody = do
-  pIdentifier
+  name <- pIdentifier
   args <- many (try pRelationArgument)
   conds <- pConditionDecl
   pReservedOp "."
-  return (MkRelationBody args conds)
+  return (MkRelationBody (MkJudgement name args) conds)
 
 -- | Parse one argument of the relation body
 pRelationArgument :: Parser ArgumentDef
 pRelationArgument =
   try pSubstArgument <|>
     try pSortArgument <|>
-      try pJudgmentArgument <|>
-        pMetaVarArgument
+      pMetaVarArgument
 
 -- | Parse a substitution argument
 pSubstArgument :: Parser ArgumentDef
@@ -397,13 +396,6 @@ pSortArgument =
             args <- many (try pRelationArgument)
             return (MkSortArgument ctorName args)
       else error "Sort constructor must begin with uppercase"
-
--- | Parse a judgement argument  
-pJudgmentArgument :: Parser ArgumentDef
-pJudgmentArgument =
-  pParens $ do
-    j <- pJudgement
-    return (MkJudgementArgument j)
 
 -- | Parse a judgement
 pJudgement :: Parser Judgement

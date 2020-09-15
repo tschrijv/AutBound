@@ -69,6 +69,23 @@ filterCtxsByNamespace namespace contextsBySortName = [
 snameAndCtxs :: SortDef -> (SortName, [Context])
 snameAndCtxs s = (sname s, sctxs s)
 
+-- Return a list of tuples where the first element in the tuple is the sort name
+-- and the second element is a list of constructors belonging to that sort
+snameAndCtorsList :: [SortDef] -> [(SortName, [ConstructorDef])]
+snameAndCtorsList s = map (\sort -> (sname sort, sctors sort)) s
+
+-- Return a list of tuples where the first element in the tuple is the sort name
+-- and the second element is a list of contexts belonging to that sort
+snameAndCtxsList :: [SortDef] -> [(SortName, [Context])]
+snameAndCtxsList = map snameAndCtxs
+
+-- Get a list of tuples containing the instance names and their corresponding namespace name
+-- of the sort with the given sort name
+instanceAndNamespaceList :: [(SortName, [Context])] -> SortName -> [(InstanceName, NamespaceName)]
+instanceAndNamespaceList ctxs sname 
+  = let ctx = fromJust (lookup sname ctxs) in
+      map (\c -> (xinst c, xnamespace c)) ctx
+
 -- | Looks up the sort name for a given identifier in a constructor
 sortNameForIden :: IdenName -> ConstructorDef -> SortName
 sortNameForIden iden ctor = fromJust (lookup iden (dropFold (cfolds ctor) ++ clists ctor ++ csorts ctor))
