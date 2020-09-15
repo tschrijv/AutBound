@@ -89,36 +89,39 @@ genOperator env = oneof [genFunction env, genUniversal env, genUnion env, genRec
 genType :: Env -> Gen Type
 genType env = oneof [genOperator env, genBool, genTop, genVariable env]
 
+--genEnv :: Env -> Gen Env
+--genEnv parentEnv = 
+
 instance Arbitrary Type
   where
     arbitrary = genType emptyEnv
 
 -- >>> sample (genType emptyEnv)
--- TypTrue
--- TypTrue
 -- Top
--- TypFunction Top Top
+-- {true:Top, false:(Top --> {true:{true:Top, false:ttrue}[tfalse], false:tfalse}[{true:Top, false:ttrue}[tfalse]])}[ttrue]
+-- {true:Top, false:{true:(Top U Top), false:Top}[tfalse]}[ttrue]
 -- Top
+-- ttrue
 -- Top
--- TypRecord (TypUnion (TypUnion (TypUnion Top (TypRecord Top Top TypFalse)) (TypUniversal (TypUnion Top (TypVariable Z)) (TypFunction Top TypFalse))) Top) (TypRecord (TypUniversal (TypUniversal Top Top) (TypFunction TypFalse Top)) Top TypTrue) TypTrue
+-- tfalse
 -- Top
--- TypUniversal Top (TypFunction TypTrue Top)
--- TypFunction Top (TypUnion Top TypFalse)
--- TypUniversal (TypUniversal Top (TypUniversal TypTrue TypFalse)) (TypFunction Top Top)
+-- tfalse
+-- {true:{true:(ttrue U ((Top U ttrue) <:-> (Top U Top))), false:{true:Top, false:ttrue}[tfalse]}[ttrue], false:tfalse}[{true:tfalse, false:tfalse}[ttrue]]
+-- tfalse
 --
 
--- >>> sample (genBoolType (Env []))
--- TypFalse
--- TypTrue
--- TypTrue
--- TypTrue
--- TypTrue
--- TypFalse
--- TypFalse
--- TypTrue
--- TypRecord (TypUnion Top (TypFunction Top (TypRecord Top (TypUnion TypFalse TypTrue) TypTrue))) TypFalse TypFalse
--- TypTrue
--- TypFalse
+-- >>> sample (genBoolType emptyEnv)
+-- tfalse
+-- tfalse
+-- ttrue
+-- tfalse
+-- ttrue
+-- tfalse
+-- ttrue
+-- tfalse
+-- {true:ttrue, false:Top}[ttrue]
+-- ttrue
+-- tfalse
 --
 
 quickCheckAllTypesSubTypeTop :: Type -> Bool
@@ -131,7 +134,72 @@ checkTransitiveTypeYes :: (Type, Type, Type) -> Property
 checkTransitiveTypeYes (t1, t2, t3) = 
   isSubTypeErrable emptyEnv t1 t2 && 
   isSubTypeErrable emptyEnv t2 t3 ==>
-  isSubTypeErrable emptyEnv t1 t3
+  isSubTypeErrable emptyEnv (traceShowId t1) (traceShowId t3)
+
+checkReflexiveType :: Type -> Bool
+checkReflexiveType t = isSubTypeErrable emptyEnv t t
+
+-- >>> quickCheck checkReflexiveType
+-- +++ OK, passed 100 tests.
+--
+
+badTerm = TypUniversal (TypUnion (TypVariable Z) TypTrue) Top
+
+badTerm2 = TypUnion (TypVariable Z) TypTrue
+
+badTerm3 = TypVariable Z
+
+isBad = TypUnion TypTrue TypFalse
+
+-- >>> badTerm
+-- (∀ t_ <: Top . (t_ U ttrue))
+--
+
+-- >>> isSubType emptyEnv badTerm badTerm
+-- Right True
+--
+
+-- >>> badTerm2
+-- (t_ U ttrue)
+--
+
+oneTypeEnv = Env [EnvVarType Top] emptyInfoEnv
+
+-- >>> isSubType oneTypeEnv t_ (TypUnion t_ TypTrue)
+-- t_
+-- t_
+-- ttrue
+-- True
+-- Right True
+--
+
+-- >>> isSubType oneTypeEnv t_ TypTrue
+-- Right False
+--
+
+-- >>> False || True
+-- True
+--
+
+-- >>> isSubType oneTypeEnv t_ t_
+-- Right True
+--
+
+-- >>> isSubType oneTypeEnv badTerm2 badTerm2
+-- Right False
+--
+
+-- >>> isSubType oneTypeEnv badTerm3 badTerm3
+-- Right True
+--
+
+-- >>> isSubType emptyEnv isBad isBad
+-- Right True
+--
+
+
+-- (Top <:-> (t_ U ttrue))
+--
 
 -- >>> quickCheck checkTransitiveTypeYes
 -- *** Failed! Falsified (after 14 tests):

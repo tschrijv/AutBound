@@ -3,7 +3,7 @@ import FlowSensitiveTypesDeBruijnBase
 import FlowSensitiveTypesDeBruijnShow
 
 import qualified Data.Map
-
+import Debug.Trace
 
 eval :: Term -> Either String Term
 eval (TmApply func arg) = case eval func of -- E-AppAbs E-App1 E-App2
@@ -55,8 +55,13 @@ type InformationEnv = Data.Map.Map Variable (Bool, Bool)
 
 data Env = Env TypingEnv InformationEnv
 
+emptyTypEnv :: TypingEnv
+emptyTypEnv = []
+emptyInfoEnv :: InformationEnv
+emptyInfoEnv = Data.Map.empty
+
 emptyEnv :: Env
-emptyEnv = Env [] Data.Map.empty
+emptyEnv = Env emptyTypEnv emptyInfoEnv
 
 getItemFromEnv :: Variable -> TypingEnv -> Either String EnvItem
 getItemFromEnv Z (item:_) = Right item
@@ -134,9 +139,6 @@ isSubType env a b@(TypRecord tru fls select) = do -- SA-TEvalWrite
   if hasSimplified
   then isSubType env a teB
   else Right False
-isSubType env (TypVariable v) superType = do -- SA-TransTVar
-  vType <- getVarTypeFromEnv v env;
-  isSubType env vType superType
 isSubType env (TypFunction s1 s2) (TypFunction t1 t2) = do -- SA-Arrow
   t1Subs1 <- isSubType env t1 s1;
   t2Subs2 <- isSubType env t2 s2;
@@ -145,7 +147,7 @@ isSubType env (TypUniversal s ua) (TypUniversal t ub) = do -- SA-All
   abEqual <- typesAreEqual env ua ub;
   sSubT <- isSubType (shiftOverVarType ua env) s t;
   Right (abEqual && sSubT)-- For S-ALL, if the supertypes of the Universals are not equal, then one cannot be a subtype of the other
-isSubType env (TypUnion l r) t = do -- SA-UnionN
+isSubType env (TypUnion l r) t = do -- SA-UnionM
   lSubT <- isSubType env l t;
   rSubT <- isSubType env r t;
   Right (lSubT && rSubT)
@@ -154,6 +156,9 @@ isSubType env t (TypUnion l r) = do -- SA-UnionLR
   tSubR <- isSubType env t r;
   Right (tSubL || tSubR)
  -- Custom rules for testing
+isSubType env (TypVariable v) superType = do -- SA-TransTVar
+  vType <- getVarTypeFromEnv v env; -- moved to back because early unpacking was interfering with UnionLR and UnionM
+  isSubType env vType superType
 isSubType env (Typ "TestSubTyp") (Typ "TestSuperTyp") = Right True
 isSubType env (Typ a) (Typ b) =
   Right (a == b)
