@@ -221,8 +221,7 @@ Judgement ::=					judgements:
 Argument ::=					arguments:
 		A				   		metavariable
 		C Argument*			   		constructor sort with its parameters
-		Judgement			   		relation with its parameters
-		A[x -> Argument]		   		substitution
+		Argument[x -> Argument]		   		substitution
  ```
  where `N` is the name of a relation, `S` is the name of an existing sort, `C` is a constructor of a sort, `x` is a variable name and `A` is a metavariable.
 
