@@ -1,0 +1,28 @@
+namespace TermVar: Term
+
+sort Term
+    inh ctx TermVar
+    | Var (x@ctx)
+    | Abs (t: Term) [x: TermVar]
+        t.ctx = lhs.ctx, x
+    | App (t1: Term) (t2: Term)
+    | Prod (t1: Term) (t2: Term)
+    | Let (p: Pat) (t1: Term) (t2: Term)
+        p.ictx = lhs.ctx
+        t2.ctx = p.sctx
+
+sort Pat
+    inh ictx TermVar
+    syn sctx TermVar
+    | PVar [x: TermVar]
+        lhs.sctx = lhs.ictx, x
+    | PProd (p1: Pat) (p2: Pat)
+        p1.ictx = lhs.ictx
+        p2.ictx = p1.sctx
+        lhs.sctx = p2.sctx
+
+
+Relations
+
+opsem : Term -> Term -> o
+opsem (App (Abs x T1) V2) (x[x -> (PVar y)]).
