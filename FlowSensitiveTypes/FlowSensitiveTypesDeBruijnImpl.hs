@@ -129,16 +129,6 @@ isSubType env a@(TypRecord tru1 fls1 select1) b@(TypRecord tru2 fls2 select2) = 
     if hasSimplified
     then isSubType env teA b
     else Right False
-isSubType env a@(TypRecord tru fls select) b = do -- SA-TEvalRead
-  (hasSimplified, teA) <- typeEval a EvalRead env;
-  if hasSimplified
-  then isSubType env teA b
-  else Right False
-isSubType env a b@(TypRecord tru fls select) = do -- SA-TEvalWrite
-  (hasSimplified, teB) <- typeEval b EvalWrite env
-  if hasSimplified
-  then isSubType env a teB
-  else Right False
 isSubType env (TypFunction s1 s2) (TypFunction t1 t2) = do -- SA-Arrow
   t1Subs1 <- isSubType env t1 s1;
   t2Subs2 <- isSubType env t2 s2;
@@ -156,6 +146,16 @@ isSubType env t (TypUnion l r) = do -- SA-UnionLR
   tSubR <- isSubType env t r;
   Right (tSubL || tSubR)
  -- Custom rules for testing
+isSubType env a@(TypRecord tru fls select) b = do -- SA-TEvalRead
+  (hasSimplified, teA) <- typeEval a EvalRead env;
+  if hasSimplified
+  then isSubType env teA b
+  else Right False
+isSubType env a b@(TypRecord tru fls select) = do -- SA-TEvalWrite
+  (hasSimplified, teB) <- typeEval b EvalWrite env
+  if hasSimplified
+  then isSubType env a teB
+  else Right False
 isSubType env (TypVariable v) superType = do -- SA-TransTVar
   vType <- getVarTypeFromEnv v env; -- moved to back because early unpacking was interfering with UnionLR and UnionM
   isSubType env vType superType
@@ -201,11 +201,26 @@ typeEval (TypUnion l r) m env = do -- TE-Union
   (br, rr) <- typeEval r m env;
   Right (bl || br, TypUnion ll rr)
 
-typeEval (TypVariable v) EvalRead env = do
+typeEval (TypVariable v) EvalRead env = do -- TE-TVarRead
   var <- getVarTypeFromEnv v env;
   Right (True, var)
-typeEval (TypVariable v) EvalWrite env = undefined
+typeEval (TypVariable v) EvalWrite env@(Env typEnv infoEnv) =  -- TE-TVarWrite
+  case getSinglyDefinedVarFromEnv infoEnv v of
+    Nothing -> Right (False, TypVariable v)
+    Just result -> do
+      (b, evalledResult) <- typeEval result EvalWrite env;
+      Right (True, evalledResult)
 typeEval t m env = Right (False, t) -- typeEval on non evaluatable type, returns that it has not changed it's input
+
+getSinglyDefinedVarFromEnv :: InformationEnv -> Variable -> Maybe Type
+getSinglyDefinedVarFromEnv infoEnv v = case Data.Map.lookup v infoEnv of
+  Nothing -> Nothing
+  Just info -> case info of
+    (True, False) -> Just TypFalse
+    (False, True) -> Just TypTrue
+    (True, True) -> Nothing
+    (False, False) -> Nothing
+    
 
 -- TODO variables?
 

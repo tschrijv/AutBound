@@ -30,7 +30,7 @@ prettyTerm TmFalse = "TmFalse"
 prettyType :: Type -> String
 prettyType (TypVariable v) = "t_" ++ prettyVar v
 prettyType (TypFunction from to) = "(" ++ prettyType from ++ " --> " ++ prettyType to ++ ")"
-prettyType (TypUniversal on superType) = "(" ++ prettyType superType ++ " <:-> " ++ prettyType on ++ ")"
+prettyType (TypUniversal on superType) = "(∀ t_ <: " ++ prettyType superType ++ " . " ++ prettyType on ++ ")"
 prettyType (TypUnion a b) = "(" ++ prettyType a ++ " U " ++ prettyType b ++ ")"
 prettyType (TypRecord tru fls selector) = "{true:" ++ prettyType tru ++ ", false:" ++ prettyType fls ++ "}[" ++ prettyType selector ++ "]"
 prettyType Top = "Top"

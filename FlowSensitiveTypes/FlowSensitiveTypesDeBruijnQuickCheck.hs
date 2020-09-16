@@ -134,14 +134,39 @@ checkTransitiveTypeYes :: (Type, Type, Type) -> Property
 checkTransitiveTypeYes (t1, t2, t3) = 
   isSubTypeErrable emptyEnv t1 t2 && 
   isSubTypeErrable emptyEnv t2 t3 ==>
-  isSubTypeErrable emptyEnv (traceShowId t1) (traceShowId t3)
+  isSubTypeErrable emptyEnv t1 t3
 
 checkReflexiveType :: Type -> Bool
 checkReflexiveType t = isSubTypeErrable emptyEnv t t
 
--- >>> quickCheck checkReflexiveType
--- +++ OK, passed 100 tests.
+-- >>> quickCheckWith stdArgs { maxSuccess = 5000 } checkReflexiveType
+-- *** Failed! (after 672 tests):
+-- Exception:
+--   Prelude.undefined
+--   CallStack (from HasCallStack):
+--     error, called at libraries/base/GHC/Err.hs:79:14 in base:GHC.Err
+--     undefined, called at /home/lennart/Desktop/AutBound/FlowSensitiveTypes/FlowSensitiveTypesDeBruijnImpl.hs:207:42 in main:FlowSensitiveTypesDeBruijnImpl
+-- (∀ t_ <: Top . (Top U {true:t_, false:t_}[ttrue]))
 --
+
+typeHitsUndefined = TypUniversal (TypUnion Top (TypRecord t_ t_ TypTrue)) Top
+
+-- >>> typeHitsUndefined
+-- (∀ t_ <: Top . (Top U {true:t_, false:t_}[ttrue]))
+--
+
+-- >>> TypUniversal (TypFunction t_ t_) Top
+-- (∀ t_ <: Top . (t_ --> t_))
+--
+
+
+-- >>> isSubType emptyEnv typeHitsUndefined typeHitsUndefined
+-- Right True
+--
+
+-- >>> quickCheckWith stdArgs { maxSuccess = 5000 } checkReflexiveType
+-- *** Failed! Falsified (after 20 tests):
+-- (∀ t_ <: (tfalse --> Top) . ({true:t_, false:t_}[(tfalse U tfalse)] U tfalse))
 
 badTerm = TypUniversal (TypUnion (TypVariable Z) TypTrue) Top
 
@@ -201,6 +226,79 @@ oneTypeEnv = Env [EnvVarType Top] emptyInfoEnv
 -- (Top <:-> (t_ U ttrue))
 --
 
+
+-- >>> quickCheckWith stdArgs { maxSuccess = 5000 } checkReflexiveType
+-- *** Failed! Falsified (after 451 tests):
+-- (∀ t_ <: Top . (t_ U {true:t_, false:(∀ t_ <: tfalse . t_t)}[ttrue]))
+--
+
+-- (∀ t_ <: Top . (t_ U {true:t_, false:(∀ t_ <: tfalse . t_t)}[ttrue]))
+failingRefl = TypUniversal failingRefl2 Top
+
+failingRefl2 = TypUnion t_ failingRefl3
+
+failingRefl3 = TypRecord t_ (TypUniversal t_t TypFalse) TypTrue
+
+failingReflHypot = TypUniversal failingReflHypotSmaller Top
+
+failingReflHypotSmaller = TypUnion t_ (TypRecord t_ Top TypTrue)
+
+--failingReflHypot2 = TypUniversal ((TypRecord t_ Top TypTrue)) Top
+
+--failingReflHypot3 = TypUniversal (TypUnion t_ t_) Top
+
+-- >>> failingRefl
+-- (∀ t_ <: Top . (t_ U {true:t_, false:(∀ t_ <: tfalse . t_t)}[ttrue]))
+--
+
+-- >>> failingRefl3
+-- {true:t_, false:(∀ t_ <: tfalse . t_t)}[ttrue]
+--
+
+-- >>> isSubType emptyEnv failingRefl failingRefl
+-- Right True
+--
+
+-- >>> isSubType emptyEnv failingReflHypot failingReflHypot
+-- Right False
+--
+
+-- >>> isSubType emptyEnv failingReflHypot2 failingReflHypot2
+-- Right True
+--
+
+-- >>> isSubType emptyEnv failingReflHypot3 failingReflHypot3
+-- Right True
+--
+
+-- >>> isSubType oneTypeEnv failingReflHypotSmaller failingReflHypotSmaller
+-- Right True
+--
+
+-- >>> isSubType oneTypeEnv t_ (TypUnion t_ (TypRecord t_ Top TypTrue))
+-- Right True
+--
+-- >>> isSubType oneTypeEnv (TypRecord t_ Top TypTrue) (TypUnion t_ (TypRecord t_ Top TypTrue))
+-- Right True
+--
+
+-- >>> isSubType oneTypeEnv (TypRecord t_ Top TypTrue) (TypRecord t_ Top TypTrue)
+-- Right True
+--
+
+-- >>> isSubType oneTypeEnv failingRefl2 failingRefl2
+-- Right False
+--
+
+-- >>> isSubType oneTypeEnv failingRefl3 failingRefl3
+-- Right True
+--
+
+-- >>> quickCheckWith stdArgs { maxSuccess = 5000 } checkReflexiveType
+-- +++ OK, passed 5000 tests.
+--
+
+
 -- >>> quickCheck checkTransitiveTypeYes
 -- *** Failed! Falsified (after 14 tests):
 -- (ttrue,Top,{true:ttrue, false:Top}[tfalse])
@@ -222,8 +320,8 @@ oneTypeEnv = Env [EnvVarType Top] emptyInfoEnv
 -- (ttrue,{true:(ttrue U tfalse), false:tfalse}[{true:tfalse, false:ttrue}[(ttrue U ttrue)]],Top)
 
 
--- >>> quickCheck checkTransitiveTypeYes
--- +++ OK, passed 100 tests; 381 discarded.
+-- >>> quickCheckWith stdArgs { maxSuccess = 5000 } checkTransitiveTypeYes
+-- +++ OK, passed 5000 tests; 16979 discarded.
 --
 
 testTyp :: Type
